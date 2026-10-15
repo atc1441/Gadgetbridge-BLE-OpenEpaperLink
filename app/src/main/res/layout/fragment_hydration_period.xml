@@ -1,0 +1,48 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/hydration_date_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="10dp"
+            android:gravity="center"
+            android:textColor="?attr/textColorPrimary"
+            android:textSize="20sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="250sp">
+
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
+                android:id="@+id/hydration_chart"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="2" />
+        </LinearLayout>
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+            android:id="@+id/hydration_chart_legend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+
+        <LinearLayout
+            android:id="@+id/hydration_period_stats_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
+            android:layout_marginTop="@dimen/chart_section_spacing"
+            android:layout_marginEnd="15dp"
+            android:layout_marginBottom="15dp"
+            android:orientation="vertical" />
+    </LinearLayout>
+
+</ScrollView>

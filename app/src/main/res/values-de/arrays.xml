@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+    Copyright (C) 2026 Gadgetbridge contributors
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<resources>
+    <!-- OEPL weather display: the lists whose entries are words rather than numbers -->
+    <string-array name="oepl_weather_accent">
+        <item>@string/oepl_weather_accent_auto</item>
+        <item>Rot</item>
+        <item>Gelb</item>
+    </string-array>
+    <string-array name="oepl_weather_forecast_days">
+        <item>keine</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="oepl_weather_update_interval">
+        <item>5 Minuten</item>
+        <item>10 Minuten</item>
+        <item>15 Minuten</item>
+        <item>30 Minuten</item>
+        <item>1 Stunde</item>
+        <item>2 Stunden</item>
+        <item>4 Stunden</item>
+        <item>12 Stunden</item>
+    </string-array>
+    <string-array name="oepl_weather_connect_window">
+        <item>10 Sekunden</item>
+        <item>20 Sekunden</item>
+        <item>30 Sekunden</item>
+        <item>45 Sekunden</item>
+        <item>60 Sekunden</item>
+    </string-array>
+</resources>

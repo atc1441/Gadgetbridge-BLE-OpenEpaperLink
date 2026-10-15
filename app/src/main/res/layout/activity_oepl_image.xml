@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+    Copyright (C) 2026 Gadgetbridge contributors
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/oepl_image_preview_title"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/oepl_image_preview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:adjustViewBounds="true"
+                    android:background="#ffffff"
+                    android:contentDescription="@string/oepl_image_preview_title"
+                    android:padding="3dp"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/oepl_image_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/oepl_image_choose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/oepl_image_choose" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/pref_oepl_weather_image_dither_title"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/oepl_image_dither"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/oepl_image_dither_diffusion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_dither_diffusion" />
+
+            <RadioButton
+                android:id="@+id/oepl_image_dither_ordered"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_dither_ordered" />
+
+            <RadioButton
+                android:id="@+id/oepl_image_dither_none"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_dither_none" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/pref_oepl_weather_image_fit_title"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/oepl_image_fit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/oepl_image_fit_contain"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_fit_contain" />
+
+            <RadioButton
+                android:id="@+id/oepl_image_fit_cover"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_fit_cover" />
+
+            <RadioButton
+                android:id="@+id/oepl_image_fit_stretch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/oepl_image_fit_stretch" />
+        </RadioGroup>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/oepl_image_use"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/oepl_image_use" />
+    </LinearLayout>
+</ScrollView>

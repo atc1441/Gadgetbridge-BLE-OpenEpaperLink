@@ -1,0 +1,63 @@
+name: Build and test
+
+# Pull requests and branches other than the default one are built and tested, but nothing is
+# released from them.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare the Android SDK
+        run: |
+          sdk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$manager" ]; then
+            yes | "$manager" --licenses > /dev/null 2>&1 || true
+            "$manager" "platforms;android-37" "build-tools;36.0.0" > /dev/null || true
+          fi
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testMainlineDebugUnitTest
+
+      - name: Build the APK
+        run: ./gradlew --no-daemon assembleMainlineNopebble
+
+      - name: Keep the drawing previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-previews
+          path: |
+            app/build/oepl-gallery/
+            app/build/oepl-preview/
+          if-no-files-found: ignore
+
+      - name: Keep the test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore

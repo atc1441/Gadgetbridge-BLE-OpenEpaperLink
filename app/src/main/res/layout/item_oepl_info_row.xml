@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingBottom="3dp"
+    android:paddingTop="3dp">
+
+    <TextView
+        android:id="@+id/oepl_info_row_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="4"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/oepl_info_row_value"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="6"
+        android:gravity="end"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</LinearLayout>

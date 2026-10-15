@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The display has one job at a time, and each kind of card reads only a handful of these
+    options. The content picker therefore sits on its own at the top, and every group below it is
+    a sub-menu that ATCBLEOEPLWeatherSettingsCustomizer hides while the selected card would not
+    read a single setting inside it.
+-->
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <Preference
+        android:key="pref_oepl_weather_info"
+        android:title="@string/pref_oepl_weather_info_title"
+        android:summary="@string/pref_oepl_weather_info_summary" />
+
+    <PreferenceCategory android:title="@string/pref_oepl_weather_category_content">
+        <Preference
+            android:key="pref_oepl_weather_pick_design"
+            android:title="@string/pref_oepl_weather_pick_design_title"
+            android:summary="@string/pref_oepl_weather_pick_design_summary" />
+
+        <ListPreference
+            android:defaultValue="oepl_4"
+            android:entries="@array/oepl_weather_content"
+            android:entryValues="@array/oepl_weather_content_values"
+            android:key="pref_oepl_weather_content"
+            android:title="@string/pref_oepl_weather_content_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_weather"
+            android:title="@string/pref_oepl_weather_screen_weather">
+            <ListPreference
+                android:defaultValue="openmeteo"
+                android:entries="@array/oepl_weather_source"
+                android:entryValues="@array/oepl_weather_source_values"
+                android:key="pref_oepl_weather_source"
+                android:title="@string/pref_oepl_weather_source_title"
+                app:useSimpleSummaryProvider="true" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_location"
+                android:title="@string/pref_oepl_weather_location_title"
+                android:summary="@string/pref_oepl_weather_location_summary"
+                android:dialogTitle="@string/pref_oepl_weather_location_title" />
+            <ListPreference
+                android:defaultValue="3"
+                android:entries="@array/oepl_weather_forecast_days"
+                android:entryValues="@array/oepl_weather_forecast_days_values"
+                android:key="pref_oepl_weather_forecast_days"
+                android:title="@string/pref_oepl_weather_forecast_days_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="12"
+                android:entries="@array/oepl_weather_forecast_hours"
+                android:entryValues="@array/oepl_weather_forecast_hours_values"
+                android:key="pref_oepl_weather_forecast_hours"
+                android:title="@string/pref_oepl_weather_forecast_hours_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="beaufort"
+                android:entries="@array/oepl_weather_wind_unit"
+                android:entryValues="@array/oepl_weather_wind_unit_values"
+                android:key="pref_oepl_weather_wind_unit"
+                android:title="@string/pref_oepl_weather_wind_unit_title"
+                app:useSimpleSummaryProvider="true" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="pref_oepl_weather_show_sun"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_oepl_weather_show_sun_title"
+                android:summary="@string/pref_oepl_weather_show_sun_summary" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_calendar"
+            android:title="@string/pref_oepl_weather_screen_calendar">
+            <ListPreference
+                android:defaultValue="4"
+                android:entries="@array/oepl_weather_calendar_events"
+                android:entryValues="@array/oepl_weather_calendar_events_values"
+                android:key="pref_oepl_weather_calendar_events"
+                android:title="@string/pref_oepl_weather_calendar_events_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="3"
+                android:entries="@array/oepl_weather_calendar_days"
+                android:entryValues="@array/oepl_weather_calendar_days_values"
+                android:key="pref_oepl_weather_calendar_days"
+                android:title="@string/pref_oepl_weather_calendar_days_title"
+                app:useSimpleSummaryProvider="true" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_calendar_title"
+                android:title="@string/pref_oepl_weather_calendar_title_title"
+                android:dialogTitle="@string/pref_oepl_weather_calendar_title_title" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_feed"
+            android:title="@string/pref_oepl_weather_screen_feed">
+            <EditTextPreference
+                android:key="pref_oepl_weather_rss_url"
+                android:title="@string/pref_oepl_weather_rss_url_title"
+                android:summary="@string/pref_oepl_weather_rss_url_summary"
+                android:dialogTitle="@string/pref_oepl_weather_rss_url_title" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_rss_title"
+                android:title="@string/pref_oepl_weather_rss_title_title"
+                android:dialogTitle="@string/pref_oepl_weather_rss_title_title" />
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="pref_oepl_weather_rss_summary"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_oepl_weather_rss_summary_title"
+                android:summary="@string/pref_oepl_weather_rss_summary_summary" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_qr"
+            android:title="@string/pref_oepl_weather_screen_qr">
+            <EditTextPreference
+                android:key="pref_oepl_weather_qr_content"
+                android:title="@string/pref_oepl_weather_qr_content_title"
+                android:summary="@string/pref_oepl_weather_qr_content_summary"
+                android:dialogTitle="@string/pref_oepl_weather_qr_content_title" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_qr_title"
+                android:title="@string/pref_oepl_weather_qr_title_title"
+                android:dialogTitle="@string/pref_oepl_weather_qr_title_title" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_counter"
+            android:title="@string/pref_oepl_weather_screen_counter">
+            <EditTextPreference
+                android:key="pref_oepl_weather_counter_target"
+                android:title="@string/pref_oepl_weather_counter_target_title"
+                android:summary="@string/pref_oepl_weather_counter_target_summary"
+                android:dialogTitle="@string/pref_oepl_weather_counter_target_title" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_counter_caption"
+                android:title="@string/pref_oepl_weather_counter_caption_title"
+                android:summary="@string/pref_oepl_weather_counter_caption_summary"
+                android:dialogTitle="@string/pref_oepl_weather_counter_caption_title" />
+            <EditTextPreference
+                android:defaultValue="1000000"
+                android:key="pref_oepl_weather_counter_threshold"
+                android:title="@string/pref_oepl_weather_counter_threshold_title"
+                android:summary="@string/pref_oepl_weather_counter_threshold_summary"
+                android:inputType="number"
+                android:dialogTitle="@string/pref_oepl_weather_counter_threshold_title" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_notifications"
+            android:title="@string/pref_oepl_weather_screen_notifications">
+            <ListPreference
+                android:defaultValue="4"
+                android:entries="@array/oepl_weather_notification_count"
+                android:entryValues="@array/oepl_weather_notification_count_values"
+                android:key="pref_oepl_weather_notification_count"
+                android:title="@string/pref_oepl_weather_notification_count_title"
+                app:useSimpleSummaryProvider="true" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_image"
+            android:title="@string/pref_oepl_weather_screen_image">
+            <Preference
+                android:key="pref_oepl_weather_image_pick"
+                android:title="@string/pref_oepl_weather_image_pick_title"
+                android:summary="@string/pref_oepl_weather_image_pick_summary" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_image_url"
+                android:title="@string/pref_oepl_weather_image_url_title"
+                android:summary="@string/pref_oepl_weather_image_url_summary"
+                android:dialogTitle="@string/pref_oepl_weather_image_url_title" />
+            <ListPreference
+                android:defaultValue="diffusion"
+                android:entries="@array/oepl_weather_image_dither"
+                android:entryValues="@array/oepl_weather_image_dither_values"
+                android:key="pref_oepl_weather_image_dither"
+                android:title="@string/pref_oepl_weather_image_dither_title"
+                android:summary="@string/pref_oepl_weather_image_dither_summary"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="contain"
+                android:entries="@array/oepl_weather_image_fit"
+                android:entryValues="@array/oepl_weather_image_fit_values"
+                android:key="pref_oepl_weather_image_fit"
+                android:title="@string/pref_oepl_weather_image_fit_title"
+                app:useSimpleSummaryProvider="true" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_text"
+            android:title="@string/pref_oepl_weather_screen_text">
+            <EditTextPreference
+                android:key="pref_oepl_weather_custom_text"
+                android:title="@string/pref_oepl_weather_custom_text_title"
+                android:summary="@string/pref_oepl_weather_custom_text_summary"
+                android:dialogTitle="@string/pref_oepl_weather_custom_text_title" />
+        </PreferenceScreen>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_oepl_weather_category_device">
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_look"
+            android:title="@string/pref_oepl_weather_screen_look">
+            <ListPreference
+                android:defaultValue="BARS"
+                android:entries="@array/oepl_weather_frame"
+                android:entryValues="@array/oepl_weather_frame_values"
+                android:key="pref_oepl_weather_frame"
+                android:title="@string/pref_oepl_weather_frame_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="auto"
+                android:entries="@array/oepl_weather_accent"
+                android:entryValues="@array/oepl_weather_accent_values"
+                android:key="pref_oepl_weather_accent"
+                android:title="@string/pref_oepl_weather_accent_title"
+                android:summary="@string/pref_oepl_weather_accent_summary"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="-1"
+                android:entries="@array/oepl_weather_rotation"
+                android:entryValues="@array/oepl_weather_rotation_values"
+                android:key="pref_oepl_weather_rotation"
+                android:title="@string/pref_oepl_weather_rotation_title"
+                android:summary="@string/pref_oepl_weather_rotation_summary"
+                app:useSimpleSummaryProvider="true" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="pref_oepl_weather_show_footer"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_oepl_weather_show_footer_title"
+                android:summary="@string/pref_oepl_weather_show_footer_summary" />
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="pref_oepl_weather_invert"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_oepl_weather_invert_title"
+                android:summary="@string/pref_oepl_weather_invert_summary" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_updates"
+            android:title="@string/pref_oepl_weather_screen_updates">
+            <ListPreference
+                android:defaultValue="60"
+                android:entries="@array/oepl_weather_update_interval"
+                android:entryValues="@array/oepl_weather_update_interval_values"
+                android:key="pref_oepl_weather_update_interval"
+                android:title="@string/pref_oepl_weather_update_interval_title"
+                android:summary="@string/pref_oepl_weather_update_interval_summary"
+                app:useSimpleSummaryProvider="true" />
+
+            <PreferenceCategory android:title="@string/pref_oepl_weather_category_live">
+                <SwitchPreferenceCompat
+                    android:defaultValue="true"
+                    android:key="pref_oepl_weather_live_updates"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_oepl_weather_live_title"
+                    android:summary="@string/pref_oepl_weather_live_summary" />
+                <ListPreference
+                    android:defaultValue="5"
+                    android:entries="@array/oepl_weather_min_gap"
+                    android:entryValues="@array/oepl_weather_min_gap_values"
+                    android:key="pref_oepl_weather_min_gap"
+                    android:title="@string/pref_oepl_weather_min_gap_title"
+                    android:summary="@string/pref_oepl_weather_min_gap_summary"
+                    app:useSimpleSummaryProvider="true" />
+            </PreferenceCategory>
+
+            <PreferenceCategory android:title="@string/pref_oepl_weather_category_connect">
+                <ListPreference
+                    android:defaultValue="30"
+                    android:entries="@array/oepl_weather_connect_window"
+                    android:entryValues="@array/oepl_weather_connect_window_values"
+                    android:key="pref_oepl_weather_connect_window"
+                    android:title="@string/pref_oepl_weather_connect_window_title"
+                    android:summary="@string/pref_oepl_weather_connect_window_summary"
+                    app:useSimpleSummaryProvider="true" />
+                <ListPreference
+                    android:defaultValue="3"
+                    android:entries="@array/oepl_weather_connect_attempts"
+                    android:entryValues="@array/oepl_weather_connect_attempts_values"
+                    android:key="pref_oepl_weather_connect_attempts"
+                    android:title="@string/pref_oepl_weather_connect_attempts_title"
+                    android:summary="@string/pref_oepl_weather_connect_attempts_summary"
+                    app:useSimpleSummaryProvider="true" />
+            </PreferenceCategory>
+
+            <PreferenceCategory android:title="@string/pref_oepl_weather_category_reach">
+                <SwitchPreferenceCompat
+                    android:defaultValue="true"
+                    android:key="pref_oepl_weather_opportunistic"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_oepl_weather_opportunistic_title"
+                    android:summary="@string/pref_oepl_weather_opportunistic_summary" />
+                <SwitchPreferenceCompat
+                    android:defaultValue="false"
+                    android:key="pref_oepl_weather_require_adv"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_oepl_weather_require_adv_title"
+                    android:summary="@string/pref_oepl_weather_require_adv_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_power"
+            android:title="@string/pref_oepl_weather_screen_power">
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="pref_oepl_weather_stay_connected"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_oepl_weather_stay_connected_title"
+                android:summary="@string/pref_oepl_weather_stay_connected_summary" />
+            <ListPreference
+                android:defaultValue="3200"
+                android:entries="@array/atc_ble_oepl_ble_adv_interval"
+                android:entryValues="@array/atc_ble_oepl_ble_adv_interval_values"
+                android:key="pref_oepl_weather_adv_interval"
+                android:title="@string/pref_atc_ble_oepl_ble_adv_interval_title"
+                app:useSimpleSummaryProvider="true" />
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="pref_oepl_weather_oepl_protocol"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_atc_ble_oepl_oepl_protocol_enable_title"
+                android:summary="@string/pref_atc_ble_oepl_oepl_protocol_enable_summary" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_hardware"
+            android:title="@string/pref_oepl_weather_category_hardware">
+            <Preference
+                android:key="pref_oepl_weather_read_config"
+                android:title="@string/pref_oepl_weather_read_config_title"
+                android:summary="@string/pref_oepl_weather_read_config_summary" />
+            <ListPreference
+                android:defaultValue="-1"
+                android:entries="@array/oepl_weather_models"
+                android:entryValues="@array/oepl_weather_models_values"
+                android:key="pref_oepl_weather_model"
+                android:title="@string/pref_atc_ble_oepl_model_title"
+                android:summary="@string/pref_oepl_weather_model_summary"
+                app:useSimpleSummaryProvider="true" />
+        </PreferenceScreen>
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>
