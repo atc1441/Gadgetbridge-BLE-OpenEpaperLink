@@ -28,6 +28,11 @@ jobs:
           # the build stamps the short commit hash into the version name
           fetch-depth: 0
 
+      - name: Make the Gradle wrapper executable
+        # the bit survives a normal checkout; this is here so a tree exported from
+        # Windows, where git cannot record it, still builds
+        run: chmod +x gradlew
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
