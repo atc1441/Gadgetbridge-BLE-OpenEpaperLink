@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.TimeZone;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -151,7 +152,51 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         // the hardware description is the authoritative source for geometry and colour count
         builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
                 OEPLProtocol.command(OEPLProtocol.CMD_READ_DYNAMIC_TYPE));
+
+        // ...and if neither question is answered in a way we can use, the catalogue answers
+        // instead. Not every firmware implements the configuration commands - the two that
+        // matter for a picture are the transfer ones - and a display that connects but is
+        // never sent anything is the worst of both worlds.
+        renderExecutor.schedule(this::drawFromCatalogueIfSilent, 4, TimeUnit.SECONDS);
         return builder;
+    }
+
+    /**
+     * The fallback for a display that did not describe itself: what it is was in its
+     * advertisement, and what panel sits behind that hardware type is in the catalogue. The
+     * geometry from there is the same geometry the firmware would have reported - it is a
+     * property of the hardware, not of the firmware revision.
+     */
+    private synchronized void drawFromCatalogueIfSilent() {
+        if (config != null && config.valid) {
+            return;
+        }
+        if (!isConnected()) {
+            return;
+        }
+        final OEPLDisplayConfig fallback = catalogueConfig();
+        if (fallback == null) {
+            LOG.warn("the display described neither itself nor its hardware type, "
+                    + "so there is nothing to draw against");
+            return;
+        }
+        LOG.info("no usable configuration came from the display, drawing from the catalogue: {}",
+                fallback);
+        config = fallback;
+        OEPLStatusStore.recordConfig(getDevice().getAddress(), fallback);
+        pushUpdateIfNeeded();
+    }
+
+    /** The panel behind the hardware type the tag advertised, or null when that is unknown. */
+    @Nullable
+    private OEPLDisplayConfig catalogueConfig() {
+        final int hardwareType = GBApplication.getDeviceSpecificSharedPrefs(
+                getDevice().getAddress()).getInt(OEPLPrefs.DETECTED_HARDWARE_TYPE, -1);
+        if (hardwareType < 0) {
+            return null;
+        }
+        final OEPLDisplayConfig fallback = OEPLDisplayConfig.fromCatalogue(hardwareType);
+        return fallback.valid ? fallback : null;
     }
 
     @Override
@@ -212,6 +257,13 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if (!config.valid) {
             LOG.error("could not make sense of the display configuration, raw {}",
                     StringUtils.bytesToHex(value));
+            final OEPLDisplayConfig fallback = catalogueConfig();
+            if (fallback != null) {
+                // no point waiting for the grace period: this answer is the one we got
+                LOG.info("falling back to what the catalogue says about 0x{}",
+                        Integer.toHexString(fallback.hardwareType));
+                config = fallback;
+            }
         }
 
         // None of the bookkeeping below may stop the picture from being sent, so each piece is
@@ -235,6 +287,17 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             }
         } catch (final Exception e) {
             LOG.error("could not report the battery level", e);
+        }
+
+        // Some firmwares answer the hardware read with the settings structure as well, so
+        // this may be the only answer the user's "read configuration" button ever gets.
+        if (configReadRequested && config.valid) {
+            configReadRequested = false;
+            final OEPLTagTypes.TagType type = config.tagType();
+            GB.toast(getContext().getString(R.string.oepl_weather_config_read,
+                            type != null ? type.name : OEPLTagTypes.nameOf(config.hardwareType),
+                            config.bufferWidth, config.bufferHeight, config.colors),
+                    Toast.LENGTH_LONG, GB.INFO);
         }
 
         // the hardware read follows right behind and is more accurate, so let that one decide
@@ -444,6 +507,12 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                 || OeplCardFactory.CALENDAR_WEEK.equals(content)
                 || OeplCardFactory.BOARD.equals(content)) {
             return calendarHint(prefs);
+        }
+        if (OeplCardFactory.isQuartered(content)) {
+            return getContext().getString(R.string.oepl_weather_no_quarters);
+        }
+        if (OeplCardFactory.needsReadings(content)) {
+            return getContext().getString(R.string.oepl_weather_no_readings);
         }
         if (OeplCardFactory.needsWeather(content)) {
             return getContext().getString(R.string.oepl_weather_no_weather);
@@ -724,18 +793,34 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
     }
 
+    /**
+     * Sets the tag's own clock, which Gadgetbridge asks for when the phone's time or time zone
+     * changes.
+     * <p>
+     * Two things about it are easy to get wrong. The tag has no time zone, so what it wants is
+     * the local time as a unix timestamp rather than UTC - an hour out is an hour out on its
+     * screen and in its own wake-up timing. And the four bytes go out lowest first, the way
+     * the firmware reads them back; sent the other way round the tag sets its clock to some
+     * moment tens of thousands of years from here.
+     * <p>
+     * Setting the time also puts the tag into its clock mode, where it draws a clock of its
+     * own over the panel every minute - which on a display whose whole purpose is the picture
+     * we push is vandalism. So the clock screen is switched off again in the same breath; the
+     * time itself stays set.
+     */
     @Override
     public void onSetTime() {
         if (config == null) {
             return;
         }
-        final long now = System.currentTimeMillis() / 1000L;
-        final byte[] arg = new byte[]{
-                (byte) ((now >> 24) & 0xff), (byte) ((now >> 16) & 0xff),
-                (byte) ((now >> 8) & 0xff), (byte) (now & 0xff)};
+        final byte[] arg = OEPLProtocol.unixTimeArgument(System.currentTimeMillis(),
+                TimeZone.getDefault());
         final TransactionBuilder builder = createTransactionBuilder("set time");
         builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
                 OEPLProtocol.command(OEPLProtocol.CMD_SET_UNIXTIME, arg));
+        builder.sleep(100);
+        builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
+                OEPLProtocol.command(OEPLProtocol.CMD_DISABLE_UNIXTIME));
         builder.queue();
     }
 
@@ -813,7 +898,8 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             }
             builder.queue();
         } catch (final IOException e) {
-            GB.toast("Error setting configuration", Toast.LENGTH_LONG, GB.ERROR, e);
+            GB.toast(getContext().getString(R.string.oepl_config_failed),
+                    Toast.LENGTH_LONG, GB.ERROR, e);
         }
     }
 

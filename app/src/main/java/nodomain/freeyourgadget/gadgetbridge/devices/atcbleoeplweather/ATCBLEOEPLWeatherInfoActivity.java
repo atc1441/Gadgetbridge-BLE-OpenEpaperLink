@@ -42,6 +42,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.HomeAssistantClient;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
@@ -395,6 +396,28 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
                             + Math.round(weather.days.get(0).maxTemperature) + " °C"));
         } else {
             row(getString(R.string.oepl_info_weather_age), dash());
+        }
+        homeAssistant(p);
+    }
+
+    /**
+     * Whether the house is being read at all, and what went wrong if it is not. A token that
+     * was mistyped fails silently on the panel - the card simply has fewer values on it - so
+     * this is the one place that says so.
+     */
+    private void homeAssistant(final SharedPreferences p) {
+        if (!HomeAssistantClient.configured(OEPLPrefs.homeAssistantUrl(p),
+                OEPLPrefs.homeAssistantToken(p), OEPLPrefs.homeAssistantEntities(p))) {
+            return;
+        }
+        final int count = HomeAssistantClient.cached().size();
+        final long fetched = HomeAssistantClient.cachedAtMillis();
+        row(getString(R.string.oepl_info_home_assistant), count > 0 && fetched > 0
+                ? getString(R.string.oepl_info_ha_entities, count, ago(fetched))
+                : dash());
+        final String error = HomeAssistantClient.lastError();
+        if (!error.isEmpty()) {
+            row(getString(R.string.oepl_info_weather_source_state), error);
         }
     }
 

@@ -125,13 +125,21 @@ public class WeatherContent implements CardContent {
 
         final String condition = spec.getCurrentCondition() == null
                 ? null : spec.getCurrentCondition().trim();
-        final Paint cond = style.paint(style.ink, false, Math.max(7f, h * 0.15f));
+        // Nine pixels rather than seven: these two lines sit under the reading on a card
+        // that is often only half a panel wide, and a panel with two or three colours leaves
+        // dust of anything thinner. The rows below are placed from the metrics of these
+        // paints, so a larger line simply takes its room from the pictogram above it.
+        final float condSize = Math.max(9f, h * 0.15f);
+        // bold once the line gets small: a regular face at ten pixels is half grey, and half
+        // grey is what the panel's quantiser throws away
+        final Paint cond = style.paint(style.ink, condSize < 12f, condSize);
         final boolean withCondition = condition != null && !condition.isEmpty() && h > 46;
         if (withCondition) {
-            style.fitNoSmallerThan(cond, condition, area.width() - pad * 2, 7f);
+            style.fitNoSmallerThan(cond, condition, area.width() - pad * 2, 9f);
         }
 
-        final Paint small = style.paint(style.ink, false, Math.max(7f, h * 0.16f));
+        final float smallSize = Math.max(9f, h * 0.16f);
+        final Paint small = style.paint(style.ink, smallSize < 12f, smallSize);
         final Paint high = style.paint(style.accent, true, small.getTextSize());
         final String hi = style.shortTemperature(spec.getTodayMaxTemp());
         final String lo = style.shortTemperature(spec.getTodayMinTemp());
@@ -256,7 +264,7 @@ public class WeatherContent implements CardContent {
 
         final float colW = area.width() / days;
         final Paint day = style.paint(style.ink, true,
-                Math.min(area.height() * 0.28f, colW * 0.36f));
+                Math.max(8f, Math.min(area.height() * 0.28f, colW * 0.36f)));
         final Paint hi = style.paint(style.accent, true, day.getTextSize());
         final Paint lo = style.paint(style.ink, false, day.getTextSize());
 

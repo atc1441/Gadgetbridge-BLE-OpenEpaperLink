@@ -177,7 +177,16 @@ public class OeplCalendarWeekCard extends OeplCard {
         }
         c.line(0, h - 1f, w, h - 1f, c.ink, 1f);
 
-        for (final CalendarEvent e : timed) {
+        // Appointments that overlap in time share their column, each in a lane of its own,
+        // which is what every week view does and what this one used to get wrong: two boxes
+        // drawn over each other left two titles in the same place and neither readable.
+        final int[] lanes = lanes(timed, midnight);
+        int columns = 1;
+        for (final int lane : lanes) {
+            columns = Math.max(columns, lane + 1);
+        }
+        for (int index = 0; index < timed.size(); index++) {
+            final CalendarEvent e = timed.get(index);
             final int day = clampDay((e.getBegin() - midnight) / 86400000L);
             final Calendar start = Calendar.getInstance();
             start.setTimeInMillis(e.getBegin());
@@ -190,21 +199,61 @@ public class OeplCalendarWeekCard extends OeplCard {
             if (boxHeight <= 2f || top >= h) {
                 continue;
             }
-            final float left = gutter + day * columnWidth + 2f;
-            final float width = columnWidth - 4f;
+            // a lane only narrows the boxes of the day it is needed on, and only as far as a
+            // box still holds something: past that the later appointment is left out, because
+            // a column of slivers says less than one box and a missing one
+            final float laneWidth = (columnWidth - 4f) / columns;
+            final boolean narrow = columns > 1 && laneWidth < 24f;
+            if (narrow && lanes[index] > 0) {
+                continue;
+            }
+            final float left = gutter + day * columnWidth + 2f
+                    + (narrow ? 0f : lanes[index] * laneWidth);
+            final float width = narrow ? columnWidth - 4f : laneWidth;
             c.fillRect(left, top, width, boxHeight, c.paper);
             c.strokeRect(left, top, width, boxHeight, c.ink, 1f);
             // Only label a box that a whole line actually fits into, measured against both
             // the box and the panel edge: the line a label occupies is a quarter taller than
             // its size, which is what used to push the last appointment of the day over the
             // bottom of the panel.
+            // eight pixels or no title at all: the box alone still says that the hour is
+            // taken, while a line of grey dust inside it says nothing
             final float titleSize = c.sizeForHeight(h * 0.085f,
-                    Math.min(boxHeight - 2f, h - top - 2f), 7f);
+                    Math.min(boxHeight - 2f, h - top - 2f), 8f);
             if (titleSize > 0f) {
                 c.textClipped(e.getTitle(), left + 2f, top + 1f, titleSize, OeplCanvas.LEFT,
                         c.ink, width - 4f);
             }
         }
+    }
+
+    /**
+     * Which lane each appointment goes into: the first one whose previous appointment has
+     * ended by the time this one starts, counted per day. Nothing is reordered - the lane of
+     * an appointment is decided by the ones before it, so the first in the list keeps the left
+     * hand side of its column.
+     */
+    private int[] lanes(final List<CalendarEvent> timed, final long midnight) {
+        final int[] lanes = new int[timed.size()];
+        // the end of the last appointment in each lane, per day
+        final java.util.Map<Integer, java.util.List<Long>> ends = new java.util.HashMap<>();
+        for (int i = 0; i < timed.size(); i++) {
+            final CalendarEvent e = timed.get(i);
+            final int day = clampDay((e.getBegin() - midnight) / 86400000L);
+            final java.util.List<Long> inDay =
+                    ends.computeIfAbsent(day, key -> new ArrayList<>());
+            int lane = 0;
+            while (lane < inDay.size() && inDay.get(lane) > e.getBegin()) {
+                lane++;
+            }
+            if (lane == inDay.size()) {
+                inDay.add(e.getEnd());
+            } else {
+                inDay.set(lane, e.getEnd());
+            }
+            lanes[i] = lane;
+        }
+        return lanes;
     }
 
     /** What the list fallback is captioned with: the span the grid would have covered. */

@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Collections;
@@ -117,16 +118,60 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         return ATCBLEOEPLWeatherDeviceSupport.class;
     }
 
+    /**
+     * The names these tags give themselves: ATC_ and four characters of the MAC address on the
+     * OpenEPaperLink firmware, RTL_ on the Realtek based ones, and whatever the next generation
+     * picks. Only used where no advertisement is at hand, see {@link #supports}.
+     */
+    private static final Pattern KNOWN_NAMES = Pattern.compile("(ATC|RTL|OEPL)_.*");
+
     @Override
     protected Pattern getSupportedDeviceName() {
-        return Pattern.compile("ATC_.*");
+        return KNOWN_NAMES;
     }
 
+    /**
+     * Recognised by what the tag advertises rather than by what it calls itself.
+     * <p>
+     * The name is the weakest thing about these displays: the same firmware answers to ATC_ on
+     * one board and RTL_ on another, and a tag that has not been queried for its name yet has
+     * none at all. What every OpenEPaperLink tag does carry is 0x1337 - as the service in its
+     * advertisement, and as the manufacturer id of the data block that holds the hardware type,
+     * the battery voltage and the panel temperature. Either of those is proof enough; the name
+     * is left as a fallback for a candidate that reached us without an advertisement, which is
+     * what a device restored from the database looks like.
+     */
+    @Override
+    public boolean supports(@NonNull final GBDeviceCandidate candidate) {
+        if (candidate.supportsService(OEPLProtocol.UUID_SERVICE)) {
+            return true;
+        }
+        final SparseArray<byte[]> manufacturerData = candidate.getManufacturerSpecificData();
+        if (manufacturerData != null
+                && manufacturerData.get(OEPLProtocol.MANUFACTURER_ID) != null) {
+            return true;
+        }
+        final String name = candidate.getName();
+        return name != null && KNOWN_NAMES.matcher(name).matches();
+    }
+
+    /**
+     * What the scan looks for: 0x1337, in either of the two places a tag puts it. Most
+     * advertise the service, some only the manufacturer data block - and a filter on the name
+     * would miss every tag that calls itself something other than ATC_, which the Realtek
+     * based ones do (RTL_). Both filters are offered to Android, which ORs them.
+     */
     @NonNull
     @Override
     public Collection<? extends ScanFilter> createBLEScanFilters() {
         final ParcelUuid service = new ParcelUuid(OEPLProtocol.UUID_SERVICE);
-        return Collections.singletonList(new ScanFilter.Builder().setServiceUuid(service).build());
+        return Arrays.asList(
+                new ScanFilter.Builder().setServiceUuid(service).build(),
+                // empty data and mask: any advertisement carrying that manufacturer id at all
+                new ScanFilter.Builder()
+                        .setManufacturerData(OEPLProtocol.MANUFACTURER_ID, new byte[0],
+                                new byte[0])
+                        .build());
     }
 
     /**
@@ -188,6 +233,23 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         }
         // nothing known yet: the plain name, rather than a title that says only half of it
         return name.length() > device.getName().length() ? name.toString() : null;
+    }
+
+    /**
+     * The battery of a display that is asleep, which is almost always. Every advertisement it
+     * sends carries its voltage, and every connection reads it again, so the figure on the
+     * card is at most one wake-up old - while Gadgetbridge's own battery reading is cleared
+     * the moment the link drops, which for this device is a few seconds after it was made.
+     */
+    @Override
+    public int getRememberedBatteryLevel(@NonNull final GBDevice device,
+                                         final int batteryIndex) {
+        if (batteryIndex != 0) {
+            return GBDevice.BATTERY_UNKNOWN;
+        }
+        final int millivolts = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
+                .getInt(OEPLPrefs.LAST_BATTERY_MV, -1);
+        return millivolts > 0 ? OEPLPrefs.batteryPercent(millivolts) : GBDevice.BATTERY_UNKNOWN;
     }
 
     /**

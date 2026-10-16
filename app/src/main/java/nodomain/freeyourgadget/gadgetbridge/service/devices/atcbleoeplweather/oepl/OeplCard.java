@@ -100,6 +100,40 @@ public abstract class OeplCard implements CardContent {
         return OeplIcons.beaufort(metresPerSecond) > 4;
     }
 
+    /**
+     * What a forecast column is called: the word for today where it fits, the weekday
+     * otherwise - and the caller draws it in the accent colour, so that the day one is
+     * standing in is never in doubt.
+     *
+     * @param room how wide the label may be, or 0 when it does not matter
+     */
+    protected String dayLabel(final OeplCanvas c, final OeplWeather weather,
+                              final OeplWeather.Day day,
+                              final java.text.SimpleDateFormat weekday, final float size,
+                              final float room) {
+        final String name = weekday.format(new java.util.Date(day.epochSeconds * 1000L));
+        if (weather == null || !weather.isToday(day)) {
+            return name;
+        }
+        final String today = todayWord();
+        return room <= 0f || c.measure(today, size) <= room ? today : name;
+    }
+
+    /** "Today", in the user's language where the resources can be reached. */
+    protected String todayWord() {
+        try {
+            final android.content.Context context =
+                    nodomain.freeyourgadget.gadgetbridge.GBApplication.getContext();
+            if (context != null) {
+                return context.getString(
+                        nodomain.freeyourgadget.gadgetbridge.R.string.oepl_card_today);
+            }
+        } catch (final Throwable ignored) {
+            // a unit test without resources, where the English word will do
+        }
+        return "Today";
+    }
+
     protected int inkOrAccent(final OeplCanvas c, final boolean accent) {
         return accent ? c.accent : c.ink;
     }

@@ -24,6 +24,9 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -32,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCardFactory;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReadings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRssClient;
 
 /**
@@ -95,18 +99,62 @@ public final class OEPLContentSync {
             ok = run(() -> OpenMeteoClient.refreshIfOlderThan(prefs, maxWeatherAge(prefs)),
                     deadline, "weather");
         }
-        final String content = OEPLPrefs.contentType(prefs);
-        if (OeplCardFactory.needsFeed(content)) {
+        // the quartered card draws four other cards, and each of them wants its own source
+        // refreshed - keying off the selected content alone would leave three quarters stale
+        final List<String> contents = effectiveContents(prefs);
+        if (contents.contains(OeplCardFactory.RSS)) {
             final String url = OEPLPrefs.rssUrl(prefs);
             ok &= run(() -> OeplRssClient.refreshIfStale(url), deadline, "news feed");
         }
-        if (CardContentFactory.IMAGE_URL.equals(content)) {
+        if (contents.contains(CardContentFactory.IMAGE_URL)) {
             final String url = OEPLPrefs.imageUrl(prefs);
             final Context context = GBApplication.getContext();
             ok &= run(() -> OEPLImageSource.refreshIfStale(context, address, url), deadline,
                     "picture");
         }
+        if (needsHomeAssistant(prefs, contents)) {
+            final String url = OEPLPrefs.homeAssistantUrl(prefs);
+            final String token = OEPLPrefs.homeAssistantToken(prefs);
+            final String entities = OEPLPrefs.homeAssistantEntities(prefs);
+            ok &= run(() -> HomeAssistantClient.refreshIfStale(url, token, entities), deadline,
+                    "home assistant");
+        }
         return ok;
+    }
+
+    /**
+     * The cards whose sources have to be fresh: the selected one, or the four quarters when
+     * what is selected is the quartered card.
+     */
+    private static List<String> effectiveContents(final SharedPreferences prefs) {
+        final String content = OEPLPrefs.contentType(prefs);
+        if (!OeplCardFactory.isQuartered(content)) {
+            return Collections.singletonList(content);
+        }
+        final List<String> slots = new ArrayList<>(OEPLPrefs.PREF_QUAD.length);
+        for (int i = 0; i < OEPLPrefs.PREF_QUAD.length; i++) {
+            final String slot = OEPLPrefs.quadSlot(prefs, i);
+            if (!slot.isEmpty()) {
+                slots.add(slot);
+            }
+        }
+        return slots;
+    }
+
+    /** Only when a card shows the house and there is something configured to ask. */
+    private static boolean needsHomeAssistant(final SharedPreferences prefs,
+                                              final List<String> contents) {
+        if (!OEPLPrefs.readingGroups(prefs).contains(OeplReadings.GROUP_HOUSE)) {
+            return false;
+        }
+        for (final String content : contents) {
+            if (OeplCardFactory.needsHomeAssistant(content)) {
+                return HomeAssistantClient.configured(OEPLPrefs.homeAssistantUrl(prefs),
+                        OEPLPrefs.homeAssistantToken(prefs),
+                        OEPLPrefs.homeAssistantEntities(prefs));
+            }
+        }
+        return false;
     }
 
     /**
@@ -119,6 +167,7 @@ public final class OEPLContentSync {
     public static void invalidateAll(@Nullable final String address) {
         OpenMeteoClient.invalidate();
         OeplRssClient.invalidate();
+        HomeAssistantClient.invalidate();
         final Context context = GBApplication.getContext();
         if (context != null && address != null) {
             OEPLImageSource.invalidate(context, address);

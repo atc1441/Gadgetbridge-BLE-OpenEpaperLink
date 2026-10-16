@@ -1176,6 +1176,23 @@ public interface DeviceCoordinator {
     }
 
     /**
+     * The battery level to show while the device is not connected, in percent, or
+     * {@link GBDevice#BATTERY_UNKNOWN} when nothing is known.
+     * <p>
+     * Gadgetbridge forgets a device's battery the moment the link drops, which is right for a
+     * gadget that is worn and reports while it is worn: a figure from last Tuesday would be a
+     * lie. A device that is connected for a few seconds at a time and asleep in between would
+     * then show a question mark for all but those few seconds, although its battery was read
+     * on the last visit and is in its advertisement besides. Such a coordinator answers here.
+     *
+     * @param batteryIndex which of the device's batteries, as the card asks for it
+     */
+    default int getRememberedBatteryLevel(@NonNull final GBDevice device,
+                                          final int batteryIndex) {
+        return GBDevice.BATTERY_UNKNOWN;
+    }
+
+    /**
      * The user pulled the device list down to refresh. The gesture otherwise means "fetch the
      * recorded data of everything that is connected", which passes by a device that is only
      * ever connected for the moment it takes to push something to it: pulling down with such a

@@ -74,6 +74,16 @@ public final class OEPLPrefs {
     public static final String PREF_CALENDAR_TITLE = "pref_oepl_weather_calendar_title";
     public static final String PREF_CALENDAR_DAYS = "pref_oepl_weather_calendar_days";
 
+    /** Which groups of values the dashboard cards collect: the sky, the house, agenda, batteries. */
+    public static final String PREF_READING_GROUPS = "pref_oepl_weather_reading_groups";
+    public static final String PREF_HA_URL = "pref_oepl_weather_ha_url";
+    public static final String PREF_HA_TOKEN = "pref_oepl_weather_ha_token";
+    public static final String PREF_HA_ENTITIES = "pref_oepl_weather_ha_entities";
+    /** The four slots of the quartered card, each holding the id of another card. */
+    public static final String[] PREF_QUAD = {
+            "pref_oepl_weather_quad_1", "pref_oepl_weather_quad_2",
+            "pref_oepl_weather_quad_3", "pref_oepl_weather_quad_4"};
+
     /**
      * Every setting of this display that the service has to hear about when it changes. The
      * settings screen notifies the device for the keys on this list and for no others, and
@@ -96,6 +106,14 @@ public final class OEPLPrefs {
             PREF_CALENDAR_EVENTS,
             PREF_CALENDAR_DAYS,
             PREF_CALENDAR_TITLE,
+            PREF_READING_GROUPS,
+            PREF_HA_URL,
+            PREF_HA_TOKEN,
+            PREF_HA_ENTITIES,
+            PREF_QUAD[0],
+            PREF_QUAD[1],
+            PREF_QUAD[2],
+            PREF_QUAD[3],
             PREF_NOTIFICATION_COUNT,
             PREF_CUSTOM_TEXT,
             PREF_COUNTER_TARGET,
@@ -284,6 +302,43 @@ public final class OEPLPrefs {
     /** Beaufort by default, the way an OpenEPaperLink tag reports wind. */
     public static boolean windAsBeaufort(final SharedPreferences prefs) {
         return !"ms".equals(prefs.getString(PREF_WIND_UNIT, "beaufort"));
+    }
+
+    /**
+     * Which groups of values the dashboard cards gather. All four by default: a display that
+     * was just paired should show what it can, and switching a group off is how a tag in the
+     * hall is told to leave the step counts to the one on the desk.
+     */
+    public static java.util.Set<String> readingGroups(final SharedPreferences prefs) {
+        final java.util.Set<String> all = new java.util.LinkedHashSet<>(Arrays.asList(
+                "weather", "house", "events", "devices"));
+        try {
+            final java.util.Set<String> chosen = prefs.getStringSet(PREF_READING_GROUPS, null);
+            return chosen == null ? all : chosen;
+        } catch (final Exception ignored) {
+            // a value of a different type under that key, which a hand edited backup can carry
+            return all;
+        }
+    }
+
+    public static String homeAssistantUrl(final SharedPreferences prefs) {
+        return prefs.getString(PREF_HA_URL, "").trim();
+    }
+
+    public static String homeAssistantToken(final SharedPreferences prefs) {
+        return prefs.getString(PREF_HA_TOKEN, "").trim();
+    }
+
+    public static String homeAssistantEntities(final SharedPreferences prefs) {
+        return prefs.getString(PREF_HA_ENTITIES, "");
+    }
+
+    /** The card in one quarter of the quartered design, or an empty string for none. */
+    public static String quadSlot(final SharedPreferences prefs, final int index) {
+        if (index < 0 || index >= PREF_QUAD.length) {
+            return "";
+        }
+        return prefs.getString(PREF_QUAD[index], "").trim();
     }
 
     /** Whether the date card carries sunrise, sunset and the moon along its bottom. */

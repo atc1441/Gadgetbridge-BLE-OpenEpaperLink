@@ -219,7 +219,15 @@ public class BatteryInfoActivity extends AbstractGBActivity {
     }
 
     private void setBatteryLabels() {
-        String level = gbDevice.getBatteryLevel(batteryIndex) > 0 ? String.format("%1s%%", gbDevice.getBatteryLevel(batteryIndex)) : "";
+        // the same fallback the device card uses: a device that is connected for a moment at
+        // a time has no live reading almost all of the time, and its coordinator may still
+        // know what the battery was on the last visit
+        int percent = gbDevice.getBatteryLevel(batteryIndex);
+        if (percent == GBDevice.BATTERY_UNKNOWN) {
+            percent = gbDevice.getDeviceCoordinator()
+                    .getRememberedBatteryLevel(gbDevice, batteryIndex);
+        }
+        String level = percent > 0 ? String.format("%1s%%", percent) : "";
         String voltage = gbDevice.getBatteryVoltage(batteryIndex) > 0 ? String.format("%1sV", gbDevice.getBatteryVoltage(batteryIndex)) : "";
         battery_status_battery_level_text.setText(level);
         battery_status_battery_voltage.setText(voltage);

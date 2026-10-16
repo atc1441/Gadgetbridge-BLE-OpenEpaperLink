@@ -155,8 +155,15 @@ public class HourlyWeatherContent implements CardContent {
                 lastValue = tx + tw;
             }
 
-            final String hour = new SimpleDateFormat("HH", Locale.getDefault())
-                    .format(new Date(points.get(i).getTimestamp() * 1000L));
+            // The row counts in hours, and once the numbers run past twelve it reads as a
+            // date instead - "15, 18, 21" looks like three days. Midnight therefore carries
+            // the name of the day that starts there.
+            final Date at = new Date(points.get(i).getTimestamp() * 1000L);
+            final java.util.Calendar when = java.util.Calendar.getInstance();
+            when.setTime(at);
+            final String hour = when.get(java.util.Calendar.HOUR_OF_DAY) == 0
+                    ? new SimpleDateFormat("EE", Locale.getDefault()).format(at)
+                    : new SimpleDateFormat("HH", Locale.getDefault()).format(at);
             final float hw = label.measureText(hour);
             final float hx = clamp(x - hw / 2f, area.left, area.right - hw);
             if (hx >= lastHour + breath) {

@@ -235,6 +235,73 @@
                 android:summary="@string/pref_oepl_weather_custom_text_summary"
                 android:dialogTitle="@string/pref_oepl_weather_custom_text_title" />
         </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_dashboard"
+            android:title="@string/pref_oepl_weather_screen_dashboard">
+            <MultiSelectListPreference
+                android:defaultValue="@array/oepl_weather_reading_groups_values"
+                android:dialogTitle="@string/pref_oepl_weather_reading_groups_title"
+                android:entries="@array/oepl_weather_reading_groups"
+                android:entryValues="@array/oepl_weather_reading_groups_values"
+                android:key="pref_oepl_weather_reading_groups"
+                android:summary="@string/pref_oepl_weather_reading_groups_summary"
+                android:title="@string/pref_oepl_weather_reading_groups_title" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_ha"
+            android:title="@string/pref_oepl_weather_screen_ha">
+            <EditTextPreference
+                android:key="pref_oepl_weather_ha_url"
+                android:title="@string/pref_oepl_weather_ha_url_title"
+                android:summary="@string/pref_oepl_weather_ha_url_summary"
+                android:dialogTitle="@string/pref_oepl_weather_ha_url_title" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_ha_token"
+                android:title="@string/pref_oepl_weather_ha_token_title"
+                android:summary="@string/pref_oepl_weather_ha_token_summary"
+                android:dialogTitle="@string/pref_oepl_weather_ha_token_title" />
+            <EditTextPreference
+                android:key="pref_oepl_weather_ha_entities"
+                android:title="@string/pref_oepl_weather_ha_entities_title"
+                android:summary="@string/pref_oepl_weather_ha_entities_summary"
+                android:dialogTitle="@string/pref_oepl_weather_ha_entities_title" />
+        </PreferenceScreen>
+
+        <PreferenceScreen
+            android:key="pref_oepl_weather_screen_quad"
+            android:title="@string/pref_oepl_weather_screen_quad"
+            android:summary="@string/pref_oepl_weather_quad_summary">
+            <ListPreference
+                android:defaultValue="oepl_4"
+                android:entries="@array/oepl_weather_quad"
+                android:entryValues="@array/oepl_weather_quad_values"
+                android:key="pref_oepl_weather_quad_1"
+                android:title="@string/pref_oepl_weather_quad_1_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="oepl_11"
+                android:entries="@array/oepl_weather_quad"
+                android:entryValues="@array/oepl_weather_quad_values"
+                android:key="pref_oepl_weather_quad_2"
+                android:title="@string/pref_oepl_weather_quad_2_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue=""
+                android:entries="@array/oepl_weather_quad"
+                android:entryValues="@array/oepl_weather_quad_values"
+                android:key="pref_oepl_weather_quad_3"
+                android:title="@string/pref_oepl_weather_quad_3_title"
+                app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue=""
+                android:entries="@array/oepl_weather_quad"
+                android:entryValues="@array/oepl_weather_quad_values"
+                android:key="pref_oepl_weather_quad_4"
+                android:title="@string/pref_oepl_weather_quad_4_title"
+                app:useSimpleSummaryProvider="true" />
+        </PreferenceScreen>
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_oepl_weather_category_device">

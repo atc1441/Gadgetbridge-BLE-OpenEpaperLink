@@ -62,8 +62,10 @@ public class NotificationsContent implements CardContent {
             return;
         }
         final float pad = Math.max(2f, area.width() * 0.025f);
-        // a row has to stay readable, so the count follows from the space, not the other way round
-        final float minRow = 22f;
+        // A row has to stay readable, so the count follows from the space rather than the
+        // other way round - and "readable" is measured against the panel's two or three
+        // colours, which turn a thin grey line into paper.
+        final float minRow = 26f;
         final int count = Math.max(1, Math.min(Math.min(maxNotes, notes.size()),
                 (int) (area.height() / minRow)));
         final float rowH = area.height() / count;
@@ -74,10 +76,13 @@ public class NotificationsContent implements CardContent {
         // sizes are chosen to leave that room: the source, the headline and the body used to
         // be placed at fractions of the row and touched each other on a narrow panel.
         final Paint app = style.paint(style.accent, true,
-                Math.min(rowH * (twoLines ? 0.24f : 0.30f), cap * 0.8f));
+                Math.max(9f, Math.min(rowH * (twoLines ? 0.24f : 0.30f), cap * 0.8f)));
         final Paint head = style.paint(style.ink, true,
-                Math.min(rowH * (twoLines ? 0.30f : 0.42f), cap));
-        final Paint sub = style.paint(style.ink, false, Math.min(rowH * 0.24f, cap * 0.85f));
+                Math.max(11f, Math.min(rowH * (twoLines ? 0.30f : 0.42f), cap)));
+        // the body line is the one that may be left out, so it keeps its own floor low and
+        // is simply not drawn when the row cannot hold it
+        final Paint sub = style.paint(style.ink, false,
+                Math.max(9f, Math.min(rowH * 0.24f, cap * 0.85f)));
 
         for (int i = 0; i < count; i++) {
             final PhoneStateStore.Note note = notes.get(i);

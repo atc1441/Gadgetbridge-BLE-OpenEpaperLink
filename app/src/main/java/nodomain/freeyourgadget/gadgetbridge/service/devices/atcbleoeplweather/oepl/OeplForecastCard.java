@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -46,12 +47,12 @@ public class OeplForecastCard extends OeplCard {
 
     @Override
     public boolean hasData() {
-        return weather != null && !weather.days.isEmpty();
+        return weather != null && !weather.upcomingDays().isEmpty();
     }
 
     @Override
     protected void paint(final OeplCanvas c) {
-        if (weather == null || weather.days.isEmpty()) {
+        if (weather == null || weather.upcomingDays().isEmpty()) {
             return;
         }
         if (c.height > c.width * 1.1f) {
@@ -71,20 +72,28 @@ public class OeplForecastCard extends OeplCard {
                 w - pad * 2);
 
         // a column needs room for two temperatures side by side, so cap the count by the width
+        // from today on: a forecast held over from yesterday would otherwise put a day
+        // that is over into the first column, where the reader takes it for today
+        final List<OeplWeather.Day> forecast = weather.upcomingDays();
         final float minColumn = h * 0.36f;
-        int days = Math.min(requestedDays, weather.days.size());
+        int days = Math.min(requestedDays, forecast.size());
         days = Math.max(1, Math.min(days, (int) (w / Math.max(24f, minColumn))));
         final float column = w / days;
         final float top = h * 0.16f;
 
-        final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
+        // read in the place's own time: a forecast for somewhere two time zones away is
+        // about that place's days, not about the phone's
+        final SimpleDateFormat weekday = weather.format("EE");
 
         for (int i = 0; i < days; i++) {
-            final OeplWeather.Day day = weather.days.get(i);
+            final OeplWeather.Day day = forecast.get(i);
             final float centre = column * i + column / 2f;
 
-            c.textClipped(weekday.format(new Date(day.epochSeconds * 1000L)), centre, top,
-                    h * 0.15f, OeplCanvas.CENTER, c.ink, column - 2);
+            // today says so, and in the accent colour: which column one is standing in is the
+            // first thing read off a forecast and the easiest to get wrong
+            final boolean today = weather.isToday(day);
+            c.textClipped(dayLabel(c, weather, day, weekday, h * 0.15f, column - 2), centre, top,
+                    h * 0.15f, OeplCanvas.CENTER, today ? c.accent : c.ink, column - 2);
 
             final float windY = top + h * 0.175f;
             final String windValue = wind(day.windSpeed);
@@ -151,20 +160,22 @@ public class OeplForecastCard extends OeplCard {
         c.textClipped(weather.location, pad, 0, headSize, OeplCanvas.LEFT, c.ink, w - pad * 2);
         final float top = headSize * 1.25f;
 
-        final int days = Math.max(1, Math.min(requestedDays, weather.days.size()));
+        final List<OeplWeather.Day> forecast = weather.upcomingDays();
+        final int days = Math.max(1, Math.min(requestedDays, forecast.size()));
         final float row = (h - top) / days;
         final float textSize = Math.min(row * 0.46f, w * 0.17f);
-        final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
+        final SimpleDateFormat weekday = weather.format("EE");
 
         for (int i = 0; i < days; i++) {
-            final OeplWeather.Day day = weather.days.get(i);
+            final OeplWeather.Day day = forecast.get(i);
             final float y = top + i * row;
             final float middle = y + row / 2f;
 
             final boolean withRain = day.precipitation > 0.05f && row > textSize * 1.9f;
             final float firstLine = middle - textSize * (withRain ? 0.95f : 0.55f);
-            c.textFitted(weekday.format(new Date(day.epochSeconds * 1000L)), pad, firstLine,
-                    textSize, OeplCanvas.LEFT, c.ink, w * 0.25f);
+            c.textFitted(dayLabel(c, weather, day, weekday, textSize, w * 0.25f), pad,
+                    firstLine, textSize, OeplCanvas.LEFT,
+                    weather.isToday(day) ? c.accent : c.ink, w * 0.25f);
             c.iconCentered(OeplIcons.weather(day.wmoCode, false), w * 0.45f, middle,
                     Math.min(row * 0.70f, w * 0.24f),
                     inkOrAccent(c, OeplIcons.isSevere(day.wmoCode)));

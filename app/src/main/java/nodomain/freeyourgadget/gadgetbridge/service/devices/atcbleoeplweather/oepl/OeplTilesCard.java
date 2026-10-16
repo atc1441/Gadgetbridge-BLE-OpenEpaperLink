@@ -73,8 +73,8 @@ public class OeplTilesCard extends OeplCard {
         // narrower than the others for nothing
         tiles.add(new Tile(OeplIcons.weather(now.wmoCode, !now.day),
                 temp(now.temperature) + "°", now.temperature < 0f));
-        if (!weather.days.isEmpty()) {
-            final OeplWeather.Day today = weather.days.get(0);
+        if (!weather.upcomingDays().isEmpty()) {
+            final OeplWeather.Day today = weather.upcomingDays().get(0);
             tiles.add(new Tile(String.valueOf(OeplIcons.THERMOMETER),
                     temp(today.minTemperature) + "/" + temp(today.maxTemperature), false));
             if (today.precipitation >= 0f) {

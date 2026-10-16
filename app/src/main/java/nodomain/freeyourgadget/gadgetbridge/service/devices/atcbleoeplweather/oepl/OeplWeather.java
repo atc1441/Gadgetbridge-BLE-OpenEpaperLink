@@ -21,8 +21,11 @@ import androidx.annotation.Nullable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 
@@ -69,9 +72,71 @@ public class OeplWeather {
     public final List<Hour> hours = new ArrayList<>();
     public long sunrise;
     public long sunset;
+    /**
+     * The place's own offset from UTC, in seconds. Weather belongs to where it falls: a
+     * forecast for a place two time zones away is about that place's morning, not about the
+     * phone's. Where the two agree - which is the normal case, the weather of the town the
+     * display hangs in - nothing about this is visible.
+     */
+    public int utcOffsetSeconds = TimeZone.getDefault().getOffset(System.currentTimeMillis())
+            / 1000;
     /** Phase angle in degrees, or -1 when nothing told us. */
     public int moonPhase = -1;
     public long fetchedAt = System.currentTimeMillis();
+
+    /**
+     * The forecast from today on.
+     * <p>
+     * What is held here can be older than it looks: the network was unreachable for a few
+     * hours, or overnight, and the display drew the picture anyway from the last answer -
+     * which is the right thing to do, except that the first day of that answer is then
+     * yesterday. Nothing on a wall is more confusing than yesterday presented as today, so a
+     * day that is over is dropped rather than drawn, and a forecast that is entirely in the
+     * past leaves the card with nothing, which is what it honestly has.
+     */
+    public List<Day> upcomingDays() {
+        final long now = System.currentTimeMillis();
+        final List<Day> upcoming = new ArrayList<>(days.size());
+        for (final Day day : days) {
+            // a day is over once its own midnight is a full day behind us; a day without a
+            // timestamp cannot be judged and is kept
+            if (day.epochSeconds <= 0 || (day.epochSeconds + 86400L) * 1000L > now) {
+                upcoming.add(day);
+            }
+        }
+        return upcoming;
+    }
+
+    /** As {@link #isToday(Day)}, for a caller that has the offset but not the forecast. */
+    public static boolean isToday(final Day day, final int utcOffsetSeconds) {
+        if (day == null || day.epochSeconds <= 0) {
+            return false;
+        }
+        // the day runs from its own midnight for twenty four hours, wherever that midnight
+        // falls - the offset is only needed because a day's start is given in local terms
+        final long start = day.epochSeconds * 1000L;
+        final long now = System.currentTimeMillis();
+        return now >= start && now < start + 86400000L;
+    }
+
+    /** The time zone the forecast's hours and days are counted in. */
+    public TimeZone zone() {
+        final int minutes = Math.abs(utcOffsetSeconds) / 60;
+        return TimeZone.getTimeZone(String.format(Locale.ROOT, "GMT%s%02d:%02d",
+                utcOffsetSeconds < 0 ? "-" : "+", minutes / 60, minutes % 60));
+    }
+
+    /** A date format that reads the forecast's timestamps in the place's own time. */
+    public SimpleDateFormat format(final String pattern) {
+        final SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
+        format.setTimeZone(zone());
+        return format;
+    }
+
+    /** Whether this day is the one the place is in, which is what a card marks as today. */
+    public boolean isToday(final Day day) {
+        return isToday(day, utcOffsetSeconds);
+    }
 
     public boolean hasData() {
         return current.temperature != 0f || !days.isEmpty() || !hours.isEmpty();

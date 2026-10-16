@@ -20,6 +20,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 
@@ -170,10 +171,46 @@ public class OeplInkRecorder extends Canvas {
         super.drawRoundRect(rect, rx, ry, paint);
     }
 
+    /**
+     * Paths matter as much as the rest: a pictogram drawn as a shape rather than set from a
+     * font goes through here, and one that was not recorded could reach over the panel edge
+     * without the audit ever noticing.
+     */
+    @Override
+    public void drawPath(final Path path, final Paint paint) {
+        record(strokeBounds(path, paint), "path", paint, false);
+        super.drawPath(path, paint);
+    }
+
+    /** What a path covers once drawn: its outline, widened by half the stroke on either side. */
+    private static RectF strokeBounds(final Path path, final Paint paint) {
+        final RectF bounds = new RectF();
+        path.computeBounds(bounds, true);
+        if (paint != null && paint.getStyle() != Paint.Style.FILL) {
+            final float half = paint.getStrokeWidth() / 2f;
+            bounds.inset(-half, -half);
+        }
+        return bounds;
+    }
+
+    /**
+     * An arc covers the part of its oval that is actually swept, not the whole oval. Recording
+     * the oval instead made every half circle look twice as tall as the ink it leaves, which
+     * is the difference between a pictogram that sits beside its label and one that is
+     * reported as lying on top of it.
+     */
     @Override
     public void drawArc(final RectF oval, final float startAngle, final float sweepAngle,
                         final boolean useCenter, final Paint paint) {
-        record(new RectF(oval), "arc", paint, false);
+        final Path path = new Path();
+        if (useCenter) {
+            path.moveTo(oval.centerX(), oval.centerY());
+        }
+        path.addArc(oval, startAngle, sweepAngle);
+        if (useCenter) {
+            path.close();
+        }
+        record(strokeBounds(path, paint), "arc", paint, false);
         super.drawArc(oval, startAngle, sweepAngle, useCenter, paint);
     }
 

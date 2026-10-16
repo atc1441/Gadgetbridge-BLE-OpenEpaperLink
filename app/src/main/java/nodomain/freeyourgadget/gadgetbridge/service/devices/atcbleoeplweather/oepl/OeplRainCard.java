@@ -101,7 +101,11 @@ public class OeplRainCard extends OeplCard {
 
         final float column = w / slots.size();
         final float barWidth = Math.max(1f, column * 0.66f);
-        final SimpleDateFormat clock = new SimpleDateFormat("HH", Locale.getDefault());
+        // the same clock the temperature curve carries, and the same marker for the day
+        // boundary: a row of numbers running past twelve reads as a date otherwise
+        final SimpleDateFormat clock = weather.format("HH");
+        final SimpleDateFormat weekday = weather.format("EE");
+        final java.util.Calendar when = java.util.Calendar.getInstance(weather.zone());
         final int labelEvery = Math.max(1, (int) Math.ceil(c.measure("00", labelSize) * 2f / column));
 
         for (int i = 0; i < slots.size(); i++) {
@@ -116,7 +120,10 @@ public class OeplRainCard extends OeplCard {
             if (i % labelEvery == 0) {
                 // the first and the last label would hang over the panel edge if they were
                 // simply centred under their column
-                final String stamp = clock.format(new Date(hour.epochSeconds * 1000L));
+                final Date at = new Date(hour.epochSeconds * 1000L);
+                when.setTime(at);
+                final String stamp = when.get(java.util.Calendar.HOUR_OF_DAY) < labelEvery
+                        ? weekday.format(at) : clock.format(at);
                 c.text(stamp, c.clampCentre(centre, stamp, labelSize), bottom + 1f, labelSize,
                         OeplCanvas.CENTER, c.ink);
             }

@@ -39,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OE
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OpenMeteoClient;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.PhoneStateStore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardContent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.QuadContent;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarManager;
 
@@ -84,6 +85,16 @@ public final class OeplCardFactory {
     public static final String BOARD = "panel_board";
     /** Your own text as a poster, for a door sign or a name plate. */
     public static final String POSTER = "panel_poster";
+    /** The dashboard grid: one framed tile per value, in the manner of a Home Assistant board. */
+    public static final String GRID = "panel_grid";
+    /** One value as large as the panel allows, the others as badges, the agenda beside it. */
+    public static final String HERO = "panel_hero";
+    /** The values as a list of rows, with a bar for everything that is a percentage. */
+    public static final String LIST = "panel_list";
+    /** The hours ahead as a temperature curve with the rain underneath. */
+    public static final String GRAPH = "panel_graph";
+    /** The panel in quarters, each holding another card. */
+    public static final String QUAD = "panel_quad";
 
     private OeplCardFactory() {
     }
@@ -95,11 +106,27 @@ public final class OeplCardFactory {
     /** True for the cards that need a weather forecast to say anything. */
     public static boolean needsWeather(final String id) {
         return WEATHER.equals(id) || FORECAST.equals(id) || RAIN.equals(id) || DATE.equals(id)
-                || BIG.equals(id) || RANGE.equals(id) || SUN.equals(id) || TILES.equals(id);
+                || BIG.equals(id) || RANGE.equals(id) || SUN.equals(id) || TILES.equals(id)
+                || GRAPH.equals(id) || needsReadings(id);
     }
 
     public static boolean needsFeed(final String id) {
         return RSS.equals(id);
+    }
+
+    /** The three cards that draw whatever {@link OeplReadings} collected. */
+    public static boolean needsReadings(final String id) {
+        return GRID.equals(id) || HERO.equals(id) || LIST.equals(id);
+    }
+
+    /** True for the cards that put entity states from a Home Assistant instance on the panel. */
+    public static boolean needsHomeAssistant(final String id) {
+        return needsReadings(id);
+    }
+
+    /** True for the card that is made of other cards, which have to be built as well. */
+    public static boolean isQuartered(final String id) {
+        return QUAD.equals(id);
     }
 
     public static CardContent create(final Context context, final GBDevice device,
@@ -151,6 +178,18 @@ public final class OeplCardFactory {
                         OEPLPrefs.calendarEvents(prefs), caption(context, prefs));
             case POSTER:
                 return new OeplPosterCard(lines(OEPLPrefs.customText(prefs)));
+            case GRID:
+                return new OeplGridCard(readings(context, device, prefs),
+                        device.getAliasOrName());
+            case HERO:
+                return new OeplHeroCard(readings(context, device, prefs),
+                        upcoming(context, device, prefs));
+            case LIST:
+                return new OeplListCard(readings(context, device, prefs));
+            case GRAPH:
+                return new OeplGraphCard(weather(prefs), OEPLPrefs.forecastHours(prefs));
+            case QUAD:
+                return quarters(context, device, prefs);
             case WEATHER:
             default:
                 return new OeplWeatherCard(weather(prefs), beaufort);
@@ -212,6 +251,48 @@ public final class OeplCardFactory {
             LOG.warn("could not read the calendar", e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Everything the dashboard cards draw, collected once and in one order. All three of them
+     * take the same list, so switching between them never changes which values a display shows
+     * - only how they are arranged.
+     */
+    private static List<OeplReading> readings(final Context context, final GBDevice device,
+                                              final SharedPreferences prefs) {
+        return OeplReadings.collect(context, device, prefs, weather(prefs),
+                events(context, device));
+    }
+
+    /** The appointments, cut to the number the card is configured for. */
+    private static List<CalendarEvent> upcoming(final Context context, final GBDevice device,
+                                                final SharedPreferences prefs) {
+        final List<CalendarEvent> events = events(context, device);
+        final int wanted = Math.max(1, OEPLPrefs.calendarEvents(prefs));
+        return events.size() <= wanted ? events : events.subList(0, wanted);
+    }
+
+    /**
+     * The quartered card. Each quarter is built by the ordinary content factory, so a quarter
+     * can hold anything the display can show - except another quartered card, which is left out
+     * rather than drawn: nesting it would halve the panel again and again.
+     */
+    private static CardContent quarters(final Context context, final GBDevice device,
+                                        final SharedPreferences prefs) {
+        final List<CardContent> parts = new ArrayList<>(OEPLPrefs.PREF_QUAD.length);
+        for (int i = 0; i < OEPLPrefs.PREF_QUAD.length; i++) {
+            final String id = OEPLPrefs.quadSlot(prefs, i);
+            if (id.isEmpty() || QUAD.equals(id)) {
+                continue;
+            }
+            try {
+                parts.add(nodomain.freeyourgadget.gadgetbridge.service.devices
+                        .atcbleoeplweather.CardContentFactory.create(context, device, prefs, id));
+            } catch (final Exception e) {
+                LOG.warn("could not build {} for a quarter of the panel", id, e);
+            }
+        }
+        return new QuadContent(parts);
     }
 
     /** What the display itself and the phone have to report. */

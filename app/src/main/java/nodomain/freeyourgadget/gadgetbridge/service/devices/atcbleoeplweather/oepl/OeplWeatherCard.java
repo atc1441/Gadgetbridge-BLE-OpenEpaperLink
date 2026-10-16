@@ -95,8 +95,8 @@ public class OeplWeatherCard extends OeplCard {
                 w - pad - h * 0.24f, h * 0.52f, h * 0.44f,
                 inkOrAccent(c, OeplIcons.isSevere(now.wmoCode)));
 
-        if (!weather.days.isEmpty() && h >= 96) {
-            final OeplWeather.Day today = weather.days.get(0);
+        if (!weather.upcomingDays().isEmpty() && h >= 96) {
+            final OeplWeather.Day today = weather.upcomingDays().get(0);
             c.textClipped(temp(today.minTemperature) + " / " + temp(today.maxTemperature)
                             + "°", pad, h * 0.235f, h * 0.17f, OeplCanvas.LEFT, c.ink,
                     w * 0.5f);
@@ -114,8 +114,8 @@ public class OeplWeatherCard extends OeplCard {
         c.textFilling(weather.location, w / 2f, head * 0.6f, w - pad * 2, head, c.ink);
 
         float y = head * 1.25f;
-        if (!weather.days.isEmpty()) {
-            final OeplWeather.Day today = weather.days.get(0);
+        if (!weather.upcomingDays().isEmpty()) {
+            final OeplWeather.Day today = weather.upcomingDays().get(0);
             final float range = head * 0.8f;
             c.textFilling(temp(today.minTemperature) + " / " + temp(today.maxTemperature)
                     + "°", w / 2f, y + range * 0.5f, w - pad * 2, range, c.ink);

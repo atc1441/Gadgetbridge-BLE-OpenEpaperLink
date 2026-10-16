@@ -7,14 +7,30 @@ pushes it over Bluetooth LE. There is no access point and no server anywhere in 
 ## Pairing
 
 1. Flash [ATC_BLE_OEPL](https://gadgetbridge.org/gadgets/displays/atc_ble_oepl/) onto the tag.
-2. Search for devices. The tag advertises as `ATC_xxxxxx` and will be offered twice: once as
+2. Search for devices. A tag calling itself `ATC_xxxxxx` is offered twice: once as
    **ATC_BLE_OEPL** (the upstream device type, for sending a picture by hand) and once as
    **OEPL Weather Display**. Pick the latter.
 3. If the wrong one was picked, long press the entry in the discovery list and force the type.
 
+**A display is drawn for even when its firmware says little about itself.** The settings
+structure a tag answers with is read for the panel - its size, its colours - and everything
+behind that in the structure is a setting rather than a property: a firmware that has never
+had a BLE interval written leaves it at zero, which says nothing about the panel and must not
+count as a broken answer. Should the answer be unreadable, or not come at all, the hardware
+type from the advertisement is looked up in the tag catalogue and the picture is drawn against
+that. A display that connects and is then let go without being sent anything is the one
+outcome worth ruling out.
+
+**A tag is recognised by what it advertises, not by what it calls itself.** The same firmware
+answers to `ATC_` on one board and `RTL_` on another, and a tag whose name has not been read
+yet has none at all - so the scan filters on 0x1337 instead, which every OpenEPaperLink tag
+carries twice over: as the service in its advertisement and as the manufacturer id of the data
+block that holds the hardware type, the battery voltage and the panel temperature. Either is
+enough to be offered as a display; the name is only consulted when neither is at hand.
+
 Each entry in the discovery list names the panel the tag carries, for example
-`M3 2.9" BWRY · 384×168 · 2.61 V`, together with its battery. Every one of these displays
-calls itself `ATC_` plus four characters of its MAC address, so a shelf of them is otherwise a
+`M3 2.9" BWRY · 384×168 · 2.61 V`, together with its battery. These displays call themselves
+`ATC_` or `RTL_` plus four characters of their MAC address, so a shelf of them is otherwise a
 list of identical entries - while the panel, which decides what can be shown on it, is in every
 advertisement they send. An unknown type still shows its code, as `Unknown (0x4F)`.
 
@@ -29,6 +45,12 @@ first card is drawn with a real battery reading and the right panel geometry.
   nothing once a second display is on the wall, while the diagonal and the resolution say what
   kind of display this is. Give the device a name of your own and that name is used instead,
   untouched.
+- **The battery** is the one from the last visit, and it is shown whether or not the link is
+  up. Gadgetbridge forgets a device's battery the moment the link drops, which is right for a
+  watch that reports while it is worn and wrong for a tag that is awake for a few seconds a
+  day: the card would show a question mark for all but those seconds, although the voltage is
+  in every advertisement the tag sends. The reading on the card is therefore at most one
+  wake-up old.
 - **The icon** is the picture the display is showing, and it stays in its own colours whether or
   not the link is up. Gadgetbridge greys out the icon of a disconnected device, which reads
   correctly for a symbol but not for a photograph of a panel - least of all here, where being
@@ -40,9 +62,51 @@ first card is drawn with a real battery reading and the right panel geometry.
   only report that nothing is connected, which for a tag that is woken for a few seconds at a
   time is almost always true.
 
+## What a card may show
+
+Two rules every card follows, which are worth knowing because they are what a display does
+when something goes wrong rather than when everything works:
+
+- **Nothing from the past.** The forecast in hand can be older than it looks - the network was
+  unreachable for a few hours, or overnight, and the display drew the picture anyway from the
+  last answer, which is the right thing to do. The first day of that answer is then yesterday,
+  so days that are over are dropped before anything is drawn, and the hourly curve starts at
+  the current hour. A forecast that lies entirely in the past leaves the card saying it has no
+  weather, which is the truth.
+- **An hour is not a date.** The curves count along their bottom edge in hours, and a row
+  reading "15, 18, 21" is taken for a date the moment the numbers run past twelve. Midnight
+  therefore carries the name of the day that starts there, with a dotted rule under it, and
+  the temperature scale up the side carries its degree sign.
+- **Today says so.** In the forecast cards the column or row for today carries the word
+  *Today* in the accent colour instead of its weekday - and where the column is too narrow for
+  the word, the weekday stays but the colour does not. Which day one is standing in is the
+  first thing read off a forecast and the easiest to get wrong.
+
+### Language and time zones
+
+Everything drawn on the panel comes from the app's string resources, so the display follows
+**Gadgetbridge's language setting** - which is the system language unless it was changed in the
+app. That includes the weekday and month names, which are formatted in the same locale, and the
+description of the sky ("light rain"), which is taken from Gadgetbridge's own translated names
+for the weather condition codes rather than written out here: the panel speaks every language
+the app does, not only the two it was written in.
+
+Times follow two different clocks on purpose:
+
+- **The phone's** for everything about the phone - the clock card, appointments, notifications,
+  the stamp in the header of the tile grid.
+- **The weather location's** for everything about the weather - the hours along the curves,
+  sunrise and sunset, the weekdays of the forecast and which of them is today. A forecast for a
+  place two time zones away is about that place's morning. Where the two clocks agree, which is
+  the normal case, none of this is visible.
+
+The tag's own clock is a separate thing again: it has no time zone, so it is given the local
+moment as a plain timestamp, and the tag's clock screen is switched off again right after -
+the firmware would otherwise draw a clock of its own over the picture every minute.
+
 ## The cards
 
-Thirty-seven of them, in four families, which the ids say apart:
+Forty-two of them, in four families, which the ids say apart:
 
 - `oepl_*` — the OpenEPaperLink layouts. The number is the content number that access point
   uses, so the two can be compared side by side.
@@ -71,6 +135,11 @@ Thirty-seven of them, in four families, which the ids say apart:
 | `panel_tiles` | Today in tiles of a pictogram and a figure | weather, wind unit |
 | `panel_board` | The appointments as a departure board | calendar, caption |
 | `panel_poster` | Your own text as a poster, for a door sign | text |
+| `panel_grid` | Dashboard tiles: a symbol, a figure and a caption per value | which values, Home Assistant |
+| `panel_hero` | One value at poster size, the rest as badges, the agenda beside it | which values, Home Assistant |
+| `panel_list` | The values as rows, with a bar for every percentage | which values, Home Assistant |
+| `panel_graph` | The hours ahead as a temperature curve with the rain under it | weather, hours |
+| `panel_quad` | The panel in quarters, each holding another card | the four slots |
 | `weather` | Weather with a short forecast | weather, days |
 | `date`, `clock` | Date, clock | — |
 | `calendar` | Appointments | calendar |
@@ -85,7 +154,7 @@ Thirty-seven of them, in four families, which the ids say apart:
 | `image` | A picture from the phone | picture, dithering, fit |
 | `image_url` | A picture from a URL | picture, dithering, fit |
 
-The twelve `oepl_*` cards, the six `panel_*` cards and the two picture cards own the whole
+The twelve `oepl_*` cards, the eleven `panel_*` cards and the two picture cards own the whole
 panel. The others are drawn inside a frame with a title bar and a status strip, which is what
 the *Appearance* settings apply to.
 
@@ -113,10 +182,86 @@ cannot drift apart.
 | **Notifications** | how many |
 | **Own text** | the text |
 | **Picture** | choose a picture, picture address, colour reduction, fit |
+| **Dashboard values** | which of the four groups the dashboard cards collect |
+| **Home Assistant** | address, access token, the entities to show |
+| **Four quarters** | which card goes into each of the four slots |
 | **Appearance** | frame, accent colour, rotation, status strip, invert |
 | **Updates** | interval, live updates and their minimum gap, connection attempts, reachability |
 | **Power and radio** | keep connection open, advertising interval, OEPL protocol flag |
 | **Hardware** | read the configuration from the display, display type |
+
+### The dashboard cards
+
+`panel_grid`, `panel_hero` and `panel_list` are three arrangements of one and the same list of
+values. What goes into that list is decided once, by group, under *Dashboard values*:
+
+- **Weather** — the temperature now, the day's range, rain, wind, humidity.
+- **House** — the Home Assistant entities, see below.
+- **Appointments** — how many are left today, and the next one by name.
+- **Batteries** — the phone, the display itself and every other paired gadget.
+
+The order is fixed and is the same for all three cards: the sky, the house, the agenda, the
+batteries. That is what makes switching between the three arrangements a matter of taste rather
+than of content - and it is also how a card decides what to leave out when the panel is full.
+A tile grid shows as many tiles as the panel can hold **at a readable size** and drops the rest,
+which is why a shelf label shows four values where a poster shows eight. Nothing is ever shrunk
+below what survives a two colour panel: thin grey strokes come out of the quantiser as paper.
+
+### Home Assistant
+
+The panel can show entity states from your own instance. The usual Home Assistant setup for
+e-paper tags runs the other way round - an add-on renders pictures and hands them to an
+OpenEPaperLink access point - but here the phone *is* the access point, so the phone fetches
+the states itself. Nothing is installed on the Home Assistant side.
+
+1. In Home Assistant, open your own profile, scroll to the bottom and create a
+   **long-lived access token**. Copy it; it is shown once.
+2. In the display's settings, under *Content → Home Assistant*, enter the **address** the phone
+   can reach, e.g. `http://homeassistant.local:8123` or `http://192.168.1.4:8123`. A plain host
+   name with a port is enough - `http://` is filled in when it is missing.
+3. Paste the token into **Access token**.
+4. List the **entities**, one per line, with an optional name after a vertical bar:
+
+   ```
+   sensor.wohnzimmer_temperatur | Wohnzimmer
+   binary_sensor.haustuer | Haustuer
+   sensor.pv_heute | PV heute
+   switch.waschmaschine
+   ```
+
+   Without a name, the entity's own friendly name is used. Up to twelve entities are read; the
+   card then shows as many of them as the panel can hold.
+5. Choose `panel_grid`, `panel_hero` or `panel_list`, and leave **House** switched on under
+   *Dashboard values*.
+
+What it does with what it gets: a number keeps its unit (`21.8 °C`, `8.4 kWh`), a percentage
+also gets a bar, and the states Home Assistant words rather than numbers - `on`, `off`, `open`,
+`closed`, `locked`, `home` - are translated. A door left open, an unlocked lock and a battery
+at twenty percent or less are drawn in the accent colour. The symbol comes from the entity's
+domain and device class, the same things Home Assistant picks its own icons by.
+
+The fetch happens while the picture is being prepared, before the radio session with the tag,
+and one `GET /api/states/<entity>` goes out per entity. States are kept for two minutes, so a
+display that redraws every quarter of an hour asks once per update. If the token is wrong or an
+entity is misspelled the card simply has fewer values on it - the display's **info screen**
+says what went wrong, under *Home Assistant*.
+
+Two limits worth knowing: the phone has to be able to reach the instance when the update runs
+(the same network, a VPN, or Nabu Casa), and a self-signed certificate only works if its
+authority is installed on the phone. On a home network, plain `http://` is the simple answer.
+
+### The quartered card
+
+`panel_quad` is not a design of its own, it is the box the others come in: *Content → Four
+quarters* holds four slots, and each slot takes any other card. Two cards split the panel along
+its longer edge, three give the first one the full width and put the other two underneath, four
+make a grid. A panel too small to hold them all readably shows fewer of them rather than four
+fragments - a pane has to be at least 118 pixels wide, which is about the narrowest a card was
+ever designed for.
+
+A quarter is drawn by the very same code that would fill the whole panel, so everything keeps
+working: the weather quarter still reads the weather settings, the feed quarter still fetches
+the feed before the tag is contacted. A quarter cannot be another quartered card.
 
 ### Showing a Google (or any other) calendar
 
@@ -261,7 +406,12 @@ devices/atcbleoeplweather/
   cover everything).
 
 `OeplLayoutAuditTest` is the sweep: every design on **every geometry in the tag catalogue, in
-both orientations**, which is 52 designs across 77 shapes and about four thousand cards a run.
+both orientations**, and every design a second time with the longest text it could plausibly
+be given - a place name that fills the panel, entity labels named after where the thing hangs,
+appointment titles with a doctor's full name in them. That is 102 designs across 77 shapes and
+close to eight thousand cards a run. The long forms are the ones that matter: a layout that
+holds "Hamburg" says nothing about what it does with "Schmalkalden-Meiningen Nord", and the
+long names are where the overlaps were.
 It draws through `OeplInkRecorder`, a canvas that writes down the box every piece of ink really
 covers, and fails on two things:
 
@@ -272,6 +422,14 @@ covers, and fails on two things:
   exactly like ink to a pixel count, so this is measured from the glyph boxes. Both thresholds
   are nearly zero; every design currently passes at a single square pixel, and what is allowed
   is for the rounding a different build of a font brings, not for anything anybody could see.
+
+`OeplDashboardTest` adds what those two cannot see. It measures the **size** of what was
+drawn, because a panel with two or three colours turns a thin grey stroke into paper: text
+under about eight pixels is not small, it is gone. So the dashboard cards show fewer values
+rather than smaller ones, and the test holds them to it - including the case where half the
+values are sentences rather than figures, which must not shrink the figures. It also checks
+the pictograms against the text beside them, which the layout audit leaves out: a symbol drawn
+as a shape is not a piece of text, and nothing else would notice it landing on a caption.
 
 The report of a run is written to `app/build/oepl-gallery/layout-audit.txt`, whether it passed
 or not. Between the two, what is left for the contact sheets is the question no assertion

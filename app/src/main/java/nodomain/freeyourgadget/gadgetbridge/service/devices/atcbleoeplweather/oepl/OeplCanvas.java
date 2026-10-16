@@ -171,6 +171,48 @@ public class OeplCanvas {
                 cy + bounds.height() / 2f - bounds.bottom, paint);
     }
 
+    /**
+     * As {@link #textFilling}, but cut with an ellipsis when no size would make it fit.
+     * <p>
+     * Setting a line as large as its box allows only works while the line is a figure. A
+     * caption somebody typed, or a state a home automation system words rather than numbers,
+     * is a sentence: it is still too wide at the smallest size that can be read, and
+     * {@link #fillingSize} has to stop shrinking somewhere. Whatever is left over then goes
+     * over the edge of the panel - which is what this exists to prevent.
+     */
+    public void textFillingClipped(final String text, final float cx, final float cy,
+                                   final float maxWidth, final float maxHeight,
+                                   final int color) {
+        textFillingAtClipped(text, cx, cy, fillingSize(text, maxWidth, maxHeight), color,
+                maxWidth);
+    }
+
+    /** As {@link #textFillingClipped}, at a size that was worked out for several lines at once. */
+    public void textFillingAtClipped(final String text, final float cx, final float cy,
+                                     final float size, final int color, final float maxWidth) {
+        if (text == null || text.isEmpty() || size <= 0f) {
+            return;
+        }
+        // measured as ink, the way textFillingAt places it: a face carries side bearings,
+        // and comparing the advance width against the box declares a figure too wide that
+        // fits perfectly well - which came out as a cut "-12...." where "-12.7" belonged
+        if (inkWidth(text, size) <= maxWidth) {
+            textFillingAt(text, cx, cy, size, color);
+        } else {
+            textClipped(text, cx, cy - lineHeight(size) / 2f, size, CENTER, color, maxWidth);
+        }
+    }
+
+    /** How wide the drawn glyphs of a line are, side bearings excluded. */
+    public float inkWidth(final String text, final float size) {
+        if (text == null || text.isEmpty()) {
+            return 0f;
+        }
+        final android.graphics.Rect bounds = new android.graphics.Rect();
+        textPaint(size, ink).getTextBounds(text, 0, text.length(), bounds);
+        return bounds.width();
+    }
+
     /** The size {@link #textFilling} would set this text in, or 0 when there is none. */
     public float fillingSize(final String text, final float maxWidth, final float maxHeight) {
         if (text == null || text.isEmpty()) {
@@ -343,7 +385,18 @@ public class OeplCanvas {
             if (end == start) {
                 end = Math.min(length, start + 1);
             }
-            draw(content.substring(start, end).trim(), x, cursor, align, paint);
+            String line = content.substring(start, end).trim();
+            // the last line that fits, with text still to come: it ends in an ellipsis rather
+            // than in the middle of a word, so that a reader can tell a summary that was cut
+            // from a sentence that simply ends there
+            final boolean last = cursor + lineHeight + (fm.descent - fm.ascent) > y + boxHeight;
+            if (last && end < length) {
+                while (line.length() > 1 && paint.measureText(line + "…") > boxWidth) {
+                    line = line.substring(0, line.length() - 1);
+                }
+                line = line.trim() + "…";
+            }
+            draw(line, x, cursor, align, paint);
             cursor += lineHeight;
             if (end < length && content.charAt(end) == 10) {
                 end++;

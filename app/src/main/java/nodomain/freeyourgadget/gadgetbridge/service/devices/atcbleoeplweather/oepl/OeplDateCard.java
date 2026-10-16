@@ -59,7 +59,7 @@ public class OeplDateCard extends OeplCard {
             return;
         }
         final float pad = Math.max(2f, w * 0.02f);
-        final SimpleDateFormat clock = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        final SimpleDateFormat clock = weather.format("HH:mm");
         final String rise = clock.format(new Date(weather.sunrise * 1000L));
         final String set = clock.format(new Date(weather.sunset * 1000L));
         final float gap = Math.max(2f, w * 0.012f);

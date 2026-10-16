@@ -168,7 +168,16 @@ object DeviceCardItemBinder {
         context: Context,
     ) {
         val batteryIndex = item.batteryIndex
-        val batteryLevel = device.getBatteryLevel(batteryIndex)
+        // A device that is only connected for a moment at a time has no live battery reading
+        // almost all of the time - Gadgetbridge clears it when the link drops. Its coordinator
+        // may still know what the battery was on the last visit, and a figure from the last
+        // wake-up says far more than a question mark does.
+        val liveLevel = device.getBatteryLevel(batteryIndex)
+        val batteryLevel = if (liveLevel == GBDevice.BATTERY_UNKNOWN.toInt()) {
+            device.deviceCoordinator.getRememberedBatteryLevel(device, batteryIndex)
+        } else {
+            liveLevel
+        }
         val batteryVoltage = device.getBatteryVoltage(batteryIndex)
         val batteryState = device.getBatteryState(batteryIndex)
         val batteryIcon = device.getBatteryIcon(batteryIndex)

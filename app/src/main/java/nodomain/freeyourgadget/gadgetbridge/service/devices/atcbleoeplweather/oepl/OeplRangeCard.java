@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -44,12 +45,12 @@ public class OeplRangeCard extends OeplCard {
 
     @Override
     public boolean hasData() {
-        return weather != null && !weather.days.isEmpty();
+        return weather != null && !weather.upcomingDays().isEmpty();
     }
 
     @Override
     protected void paint(final OeplCanvas c) {
-        if (weather == null || weather.days.isEmpty()) {
+        if (weather == null || weather.upcomingDays().isEmpty()) {
             return;
         }
         final float w = c.width;
@@ -66,7 +67,9 @@ public class OeplRangeCard extends OeplCard {
 
         // a row has to stay thick enough for a readable figure, so the number of days follows
         // from the room rather than from the setting
-        final int days = Math.max(1, Math.min(Math.min(requestedDays, weather.days.size()),
+        // from today on, never from a day that is already over
+        final List<OeplWeather.Day> forecast = weather.upcomingDays();
+        final int days = Math.max(1, Math.min(Math.min(requestedDays, forecast.size()),
                 (int) ((h - top) / 11f)));
         final float row = (h - top) / days;
         final float textSize = c.sizeForHeight(Math.min(row * 0.72f, w * 0.14f), row * 0.94f,
@@ -79,13 +82,13 @@ public class OeplRangeCard extends OeplCard {
         float max = -Float.MAX_VALUE;
         float dayColumn = 0f;
         float figureColumn = 0f;
-        final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
+        final SimpleDateFormat weekday = weather.format("EE");
         for (int i = 0; i < days; i++) {
-            final OeplWeather.Day day = weather.days.get(i);
+            final OeplWeather.Day day = forecast.get(i);
             min = Math.min(min, day.minTemperature);
             max = Math.max(max, day.maxTemperature);
             dayColumn = Math.max(dayColumn,
-                    c.measure(weekday.format(new Date(day.epochSeconds * 1000L)), textSize));
+                    c.measure(dayLabel(c, weather, day, weekday, textSize, 0f), textSize));
             figureColumn = Math.max(figureColumn, Math.max(
                     c.measure(temp(day.minTemperature) + "°", textSize),
                     c.measure(temp(day.maxTemperature) + "°", textSize)));
@@ -103,17 +106,17 @@ public class OeplRangeCard extends OeplCard {
         // cold one is a few pixels, which says less than the figures do on their own - so a
         // narrow tag gets the figures and no chart at all.
         if (barRight - barLeft < Math.max(w * 0.3f, 80f)) {
-            rowsWithoutBars(c, days, top, row, textSize, pad, gap, weekday);
+            rowsWithoutBars(c, forecast, days, top, row, textSize, pad, gap, weekday);
             return;
         }
 
         for (int i = 0; i < days; i++) {
-            final OeplWeather.Day day = weather.days.get(i);
+            final OeplWeather.Day day = forecast.get(i);
             final float middle = top + row * (i + 0.5f);
             final float textTop = middle - c.lineHeight(textSize) / 2f;
 
-            c.text(weekday.format(new Date(day.epochSeconds * 1000L)), pad, textTop, textSize,
-                    OeplCanvas.LEFT, i == 0 ? c.accent : c.ink);
+            c.text(dayLabel(c, weather, day, weekday, textSize, 0f), pad, textTop, textSize,
+                    OeplCanvas.LEFT, weather.isToday(day) ? c.accent : c.ink);
 
             final float x0 = barLeft + (day.minTemperature - min) / (max - min)
                     * (barRight - barLeft);
@@ -130,15 +133,16 @@ public class OeplRangeCard extends OeplCard {
     }
 
     /** The same week on a tag too narrow for a chart: weekday, low and high, nothing drawn. */
-    private void rowsWithoutBars(final OeplCanvas c, final int days, final float top,
-                                 final float row, final float textSize, final float pad,
-                                 final float gap, final SimpleDateFormat weekday) {
+    private void rowsWithoutBars(final OeplCanvas c, final List<OeplWeather.Day> forecast,
+                                 final int days, final float top, final float row,
+                                 final float textSize, final float pad, final float gap,
+                                 final SimpleDateFormat weekday) {
         for (int i = 0; i < days; i++) {
-            final OeplWeather.Day day = weather.days.get(i);
+            final OeplWeather.Day day = forecast.get(i);
             final float textTop = top + row * (i + 0.5f) - c.lineHeight(textSize) / 2f;
-            c.rowEnds(weekday.format(new Date(day.epochSeconds * 1000L)),
+            c.rowEnds(dayLabel(c, weather, day, weekday, textSize, c.width * 0.3f),
                     temp(day.minTemperature) + " / " + temp(day.maxTemperature) + "°",
-                    textTop, textSize, i == 0 ? c.accent : c.ink, c.ink, pad,
+                    textTop, textSize, weather.isToday(day) ? c.accent : c.ink, c.ink, pad,
                     c.width - pad, gap);
         }
     }

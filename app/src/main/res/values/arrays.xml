@@ -5407,6 +5407,107 @@
         <item>18</item>
         <item>24</item>
     </string-array>
+    <!-- What one quarter of the quartered card can hold: any other card, or nothing. -->
+    <string-array name="oepl_weather_quad">
+        <item>@string/oepl_quad_none</item>
+        <item>@string/oepl_content_oepl_weather</item>
+        <item>@string/oepl_content_oepl_forecast</item>
+        <item>@string/oepl_content_oepl_rain</item>
+        <item>@string/oepl_content_oepl_date</item>
+        <item>@string/oepl_content_oepl_clock</item>
+        <item>@string/oepl_content_oepl_calendar</item>
+        <item>@string/oepl_content_oepl_calendar_week</item>
+        <item>@string/oepl_content_oepl_rss</item>
+        <item>@string/oepl_content_oepl_qr</item>
+        <item>@string/oepl_content_oepl_count_days</item>
+        <item>@string/oepl_content_oepl_count_hours</item>
+        <item>@string/oepl_content_oepl_info</item>
+        <item>@string/oepl_content_panel_big</item>
+        <item>@string/oepl_content_panel_bars</item>
+        <item>@string/oepl_content_panel_sun</item>
+        <item>@string/oepl_content_panel_tiles</item>
+        <item>@string/oepl_content_panel_board</item>
+        <item>@string/oepl_content_panel_poster</item>
+        <item>@string/oepl_content_panel_grid</item>
+        <item>@string/oepl_content_panel_hero</item>
+        <item>@string/oepl_content_panel_list</item>
+        <item>@string/oepl_content_panel_graph</item>
+        <item>@string/oepl_content_weather</item>
+        <item>@string/oepl_content_date</item>
+        <item>@string/oepl_content_calendar</item>
+        <item>@string/oepl_content_text</item>
+        <item>@string/oepl_content_status</item>
+        <item>@string/oepl_content_weather_calendar</item>
+        <item>@string/oepl_content_weather_date</item>
+        <item>@string/oepl_content_date_calendar</item>
+        <item>@string/oepl_content_clock</item>
+        <item>@string/oepl_content_notifications</item>
+        <item>@string/oepl_content_music</item>
+        <item>@string/oepl_content_hourly</item>
+        <item>@string/oepl_content_forecast</item>
+        <item>@string/oepl_content_clock_weather</item>
+        <item>@string/oepl_content_weather_notifications</item>
+        <item>@string/oepl_content_calendar_notifications</item>
+        <item>@string/oepl_content_dashboard</item>
+        <item>@string/oepl_content_image</item>
+        <item>@string/oepl_content_image_url</item>
+    </string-array>
+    <string-array name="oepl_weather_quad_values" translatable="false">
+        <item></item>
+        <item>oepl_4</item>
+        <item>oepl_8</item>
+        <item>oepl_16</item>
+        <item>oepl_1</item>
+        <item>oepl_29</item>
+        <item>oepl_11</item>
+        <item>oepl_11w</item>
+        <item>oepl_9</item>
+        <item>oepl_10</item>
+        <item>oepl_2</item>
+        <item>oepl_3</item>
+        <item>oepl_21</item>
+        <item>panel_big</item>
+        <item>panel_bars</item>
+        <item>panel_sun</item>
+        <item>panel_tiles</item>
+        <item>panel_board</item>
+        <item>panel_poster</item>
+        <item>panel_grid</item>
+        <item>panel_hero</item>
+        <item>panel_list</item>
+        <item>panel_graph</item>
+        <item>weather</item>
+        <item>date</item>
+        <item>calendar</item>
+        <item>text</item>
+        <item>status</item>
+        <item>weather_calendar</item>
+        <item>weather_date</item>
+        <item>date_calendar</item>
+        <item>clock</item>
+        <item>notifications</item>
+        <item>music</item>
+        <item>hourly</item>
+        <item>forecast</item>
+        <item>clock_weather</item>
+        <item>weather_notifications</item>
+        <item>calendar_notifications</item>
+        <item>dashboard</item>
+        <item>image</item>
+        <item>image_url</item>
+    </string-array>
+    <string-array name="oepl_weather_reading_groups">
+        <item>@string/oepl_group_weather</item>
+        <item>@string/oepl_group_house</item>
+        <item>@string/oepl_group_events</item>
+        <item>@string/oepl_group_devices</item>
+    </string-array>
+    <string-array name="oepl_weather_reading_groups_values" translatable="false">
+        <item>weather</item>
+        <item>house</item>
+        <item>events</item>
+        <item>devices</item>
+    </string-array>
     <string-array name="oepl_weather_content">
         <item>@string/oepl_content_oepl_weather</item>
         <item>@string/oepl_content_oepl_forecast</item>
@@ -5426,6 +5527,11 @@
         <item>@string/oepl_content_panel_tiles</item>
         <item>@string/oepl_content_panel_board</item>
         <item>@string/oepl_content_panel_poster</item>
+        <item>@string/oepl_content_panel_grid</item>
+        <item>@string/oepl_content_panel_hero</item>
+        <item>@string/oepl_content_panel_list</item>
+        <item>@string/oepl_content_panel_graph</item>
+        <item>@string/oepl_content_panel_quad</item>
         <item>@string/oepl_content_weather</item>
         <item>@string/oepl_content_date</item>
         <item>@string/oepl_content_calendar</item>
@@ -5465,6 +5571,11 @@
         <item>panel_tiles</item>
         <item>panel_board</item>
         <item>panel_poster</item>
+        <item>panel_grid</item>
+        <item>panel_hero</item>
+        <item>panel_list</item>
+        <item>panel_graph</item>
+        <item>panel_quad</item>
         <item>weather</item>
         <item>date</item>
         <item>calendar</item>

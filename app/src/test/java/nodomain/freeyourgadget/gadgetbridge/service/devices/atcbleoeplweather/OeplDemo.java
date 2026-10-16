@@ -38,6 +38,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.co
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.ImageContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.MusicContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.NotificationsContent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.QuadContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.SplitContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.StatusContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.TextContent;
@@ -52,6 +53,13 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplDateCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplForecastCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplGlyphs;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplGraphCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplGridCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplHeroCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplIcons;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplListCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReading;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplInfoCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplPosterCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplQrCard;
@@ -83,7 +91,8 @@ public final class OeplDemo {
             "oepl_9", "oepl_10", "oepl_2", "oepl_3", "oepl_21",
             // our own designs, which own the whole panel as well
             "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
-            "panel_poster",
+            "panel_poster", "panel_grid", "panel_hero", "panel_list", "panel_graph",
+            "panel_quad",
             // the cards with the Gadgetbridge frame around them
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
@@ -98,7 +107,35 @@ public final class OeplDemo {
             "oepl_11:long", "text:long", "status:many", "notifications:long",
             "image:none", "image:ordered", "image:stretch",
             "panel_sun:night", "panel_poster:one", "panel_bars:week",
+            "panel_grid:weather", "panel_hero:noagenda", "panel_list:many",
+            "panel_graph:dry", "panel_quad:two", "panel_quad:three",
     };
+
+    /**
+     * Every design again, with everything in it as long and as awkward as it plausibly gets.
+     * A layout that holds "Hamburg" says nothing about what it does with a place whose name
+     * fills the panel, and the long names are where the overlaps are.
+     */
+    public static final String[] STRESS;
+
+    static {
+        STRESS = new String[IDS.length];
+        for (int i = 0; i < IDS.length; i++) {
+            STRESS[i] = IDS[i] + ":long";
+        }
+    }
+
+    /** A real place, and one of the longest names Germany has to offer. */
+    public static final String LONG_PLACE = "Schmalkalden-Meiningen Nord";
+    /** The label a tile gets when somebody names an entity after where it hangs. */
+    public static final String LONG_LABEL = "Waschmaschine im Keller hinten links";
+
+    /**
+     * Set while a ":long" variant is being built, which is what makes the shared demo data -
+     * the weather, the appointments, the batteries - come out in its awkward form. It is
+     * assigned on every call to {@link #card}, so it can never leak from one card to the next.
+     */
+    private static boolean stress;
 
     private OeplDemo() {
     }
@@ -125,6 +162,7 @@ public final class OeplDemo {
     public static CardContent card(final String id) {
         final String kind = id.contains(":") ? id.substring(0, id.indexOf(':')) : id;
         final String variant = id.contains(":") ? id.substring(id.indexOf(':') + 1) : "";
+        stress = "long".equals(variant);
         switch (kind) {
             case OeplCardFactory.WEATHER:
                 if ("night".equals(variant)) {
@@ -147,15 +185,17 @@ public final class OeplDemo {
             case OeplCardFactory.CLOCK:
                 return new OeplClockCard();
             case OeplCardFactory.CALENDAR:
-                return new OeplCalendarListCard(events(), "long".equals(variant) ? 10 : 4,
-                        "long".equals(variant) ? "Familienkalender und Termine" : "Kalender");
+                return new OeplCalendarListCard(events(), stress ? 10 : 4,
+                        stress ? "Familienkalender, Schule und Werkstatttermine" : "Kalender");
             case OeplCardFactory.CALENDAR_WEEK:
                 return new OeplCalendarWeekCard(events(), 3);
             case OeplCardFactory.RSS:
-                return new OeplRssCard(feed(), "Nachrichten", "summary".equals(variant));
+                return new OeplRssCard(feed(),
+                        stress ? "Nachrichten aus der Region und dem Umland" : "Nachrichten",
+                        "summary".equals(variant));
             case OeplCardFactory.QR:
                 return new OeplQrCard("https://codeberg.org/Freeyourgadget/Gadgetbridge",
-                        "Gadgetbridge");
+                        stress ? "Gadgetbridge, Quelltext und Anleitung dazu" : "Gadgetbridge");
             case OeplCardFactory.COUNT_DAYS:
                 return new OeplCounterCard(42, 30, "bis Weihnachten");
             case OeplCardFactory.COUNT_HOURS:
@@ -179,13 +219,64 @@ public final class OeplDemo {
             case OeplCardFactory.TILES:
                 return new OeplTilesCard(weather(), true);
             case OeplCardFactory.BOARD:
-                return new OeplBoardCard(events(), 6, "Termine");
+                return new OeplBoardCard(events(), 6,
+                        stress ? "Termine der ganzen Familie" : "Termine");
             case OeplCardFactory.POSTER:
-                return "one".equals(variant)
-                        ? new OeplPosterCard(Arrays.asList("Zimmer 4"))
-                        : new OeplPosterCard(Arrays.asList("Werkstatt",
+                if ("one".equals(variant)) {
+                    return new OeplPosterCard(Arrays.asList("Zimmer 4"));
+                }
+                if (stress) {
+                    return new OeplPosterCard(Arrays.asList(
+                            "Werkstatt und Ersatzteillager im Hinterhof",
+                            "!Bitte an der Seitentuer klingeln und warten",
+                            "Montag bis Freitag von 8 bis 17 Uhr"));
+                }
+                return new OeplPosterCard(Arrays.asList("Werkstatt",
                         "!Bitte klingeln", "Mo - Fr 8 bis 17 Uhr"));
+            case OeplCardFactory.GRID:
+                return new OeplGridCard("weather".equals(variant)
+                        ? readings(false, false) : readings(true, true),
+                        stress ? "Kueche, Esszimmer und Flur oben" : "Kueche");
+            case OeplCardFactory.HERO:
+                return new OeplHeroCard(readings(true, true),
+                        "noagenda".equals(variant) ? java.util.Collections.emptyList()
+                                : events());
+            case OeplCardFactory.LIST:
+                return new OeplListCard(readings(true, true));
+            case OeplCardFactory.GRAPH:
+                if ("dry".equals(variant)) {
+                    // a forecast without a drop in it, so the curve has the panel to itself
+                    final OeplWeather dry = weather();
+                    for (final OeplWeather.Hour hour : dry.hours) {
+                        hour.precipitation = 0f;
+                    }
+                    return new OeplGraphCard(dry, 24);
+                }
+                return new OeplGraphCard(weather(), 18);
+            case OeplCardFactory.QUAD: {
+                final List<CardContent> parts = new ArrayList<>();
+                parts.add(new WeatherContent(spec(), 3));
+                parts.add(new CalendarContent(events(), 4));
+                if (!"two".equals(variant)) {
+                    parts.add(new OeplRssCard(feed(), "Nachrichten", false));
+                }
+                if (!"two".equals(variant) && !"three".equals(variant)) {
+                    parts.add(new OeplListCard(readings(false, true)));
+                }
+                return new QuadContent(parts);
+            }
             case OeplCardFactory.INFO:
+                if (stress) {
+                    return new OeplInfoCard("Kueche, Esszimmer und Flur oben", Arrays.asList(
+                            new OeplInfoCard.Row("Typ", "Hanshow Stellar Pro M3 2.9 BWRY"),
+                            new OeplInfoCard.Row("Panel", "384 x 184, 4 Farben, gedreht"),
+                            new OeplInfoCard.Row("Firmware", "124 (OpenEPaperLink)"),
+                            new OeplInfoCard.Row("Akku", "3,07 V (95%), gemessen 12:40"),
+                            new OeplInfoCard.Row("Temperatur", "23 °C am Panel"),
+                            new OeplInfoCard.Row("MAC", "FF:FC:4F:05:E4:11"),
+                            new OeplInfoCard.Row("Telefon", "64%, laedt nicht"),
+                            new OeplInfoCard.Row("Stand", "15.10.2026 22:15:43")));
+                }
                 return new OeplInfoCard("Kueche", Arrays.asList(
                         new OeplInfoCard.Row("Typ", "HS BWRY 3,5"),
                         new OeplInfoCard.Row("Panel", "384 x 184, 4 Farben"),
@@ -218,7 +309,9 @@ public final class OeplDemo {
                         new StatusContent.Entry("Tastatur im Buero", 8),
                         new StatusContent.Entry("Fahrradcomputer", 55)))
                         : new StatusContent(Arrays.asList(
-                        new StatusContent.Entry("Pixel Watch", 72),
+                        new StatusContent.Entry(stress
+                                ? "Pixel Watch 2 von der Kollegin aus dem Buero"
+                                : "Pixel Watch", 72),
                         new StatusContent.Entry("Mi Band 7", 15),
                         new StatusContent.Entry("Buds", 91)));
             case CardContentFactory.CLOCK:
@@ -270,6 +363,72 @@ public final class OeplDemo {
         }
     }
 
+    /**
+     * What the dashboard cards draw: the same four groups the collector builds on a phone, with
+     * values chosen to put pressure on the layouts - a house entity whose name is too long for
+     * a tile, a door that is open and therefore accented, a battery at fifteen percent.
+     *
+     * @param house  whether the Home Assistant group is in, as it is when an instance is set up
+     * @param others whether the agenda and the batteries are in as well
+     */
+    public static List<OeplReading> readings(final boolean house, final boolean others) {
+        final List<OeplReading> readings = new ArrayList<>();
+        final String outside = stress ? "Draussen vor dem Fenster" : "Draussen";
+        readings.add(new OeplReading(outside, stress ? LONG_PLACE : "Hamburg", "")
+                .withTemperature(stress ? -12.7f : 13.4f, true)
+                .withFontGlyph(OeplIcons.weather(61, false)));
+        readings.add(new OeplReading(outside, "Heute", "")
+                .withRange(9f, 15f)
+                .withFontGlyph(String.valueOf(OeplIcons.THERMOMETER)));
+        readings.add(new OeplReading(outside, stress ? "Niederschlag heute" : "Regen",
+                stress ? "123.4 mm" : "2.3 mm")
+                .withFontGlyph(String.valueOf(OeplIcons.RAINDROP))
+                .accented(true));
+        readings.add(new OeplReading(outside, "Wind", "4")
+                .withFontGlyph(OeplIcons.windDirection(225)));
+        readings.add(new OeplReading(outside, "Feuchte", "78 %")
+                .withFontGlyph(String.valueOf(OeplIcons.UMBRELLA))
+                .withPercent(78));
+        if (house) {
+            final String inside = "Haus";
+            readings.add(new OeplReading(inside,
+                    stress ? "Wohnzimmer hinten am Fenster" : "Wohnzimmer",
+                    stress ? "-12.8 °C" : "21.8 °C")
+                    .withFontGlyph(String.valueOf(OeplIcons.THERMOMETER)));
+            readings.add(new OeplReading(inside,
+                    stress ? "Haustuer und Kellerabgang" : "Haustuer",
+                    stress ? "weit offen seit 12:40" : "offen")
+                    .withShape(OeplGlyphs.Glyph.DOOR)
+                    .accented(true));
+            readings.add(new OeplReading(inside,
+                    stress ? LONG_LABEL : "Waschmaschine im Keller",
+                    stress ? "laeuft im Schleudergang" : "laeuft")
+                    .withShape(OeplGlyphs.Glyph.PLUG));
+            readings.add(new OeplReading(inside,
+                    stress ? "Photovoltaik heute gesamt" : "PV heute",
+                    stress ? "1234.5 kWh" : "8.4 kWh")
+                    .withShape(OeplGlyphs.Glyph.BOLT));
+        }
+        if (others) {
+            readings.add(new OeplReading("Termine", "Termine", "2")
+                    .withShape(OeplGlyphs.Glyph.CALENDAR)
+                    .accented(true));
+            readings.add(new OeplReading("Geraete", "Telefon", "64 %")
+                    .withShape(OeplGlyphs.Glyph.PHONE)
+                    .withPercent(64));
+            readings.add(new OeplReading("Geraete", "Display", "95 %")
+                    .withShape(OeplGlyphs.Glyph.BATTERY)
+                    .withPercent(95));
+            readings.add(new OeplReading("Geraete",
+                    stress ? "Mi Band 7 von der Kollegin" : "Mi Band 7",
+                    stress ? "100 %" : "15 %")
+                    .withShape(OeplGlyphs.Glyph.WATCH)
+                    .withPercent(stress ? 100 : 15)
+                    .accented(true));
+        }
+        return readings;
+    }
+
     /** The colours a three colour tag has, which is what a picture is reduced to. */
     public static int[] palette() {
         return OEPLImageCodec.palette(3, false);
@@ -302,7 +461,7 @@ public final class OeplDemo {
 
     public static OeplWeather weather() {
         final OeplWeather w = new OeplWeather();
-        w.location = "Hamburg";
+        w.location = stress ? LONG_PLACE : "Hamburg";
         w.current.temperature = 13.4f;
         w.current.windSpeed = 7.2f;      // Beaufort 4
         w.current.windDirection = 225;
@@ -352,7 +511,7 @@ public final class OeplDemo {
     /** The same weather in the shape Gadgetbridge normally carries it. */
     public static WeatherSpec spec() {
         final WeatherSpec spec = new WeatherSpec();
-        spec.setLocation("Hamburg");
+        spec.setLocation(stress ? LONG_PLACE : "Hamburg");
         spec.setCurrentTemp(287);
         spec.setCurrentConditionCode(802);
         spec.setCurrentCondition("Stark bewoelkt");
@@ -404,6 +563,22 @@ public final class OeplDemo {
         final List<CalendarEvent> events = new ArrayList<>();
         // one running right now, one later today, one with a title no panel can hold, one
         // tomorrow, one all day
+        if (stress) {
+            // every title too long, and two on the same morning, so that nothing is placed by
+            // chance: this is the shape a real calendar has in a family of four
+            events.add(event(now - 600_000L, now + 1800_000L, 0,
+                    "Jahreshauptversammlung des Kleingartenvereins", false));
+            events.add(event(now + 300_000L, now + 3600_000L, 1,
+                    "Elterngespraech mit Frau Hohenschwangau-Reisinger", false));
+            events.add(event(base + 13 * 3600_000L, base + 14 * 3600_000L, 2,
+                    "Zahnarzt Dr. Mueller-Luedenscheidt, Praxis am Hauptbahnhof", false));
+            events.add(event(base + 86400_000L + 10 * 3600_000L,
+                    base + 86400_000L + 12 * 3600_000L, 3,
+                    "Werkstatttermin: Inspektion, Reifen und Klimaanlage", false));
+            events.add(event(base + 86400_000L, base + 3 * 86400_000L, 4,
+                    "Betriebsausflug in den Harz mit Uebernachtung", true));
+            return events;
+        }
         events.add(event(now - 600_000L, now + 1800_000L, 0, "Standup", false));
         events.add(event(base + 13 * 3600_000L, base + 14 * 3600_000L, 1, "Zahnarzt", false));
         events.add(event(base + 16 * 3600_000L, base + 18 * 3600_000L, 2,

@@ -57,7 +57,7 @@ public class OeplBigTemperatureCard extends OeplCard {
         final float headSize = c.sizeForHeight(Math.min(h * 0.15f, w * 0.1f), h * 0.22f, 7f);
         final float footSize = c.sizeForHeight(Math.min(h * 0.13f, w * 0.09f), h * 0.2f, 7f);
         final boolean head = headSize > 0f && !weather.location.isEmpty();
-        final boolean foot = footSize > 0f && !weather.days.isEmpty() && h >= 70f;
+        final boolean foot = footSize > 0f && !weather.upcomingDays().isEmpty() && h >= 70f;
 
         float top = 0f;
         float bottom = h;
@@ -74,7 +74,7 @@ public class OeplBigTemperatureCard extends OeplCard {
         }
 
         if (foot) {
-            final OeplWeather.Day today = weather.days.get(0);
+            final OeplWeather.Day today = weather.upcomingDays().get(0);
             final float line = c.lineHeight(footSize);
             bottom = h - line;
             final String range = temp(today.minTemperature) + " / "

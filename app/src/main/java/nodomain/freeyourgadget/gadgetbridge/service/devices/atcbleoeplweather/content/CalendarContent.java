@@ -57,18 +57,25 @@ public class CalendarContent implements CardContent {
             return;
         }
         final float pad = Math.max(2f, area.width() * 0.025f);
-        // a row below this height is no longer legible on e-paper, so show fewer entries
-        final float minRow = 21f;
+        // A row below this height is no longer legible on e-paper, so show fewer entries.
+        // The type is sized off the row, and the quantiser of a two colour panel leaves
+        // nothing but dust of a line under about ten pixels - which is what the combination
+        // cards, where this content gets a third of the panel, used to be full of.
+        final float minRow = 24f;
         final int count = Math.max(1, Math.min(Math.min(maxEvents, events.size()),
                 (int) (area.height() / minRow)));
         final float rowH = Math.min(area.height() / count, area.height() * 0.34f);
 
         // sized by the width too: a card with few entries has tall rows, and type scaled off
         // those alone leaves nothing but the first letter of every title
-        final Paint when = style.paint(style.accent, true,
-                Math.min(rowH * 0.38f, area.width() * 0.11f));
-        final Paint what = style.paint(style.ink, false,
-                Math.min(rowH * 0.42f, area.width() * 0.12f));
+        // ...and never below what the panel can still show. The combination cards hand this
+        // content a third of the panel, where the row height alone would set the titles in
+        // nine pixels of a regular face - which the quantiser leaves as grey dust. Under
+        // thirteen pixels the bold face goes on instead, for the same reason.
+        final float stampSize = Math.max(10f, Math.min(rowH * 0.38f, area.width() * 0.11f));
+        final float titleSize = Math.max(11f, Math.min(rowH * 0.42f, area.width() * 0.12f));
+        final Paint when = style.paint(style.accent, true, stampSize);
+        final Paint what = style.paint(style.ink, titleSize < 13f, titleSize);
         final Paint bullet = new Paint(Paint.ANTI_ALIAS_FLAG);
         bullet.setColor(style.ink);
 

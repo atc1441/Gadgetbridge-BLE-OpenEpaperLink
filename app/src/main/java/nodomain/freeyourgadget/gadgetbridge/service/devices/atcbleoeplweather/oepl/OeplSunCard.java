@@ -57,7 +57,8 @@ public class OeplSunCard extends OeplCard {
         final float h = c.height;
         final float pad = Math.max(2f, w * 0.03f);
 
-        final SimpleDateFormat clock = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        // the sun rises where the weather is, so these are that place's hours
+        final SimpleDateFormat clock = weather.format("HH:mm");
         final String rise = clock.format(new Date(weather.sunrise * 1000L));
         final String set = clock.format(new Date(weather.sunset * 1000L));
 

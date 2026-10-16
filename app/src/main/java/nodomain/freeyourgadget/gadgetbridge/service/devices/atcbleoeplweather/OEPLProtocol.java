@@ -81,6 +81,19 @@ public final class OEPLProtocol {
         return frame;
     }
 
+    /**
+     * The argument of {@link #CMD_SET_UNIXTIME}: the local time as a unix timestamp, lowest
+     * byte first. The tag has no time zone of its own, so local is what it wants; and it reads
+     * the four bytes back low to high, which is the opposite of every other number in this
+     * protocol.
+     */
+    public static byte[] unixTimeArgument(final long nowMillis, final java.util.TimeZone zone) {
+        final long local = (nowMillis + zone.getOffset(nowMillis)) / 1000L;
+        return new byte[]{
+                (byte) (local & 0xff), (byte) ((local >> 8) & 0xff),
+                (byte) ((local >> 16) & 0xff), (byte) ((local >> 24) & 0xff)};
+    }
+
     /** Announces a pending transfer; the tag answers with {@link #REQUEST_BLOCK} per block. */
     public static byte[] availableData(final long dataVersion, final int size, final int dataType) {
         final ByteBuffer buf = ByteBuffer.allocate(19).order(ByteOrder.LITTLE_ENDIAN);

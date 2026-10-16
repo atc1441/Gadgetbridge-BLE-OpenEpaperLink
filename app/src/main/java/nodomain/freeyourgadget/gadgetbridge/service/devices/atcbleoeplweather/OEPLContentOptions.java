@@ -61,6 +61,12 @@ public final class OEPLContentOptions {
         TEXT,
         /** The picture, where it comes from and how it is reduced to the panel's colours. */
         IMAGE,
+        /** Which groups of values the dashboard cards gather. */
+        READINGS,
+        /** The address of a Home Assistant instance, its token and the entities to show. */
+        HOME_ASSISTANT,
+        /** The four slots of the quartered card. */
+        QUAD,
         /**
          * The title bar and status strip that {@link CardRenderer} draws around a card. The
          * OpenEPaperLink layouts assume every pixel is theirs and draw neither, so the frame and
@@ -112,6 +118,22 @@ public final class OEPLContentOptions {
                 return EnumSet.of(Option.CALENDAR_EVENTS, Option.CALENDAR_TITLE);
             case OeplCardFactory.POSTER:
                 return EnumSet.of(Option.TEXT);
+            case OeplCardFactory.GRID:
+            case OeplCardFactory.HERO:
+            case OeplCardFactory.LIST:
+                // the dashboard cards draw whatever the chosen groups collected, which is why
+                // they read the weather, the calendar and the Home Assistant settings alike
+                return EnumSet.of(Option.READINGS, Option.HOME_ASSISTANT, Option.WEATHER,
+                        Option.WIND_UNIT, Option.CALENDAR_EVENTS);
+            case OeplCardFactory.GRAPH:
+                return EnumSet.of(Option.WEATHER, Option.FORECAST_HOURS);
+            case OeplCardFactory.QUAD:
+                // a quarter can hold any card there is, so any setting may be the one that
+                // matters. Hiding a menu here would hide the settings of the quarter that uses
+                // it, and this is the one card where nothing can be ruled out in advance. Only
+                // the frame is certain: the quartered card lays out the whole panel, so the
+                // title bar and the status strip are not drawn whatever a quarter would like.
+                return EnumSet.complementOf(EnumSet.of(Option.FRAME));
 
             // ------------------------------------------------- the framed cards
             case CardContentFactory.DATE:

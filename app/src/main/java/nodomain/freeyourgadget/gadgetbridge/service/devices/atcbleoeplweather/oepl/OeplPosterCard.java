@@ -88,7 +88,9 @@ public class OeplPosterCard extends OeplCard {
 
         final float rule = shown > 0 ? Math.max(1f, h * 0.012f) : 0f;
         final float headRoom = h - bodyBlock - rule * 3f - pad;
-        c.textFilling(headline, w / 2f, pad * 0.5f + headRoom / 2f, w - pad * 2f,
+        // clipped, not merely fitted: a headline of forty characters is still too wide for
+        // a price tag at the smallest size that can be read
+        c.textFillingClipped(headline, w / 2f, pad * 0.5f + headRoom / 2f, w - pad * 2f,
                 headRoom * 0.96f, headlineAccent ? c.accent : c.ink);
 
         if (shown <= 0) {

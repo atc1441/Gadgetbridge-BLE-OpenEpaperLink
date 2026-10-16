@@ -55,6 +55,9 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
     public static final String SCREEN_NOTIFICATIONS = "pref_oepl_weather_screen_notifications";
     public static final String SCREEN_TEXT = "pref_oepl_weather_screen_text";
     public static final String SCREEN_IMAGE = "pref_oepl_weather_screen_image";
+    public static final String SCREEN_DASHBOARD = "pref_oepl_weather_screen_dashboard";
+    public static final String SCREEN_HOME_ASSISTANT = "pref_oepl_weather_screen_ha";
+    public static final String SCREEN_QUAD = "pref_oepl_weather_screen_quad";
     public static final String SCREEN_LOOK = "pref_oepl_weather_screen_look";
     public static final String SCREEN_UPDATES = "pref_oepl_weather_screen_updates";
     public static final String SCREEN_POWER = "pref_oepl_weather_screen_power";
@@ -111,6 +114,10 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
                 OEPLContentOptions.uses(content, Option.NOTIFICATIONS));
         show(handler, SCREEN_TEXT, OEPLContentOptions.uses(content, Option.TEXT));
         show(handler, SCREEN_IMAGE, OEPLContentOptions.uses(content, Option.IMAGE));
+        show(handler, SCREEN_DASHBOARD, OEPLContentOptions.uses(content, Option.READINGS));
+        show(handler, SCREEN_HOME_ASSISTANT,
+                OEPLContentOptions.uses(content, Option.HOME_ASSISTANT));
+        show(handler, SCREEN_QUAD, OEPLContentOptions.uses(content, Option.QUAD));
 
         // the two picture cards differ in one thing only: where the picture comes from
         show(handler, OEPLPrefs.PREF_IMAGE_PICK,
@@ -171,6 +178,11 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
         summary(handler, SCREEN_NOTIFICATIONS, count(context, handler,
                 OEPLPrefs.PREF_NOTIFICATION_COUNT, R.string.oepl_screen_notifications));
         summary(handler, SCREEN_TEXT, firstLine(text(handler, OEPLPrefs.PREF_CUSTOM_TEXT, unset)));
+        summary(handler, SCREEN_DASHBOARD, groups(context, handler));
+        summary(handler, SCREEN_HOME_ASSISTANT, text(handler, OEPLPrefs.PREF_HA_URL, unset));
+        summary(handler, SCREEN_QUAD, join(entry(handler, OEPLPrefs.PREF_QUAD[0]),
+                entry(handler, OEPLPrefs.PREF_QUAD[1]), entry(handler, OEPLPrefs.PREF_QUAD[2]),
+                entry(handler, OEPLPrefs.PREF_QUAD[3])));
 
         summary(handler, SCREEN_LOOK, OEPLContentOptions.uses(content, Option.FRAME)
                 ? join(entry(handler, OEPLPrefs.PREF_FRAME),
@@ -208,6 +220,34 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
         if (preference != null && value != null && !value.isEmpty()) {
             preference.setSummary(value);
         }
+    }
+
+    /**
+     * Which groups of values are switched on, by their labels rather than by their count: "3
+     * of 4" says nothing, while "Weather - House" is the one line that describes the display.
+     */
+    private String groups(final Context context, final DeviceSpecificSettingsHandler handler) {
+        final Preference preference = handler.findPreference(OEPLPrefs.PREF_READING_GROUPS);
+        if (preference == null || preference.getSharedPreferences() == null) {
+            return null;
+        }
+        final Set<String> chosen = OEPLPrefs.readingGroups(preference.getSharedPreferences());
+        final String[] labels = context.getResources()
+                .getStringArray(R.array.oepl_weather_reading_groups);
+        final String[] values = context.getResources()
+                .getStringArray(R.array.oepl_weather_reading_groups_values);
+        final StringBuilder line = new StringBuilder();
+        for (int i = 0; i < values.length && i < labels.length; i++) {
+            if (!chosen.contains(values[i])) {
+                continue;
+            }
+            if (line.length() > 0) {
+                line.append(" · ");
+            }
+            line.append(labels[i]);
+        }
+        return line.length() == 0 ? context.getString(R.string.oepl_screen_unset)
+                : line.toString();
     }
 
     /** The label of a list preference's current choice, not its stored value. */

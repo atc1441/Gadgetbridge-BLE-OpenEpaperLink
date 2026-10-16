@@ -39,6 +39,7 @@ import java.util.ArrayList;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.weather.OwmCondition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeather;
 
 /**
@@ -452,60 +453,33 @@ public final class OpenMeteoClient {
         }
     }
 
+    /**
+     * What the sky is doing, in the user's language.
+     * <p>
+     * Gadgetbridge already carries translated names for the OpenWeatherMap condition codes -
+     * in every language it has, not only the two this display was written in - so the WMO code
+     * is mapped to theirs and the name comes from there. Writing the words out here would mean
+     * one language, hardcoded, on a panel that hangs in somebody's hall.
+     */
     static String describe(final int wmo) {
-        switch (wmo) {
-            case 0:
-                return "Klar";
-            case 1:
-                return "Überwiegend klar";
-            case 2:
-                return "Teilweise bewölkt";
-            case 3:
-                return "Bedeckt";
-            case 45:
-            case 48:
-                return "Nebel";
-            case 51:
-            case 53:
-            case 55:
-                return "Nieselregen";
-            case 56:
-            case 57:
-                return "Gefrierender Niesel";
-            case 61:
-                return "Leichter Regen";
-            case 63:
-                return "Regen";
-            case 65:
-                return "Starker Regen";
-            case 66:
-            case 67:
-                return "Gefrierender Regen";
-            case 71:
-                return "Leichter Schneefall";
-            case 73:
-                return "Schneefall";
-            case 75:
-                return "Starker Schneefall";
-            case 77:
-                return "Schneegriesel";
-            case 80:
-                return "Leichte Schauer";
-            case 81:
-                return "Schauer";
-            case 82:
-                return "Kräftige Schauer";
-            case 85:
-            case 86:
-                return "Schneeschauer";
-            case 95:
-                return "Gewitter";
-            case 96:
-            case 99:
-                return "Gewitter mit Hagel";
-            default:
-                return "";
+        final OwmCondition condition =
+                OwmCondition.Companion.fromCode(toOwmCode(wmo));
+        if (condition == null) {
+            return "";
         }
+        try {
+            final Context context = GBApplication.getContext();
+            if (context != null) {
+                final String name = context.getString(condition.getLabelRes());
+                // the catalogue spells them in running text ("light rain"), and this one goes
+                // on a line of its own
+                return name.isEmpty() ? name
+                        : Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            }
+        } catch (final Throwable ignored) {
+            // no resources, which is what a plain unit test looks like
+        }
+        return "";
     }
 
     private static String get(final String url) throws Exception {

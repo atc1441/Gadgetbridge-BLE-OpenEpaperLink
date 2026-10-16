@@ -16,7 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
+
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -51,9 +56,16 @@ public class OEPLDisplayConfig {
     public int guiRotation;
     public boolean oeplEnabled;
     public int bleAdvertisingInterval; // milliseconds
+    /**
+     * Whether that interval is a real setting rather than an unset field. A firmware that has
+     * never had one written leaves it at zero, which says nothing about the panel.
+     */
+    public boolean advertisingIntervalKnown;
     public boolean valid;
     /** True when this came from the dynamic hardware read rather than the settings blob. */
     public boolean fromDynamicRead;
+    /** True when nothing readable came from the display and the catalogue filled in. */
+    public boolean fromCatalogue;
 
     /**
      * Decodes the reply to {@link OEPLProtocol#CMD_READ_DYNAMIC_TYPE}, which is the display
@@ -98,16 +110,52 @@ public class OEPLDisplayConfig {
     }
 
     public static OEPLDisplayConfig parse(final byte[] frame) {
-        // try the current layout first, then the one without the rotation byte
+        // Both layouts are decoded and the one that reads back consistently wins. The
+        // advertising interval is what tells them apart - it sits behind the rotation byte,
+        // so a reading that is one byte out of step has nonsense there - but only when the
+        // firmware has ever set one. When neither reading has a usable interval the two agree
+        // about everything that matters, because everything behind that byte is then unset.
         final OEPLDisplayConfig withRotation = decode(frame, true);
-        if (withRotation.valid) {
+        if (withRotation.valid && withRotation.advertisingIntervalKnown) {
             return withRotation;
         }
         final OEPLDisplayConfig withoutRotation = decode(frame, false);
+        if (withoutRotation.valid && withoutRotation.advertisingIntervalKnown) {
+            return withoutRotation;
+        }
+        if (withRotation.valid) {
+            return withRotation;
+        }
         if (withoutRotation.valid) {
             return withoutRotation;
         }
         return withRotation; // nothing looked sane; return the modern reading for logging
+    }
+
+    /**
+     * What the catalogue knows about a hardware type, as a configuration to draw from.
+     * <p>
+     * A display whose firmware answers nothing we can read - or nothing at all - still
+     * advertises what it is, and the panel behind a hardware type is a fact of the hardware
+     * rather than of the firmware. Drawing from the catalogue is a far better answer than
+     * leaving the panel blank because a settings structure was not understood.
+     */
+    public static OEPLDisplayConfig fromCatalogue(final int hardwareType) {
+        final OEPLDisplayConfig c = new OEPLDisplayConfig();
+        final OEPLTagTypes.TagType type = OEPLTagTypes.byHardwareType(hardwareType);
+        if (type == null) {
+            return c;
+        }
+        c.hardwareType = hardwareType;
+        // the catalogue states the panel as it is seen; the buffer is the short axis first,
+        // the same way the firmware reports screen_w and screen_h
+        c.bufferWidth = Math.min(type.width, type.height);
+        c.bufferHeight = Math.max(type.width, type.height);
+        c.colors = Math.max(1, type.colorCount - 1);
+        c.blackInvert = true;
+        c.fromCatalogue = true;
+        c.valid = c.bufferWidth >= 32 && c.bufferHeight >= 32;
+        return c;
     }
 
     private static OEPLDisplayConfig decode(final byte[] frame, final boolean hasGuiRotation) {
@@ -141,11 +189,20 @@ public class OEPLDisplayConfig {
         buf.getInt();           // OEPL wakeup seconds
         buf.get();              // BLE enabled
         c.bleAdvertisingInterval = buf.getInt();
+        c.advertisingIntervalKnown = c.bleAdvertisingInterval >= 100
+                && c.bleAdvertisingInterval <= 300000;
+        if (!c.advertisingIntervalKnown) {
+            c.bleAdvertisingInterval = 0;
+        }
 
+        // The panel is what decides whether this reading is usable. The interval behind it is
+        // a setting, and a firmware that has never had one written leaves it at zero - which
+        // used to make the whole configuration count as broken, and with it went the picture:
+        // the display connected, was found to have no usable configuration, and was let go
+        // again without ever being sent anything.
         c.valid = c.bufferWidth >= 32 && c.bufferWidth <= 2048
                 && c.bufferHeight >= 32 && c.bufferHeight <= 2048
                 && c.colors >= 1 && c.colors <= 4
-                && c.bleAdvertisingInterval >= 100 && c.bleAdvertisingInterval <= 300000
                 && c.guiRotation <= 3;
         return c;
     }
@@ -196,14 +253,30 @@ public class OEPLDisplayConfig {
         return (bufferWidth * bufferHeight) / 8;
     }
 
-    /** A one line summary for the overview screen, in the user's terms rather than field names. */
+    /**
+     * A one line summary for the overview screen, in the user's terms rather than in field
+     * names - and in the user's language: this line is read on the phone, not drawn on the
+     * panel, and it used to be German whatever the app was set to.
+     */
     @NonNull
     public String describe() {
-        return bufferWidth + "x" + bufferHeight + " Puffer, " + colorCount() + " Farben"
-                + ", Drehung " + autoRotationDegrees() + "°"
-                + (blackInvert ? ", schwarz invertiert" : "")
-                + (secondInvert ? ", Akzent invertiert" : "")
-                + (widthHeightSwapped ? ", B/H getauscht" : "");
+        final Context context = GBApplication.getContext();
+        if (context == null) {
+            return bufferWidth + "x" + bufferHeight + ", " + colorCount() + " colours";
+        }
+        final StringBuilder line = new StringBuilder(context.getString(
+                R.string.oepl_config_summary, bufferWidth, bufferHeight, colorCount(),
+                autoRotationDegrees()));
+        if (blackInvert) {
+            line.append(", ").append(context.getString(R.string.oepl_config_black_inverted));
+        }
+        if (secondInvert) {
+            line.append(", ").append(context.getString(R.string.oepl_config_accent_inverted));
+        }
+        if (widthHeightSwapped) {
+            line.append(", ").append(context.getString(R.string.oepl_config_swapped));
+        }
+        return line.toString();
     }
 
     @NonNull

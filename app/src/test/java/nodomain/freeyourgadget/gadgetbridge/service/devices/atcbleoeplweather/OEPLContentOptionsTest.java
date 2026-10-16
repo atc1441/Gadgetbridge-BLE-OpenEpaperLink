@@ -39,7 +39,8 @@ public class OEPLContentOptionsTest {
             "oepl_4", "oepl_8", "oepl_16", "oepl_1", "oepl_29", "oepl_11", "oepl_11w", "oepl_9",
             "oepl_10", "oepl_2", "oepl_3", "oepl_21",
             "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
-            "panel_poster",
+            "panel_poster", "panel_grid", "panel_hero", "panel_list", "panel_graph",
+            "panel_quad",
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
             "clock_weather", "weather_notifications", "calendar_notifications", "dashboard",
@@ -104,6 +105,11 @@ public class OEPLContentOptionsTest {
     public void noCardOffersMoreThanAHandfulOfOptions() {
         // this is the whole point of the sub-menus: showing all of them at once says nothing
         for (final String id : ALL) {
+            if (OeplCardFactory.QUAD.equals(id)) {
+                // except for the one card made of other cards, where every menu may belong to
+                // a quarter and none of them can be ruled out without reading the slots
+                continue;
+            }
             assertTrue(id + " got out of hand", OEPLContentOptions.of(id).size() <= 5);
         }
     }

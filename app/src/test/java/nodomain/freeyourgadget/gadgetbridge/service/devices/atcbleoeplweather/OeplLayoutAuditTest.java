@@ -100,15 +100,24 @@ public class OeplLayoutAuditTest {
         return shapes;
     }
 
+    /**
+     * Every design, its data variants, and every design once more with the longest text it
+     * could plausibly be given - a place name that fills the panel, entity labels named after
+     * where the thing hangs, appointment titles with a doctor's full name in them. The short
+     * forms say whether a layout works; the long ones say whether it holds.
+     */
     static List<String> designs() {
-        final List<String> ids = new ArrayList<>();
+        final Set<String> ids = new LinkedHashSet<>();
         for (final String id : OeplDemo.IDS) {
             ids.add(id);
         }
         for (final String id : OeplDemo.VARIANTS) {
             ids.add(id);
         }
-        return ids;
+        for (final String id : OeplDemo.STRESS) {
+            ids.add(id);
+        }
+        return new ArrayList<>(ids);
     }
 
     @Test
