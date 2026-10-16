@@ -64,6 +64,23 @@ public class OeplCanvas {
         return p;
     }
 
+    /**
+     * Shrinks a paint until the text fits the width, but no further than a floor. What does
+     * not fit at that size is a caller's decision to cut; everything above it is a label that
+     * can be read in full, which for a name is the difference between useful and useless.
+     */
+    public void fitNoSmallerThan(final Paint paint, final String text, final float maxWidth,
+                                 final float floor) {
+        if (text == null) {
+            return;
+        }
+        int guard = 0;
+        while (maxWidth > 0 && paint.measureText(text) > maxWidth
+                && paint.getTextSize() > floor && guard++ < 128) {
+            paint.setTextSize(Math.max(floor, paint.getTextSize() * 0.95f));
+        }
+    }
+
     /** Shrinks a paint until the text fits the width. */
     public void fit(final Paint paint, final String text, final float maxWidth) {
         if (text == null) {
@@ -427,7 +444,17 @@ public class OeplCanvas {
             draw(right, x1, y, RIGHT, paint);
         }
         if (left != null && !left.isEmpty()) {
-            textClipped(left, x0, y, size, LEFT, leftColor, x1 - x0 - used);
+            // The caption is made smaller before it is cut. A row headed "Hamb…" names
+            // nowhere, and the line has the height for a smaller word either way; only a
+            // caption that would have to go below two thirds of the row is cut after all.
+            final float room = x1 - x0 - used;
+            final Paint paint = textPaint(size, leftColor);
+            fitNoSmallerThan(paint, left, room, Math.max(7f, size * 0.62f));
+            if (paint.measureText(left) <= room) {
+                draw(left, x0, y, LEFT, paint);
+            } else {
+                textClipped(left, x0, y, paint.getTextSize(), LEFT, leftColor, room);
+            }
         }
     }
 

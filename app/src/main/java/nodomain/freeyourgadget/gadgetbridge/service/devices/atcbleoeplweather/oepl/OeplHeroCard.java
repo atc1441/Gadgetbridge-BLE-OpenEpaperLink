@@ -179,7 +179,11 @@ public class OeplHeroCard extends OeplCard {
 
     /** The next appointments, a time and a title per line, for as many lines as there is room. */
     private void agenda(final OeplCanvas c, final RectF box, final float pad) {
-        final float size = c.sizeForHeight(box.height() * 0.2f, box.height() * 0.24f, 8f);
+        // sized by the column as well as by the height: on a panel that is tall for its width
+        // the height alone asks for sixty pixel type in a column six characters wide, and
+        // every appointment then reads "16:56 ..."
+        final float size = Math.min(c.sizeForHeight(box.height() * 0.2f,
+                box.height() * 0.24f, 8f), box.width() / 6.5f);
         if (size <= 0f) {
             return;
         }

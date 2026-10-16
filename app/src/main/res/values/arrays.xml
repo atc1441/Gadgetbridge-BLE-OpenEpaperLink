@@ -5408,6 +5408,18 @@
         <item>24</item>
     </string-array>
     <!-- What one quarter of the quartered card can hold: any other card, or nothing. -->
+    <string-array name="device_sort_order">
+        <item>@string/device_sort_default</item>
+        <item>@string/device_sort_last_update</item>
+        <item>@string/device_sort_name</item>
+        <item>@string/device_sort_type</item>
+    </string-array>
+    <string-array name="device_sort_order_values" translatable="false">
+        <item>default</item>
+        <item>last_update</item>
+        <item>name</item>
+        <item>type</item>
+    </string-array>
     <string-array name="oepl_weather_quad">
         <item>@string/oepl_quad_none</item>
         <item>@string/oepl_content_oepl_weather</item>
@@ -5417,6 +5429,7 @@
         <item>@string/oepl_content_oepl_clock</item>
         <item>@string/oepl_content_oepl_calendar</item>
         <item>@string/oepl_content_oepl_calendar_week</item>
+        <item>@string/oepl_content_panel_month</item>
         <item>@string/oepl_content_oepl_rss</item>
         <item>@string/oepl_content_oepl_qr</item>
         <item>@string/oepl_content_oepl_count_days</item>
@@ -5461,6 +5474,7 @@
         <item>oepl_29</item>
         <item>oepl_11</item>
         <item>oepl_11w</item>
+        <item>panel_month</item>
         <item>oepl_9</item>
         <item>oepl_10</item>
         <item>oepl_2</item>
@@ -5516,6 +5530,7 @@
         <item>@string/oepl_content_oepl_clock</item>
         <item>@string/oepl_content_oepl_calendar</item>
         <item>@string/oepl_content_oepl_calendar_week</item>
+        <item>@string/oepl_content_panel_month</item>
         <item>@string/oepl_content_oepl_rss</item>
         <item>@string/oepl_content_oepl_qr</item>
         <item>@string/oepl_content_oepl_count_days</item>
@@ -5560,6 +5575,7 @@
         <item>oepl_29</item>
         <item>oepl_11</item>
         <item>oepl_11w</item>
+        <item>panel_month</item>
         <item>oepl_9</item>
         <item>oepl_10</item>
         <item>oepl_2</item>
@@ -5636,6 +5652,9 @@
         <item>2</item>
         <item>3</item>
         <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
     </string-array>
     <string-array name="oepl_weather_forecast_days_values" translatable="false">
         <item>0</item>
@@ -5643,6 +5662,9 @@
         <item>2</item>
         <item>3</item>
         <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
     </string-array>
     <string-array name="oepl_weather_accent">
         <item>@string/oepl_weather_accent_auto</item>

@@ -59,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplHeroCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplIcons;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplListCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplMonthCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReading;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplInfoCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplPosterCard;
@@ -92,7 +93,7 @@ public final class OeplDemo {
             // our own designs, which own the whole panel as well
             "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
             "panel_poster", "panel_grid", "panel_hero", "panel_list", "panel_graph",
-            "panel_quad",
+            "panel_quad", "panel_month",
             // the cards with the Gadgetbridge frame around them
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
@@ -218,6 +219,8 @@ public final class OeplDemo {
                 return new OeplSunCard(weather());
             case OeplCardFactory.TILES:
                 return new OeplTilesCard(weather(), true);
+            case OeplCardFactory.MONTH:
+                return new OeplMonthCard(events(), stress ? "Familienkalender" : "Kalender");
             case OeplCardFactory.BOARD:
                 return new OeplBoardCard(events(), 6,
                         stress ? "Termine der ganzen Familie" : "Termine");

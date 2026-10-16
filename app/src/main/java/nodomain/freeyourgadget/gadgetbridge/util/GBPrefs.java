@@ -120,6 +120,14 @@ public class GBPrefs extends Prefs {
     public static final String LAST_DEVICE_ADDRESSES = "last_device_addresses";
     public static final String LAST_CONNECTED_TS = "last_connected_ts";
     public static final String SORT_BY_LAST_CONNECTED_TS_KEY = "general_prefs_key_sort_by_last_connected_ts";
+    /** How the device list is ordered: see {@link #getDeviceSortOrder()}. */
+    public static final String DEVICE_SORT_ORDER_KEY = "general_prefs_key_device_sort_order";
+    public static final String DEVICE_SORT_DEFAULT = "default";
+    public static final String DEVICE_SORT_LAST_UPDATE = "last_update";
+    public static final String DEVICE_SORT_NAME = "name";
+    public static final String DEVICE_SORT_TYPE = "type";
+    /** The identification mode: see {@link #getShowDisplayNameTags()}. */
+    public static final String DISPLAY_NAME_TAGS_KEY = "general_prefs_key_display_name_tags";
     public static final String RECONNECT_ONLY_TO_CONNECTED = "general_reconnectonlytoconnected";
     public static final String BLOCK_SCREENSHOTS = "block_screenshots";
 
@@ -157,6 +165,32 @@ public class GBPrefs extends Prefs {
 
     public boolean getAutoReconnectByScan() {
         return getBoolean(RECONNECT_SCAN_KEY, RECONNECT_SCAN_DEFAULT);
+    }
+
+    /**
+     * How the device list is ordered.
+     * <p>
+     * "default" is what Gadgetbridge has always done: whatever is connected first, the rest
+     * by name. The other three ignore the connection state, which is the point of them - a
+     * shelf of displays that are asleep nearly all of the time is a list in which the
+     * connection state says nothing at all, while when each of them last showed something new
+     * says a great deal.
+     */
+    public String getDeviceSortOrder() {
+        final String order = getString(DEVICE_SORT_ORDER_KEY, DEVICE_SORT_DEFAULT);
+        return order == null || order.isEmpty() ? DEVICE_SORT_DEFAULT : order;
+    }
+
+    /**
+     * Whether every display should carry its own Bluetooth name in its corner.
+     * <p>
+     * Six identical panels on a shelf are six panels nobody can tell apart, and the one that
+     * is not updating is the one somebody needs to find. Switching this on writes the name on
+     * all of them at once, so a glance along the wall matches each panel to its entry in the
+     * device list; switching it off takes the tags away again.
+     */
+    public boolean getShowDisplayNameTags() {
+        return getBoolean(DISPLAY_NAME_TAGS_KEY, false);
     }
 
     public boolean getSortByLastConnectedTs() {

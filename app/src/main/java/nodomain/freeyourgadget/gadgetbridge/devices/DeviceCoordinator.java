@@ -22,6 +22,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices;
 import android.app.Activity;
 import android.bluetooth.le.ScanFilter;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
@@ -56,6 +57,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.AbstractNotificationPattern;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -1176,6 +1179,23 @@ public interface DeviceCoordinator {
     }
 
     /**
+     * When this device last did the thing it is there for, as a timestamp - which the device
+     * list can order by and show beside the name.
+     * <p>
+     * For most devices that is the last time they were connected, because that is when they
+     * last handed over anything. A device that is connected for a few seconds to be written
+     * to answers with the moment it last showed something new instead: its connections are
+     * not events anybody is interested in, the pictures are.
+     *
+     * @return the timestamp, or 0 when nothing is known
+     */
+    default long getLastUpdateMillis(@NonNull final GBDevice device) {
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+        return prefs == null ? 0L : prefs.getLong(GBPrefs.LAST_CONNECTED_TS, 0L);
+    }
+
+    /**
      * The battery level to show while the device is not connected, in percent, or
      * {@link GBDevice#BATTERY_UNKNOWN} when nothing is known.
      * <p>
@@ -1205,6 +1225,24 @@ public interface DeviceCoordinator {
      */
     default boolean onPullToRefresh(@NonNull final Context context,
                                     @NonNull final GBDevice device) {
+        return false;
+    }
+
+    /**
+     * A setting of Gadgetbridge itself changed, and this device may have to be told right away
+     * rather than at its next connection.
+     * <p>
+     * Almost every setting is read when it is needed, so almost no device has anything to do
+     * here. One that is shown something - a panel holding a picture that was drawn on the
+     * phone - does: the picture on it was drawn under the old setting and stays wrong until a
+     * new one is pushed, which is a change the user cannot see happening and would read as a
+     * setting that does nothing.
+     *
+     * @return true when this device was given something to do, so the caller can say how many
+     */
+    default boolean onGlobalPreferenceChanged(@NonNull final Context context,
+                                              @NonNull final GBDevice device,
+                                              @NonNull final String key) {
         return false;
     }
 

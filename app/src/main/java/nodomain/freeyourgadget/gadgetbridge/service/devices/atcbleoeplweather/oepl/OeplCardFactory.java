@@ -95,6 +95,8 @@ public final class OeplCardFactory {
     public static final String GRAPH = "panel_graph";
     /** The panel in quarters, each holding another card. */
     public static final String QUAD = "panel_quad";
+    /** The month as a sheet, with a dot per appointment and today marked. */
+    public static final String MONTH = "panel_month";
 
     private OeplCardFactory() {
     }
@@ -146,8 +148,10 @@ public final class OeplCardFactory {
             case COUNT_HOURS:
                 return counter(prefs, false);
             case FORECAST:
-                return new OeplForecastCard(weather(prefs), OEPLPrefs.forecastDays(prefs) + 2,
-                        beaufort);
+                // a forecast of fewer than three days is not a forecast, whatever the
+                // setting says; the card itself drops days a panel cannot hold
+                return new OeplForecastCard(weather(prefs),
+                        Math.max(3, OEPLPrefs.forecastDays(prefs)), beaufort);
             case RSS:
                 return new OeplRssCard(OeplRssClient.cached(), OEPLPrefs.rssTitle(prefs),
                         OEPLPrefs.rssSummaries(prefs));
@@ -168,7 +172,8 @@ public final class OeplCardFactory {
             case BIG:
                 return new OeplBigTemperatureCard(weather(prefs), beaufort);
             case RANGE:
-                return new OeplRangeCard(weather(prefs), OEPLPrefs.forecastDays(prefs) + 2);
+                return new OeplRangeCard(weather(prefs),
+                        Math.max(3, OEPLPrefs.forecastDays(prefs)));
             case SUN:
                 return new OeplSunCard(weather(prefs));
             case TILES:
@@ -190,6 +195,10 @@ public final class OeplCardFactory {
                 return new OeplGraphCard(weather(prefs), OEPLPrefs.forecastHours(prefs));
             case QUAD:
                 return quarters(context, device, prefs);
+            case MONTH:
+                // the month, so the calendar is read for the whole of it rather than for the
+                // week the other cards are configured for
+                return new OeplMonthCard(monthEvents(context, device), caption(context, prefs));
             case WEATHER:
             default:
                 return new OeplWeatherCard(weather(prefs), beaufort);
@@ -262,6 +271,25 @@ public final class OeplCardFactory {
                                               final SharedPreferences prefs) {
         return OeplReadings.collect(context, device, prefs, weather(prefs),
                 events(context, device));
+    }
+
+    /**
+     * The appointments of this month, which is a different question from the one the other
+     * calendar cards ask: they show what is coming up over the next few days, the month sheet
+     * marks the days of a whole month. The lookahead setting is therefore not what decides it.
+     */
+    private static List<CalendarEvent> monthEvents(final Context context,
+                                                   final GBDevice device) {
+        try {
+            final java.util.Calendar end = java.util.Calendar.getInstance();
+            final int left = end.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                    - end.get(java.util.Calendar.DAY_OF_MONTH);
+            return new CalendarManager(context, device.getAddress())
+                    .getCalendarEventList(Math.max(1, left + 1));
+        } catch (final Exception e) {
+            LOG.warn("could not read the calendar for the month", e);
+            return Collections.emptyList();
+        }
     }
 
     /** The appointments, cut to the number the card is configured for. */

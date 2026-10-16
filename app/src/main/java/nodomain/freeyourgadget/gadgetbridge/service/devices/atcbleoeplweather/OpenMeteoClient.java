@@ -170,7 +170,11 @@ public final class OpenMeteoClient {
                     + "&hourly=temperature_2m,weathercode,relativehumidity_2m,precipitation"
                     + "&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,"
                     + "precipitation_sum,windspeed_10m_max,winddirection_10m_dominant"
-                    + "&windspeed_unit=ms&timeformat=unixtime&timezone=auto";
+                    + "&windspeed_unit=ms&timeformat=unixtime&timezone=auto"
+                    // a full week, said out loud rather than relied upon: the service's own
+                    // default is seven days today, and a card that offers a week has to have
+                    // one whatever that default becomes
+                    + "&forecast_days=7";
             final String body = get(url);
             final JSONObject doc = new JSONObject(body);
             final WeatherSpec spec = parse(doc, resolved.name);

@@ -20,6 +20,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 
+import androidx.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +83,43 @@ public final class CardContentFactory {
     private CardContentFactory() {
     }
 
+    /**
+     * What the chosen card is still waiting for before there is anything worth sending, or
+     * null when it can be drawn.
+     * <p>
+     * Picking "picture" and then choosing the picture are two steps, and between them the card
+     * has nothing on it but the words "no picture". Sending that is worse than sending
+     * nothing: it wipes whatever the panel was showing, costs a connection and a full refresh
+     * of the display, and is gone again a few seconds later. So a card whose content is
+     * something the user hands over by hand waits until it has been handed over, and the panel
+     * keeps what it had until then.
+     * <p>
+     * This is only about a source that was never set. A feed that does not answer or a picture
+     * that will not download are different: there the user has said what they want and the
+     * card saying so is the useful answer.
+     */
+    @Nullable
+    public static String waitingForSource(final SharedPreferences prefs) {
+        final String content = OEPLPrefs.contentType(prefs);
+        if (IMAGE.equals(content) && OEPLPrefs.imageUri(prefs).isEmpty()) {
+            return "no picture chosen yet";
+        }
+        if (IMAGE_URL.equals(content) && OEPLPrefs.imageUrl(prefs).isEmpty()) {
+            return "no address for the picture yet";
+        }
+        if (OeplCardFactory.QR.equals(content) && OEPLPrefs.qrContent(prefs).isEmpty()) {
+            return "nothing to put in the code yet";
+        }
+        if (OeplCardFactory.RSS.equals(content) && OEPLPrefs.rssUrl(prefs).isEmpty()) {
+            return "no feed address yet";
+        }
+        if ((TEXT.equals(content) || OeplCardFactory.POSTER.equals(content))
+                && OEPLPrefs.customText(prefs).trim().isEmpty()) {
+            return "no text yet";
+        }
+        return null;
+    }
+
     public static CardContent create(final Context context, final GBDevice device,
                                      final SharedPreferences prefs) {
         return create(context, device, prefs, OEPLPrefs.contentType(prefs));
@@ -125,7 +164,7 @@ public final class CardContentFactory {
                         context.getString(R.string.oepl_card_curve));
             case FORECAST:
                 return new ForecastContent(spec(prefs),
-                        Math.max(3, OEPLPrefs.forecastDays(prefs) + 2),
+                        Math.max(3, OEPLPrefs.forecastDays(prefs)),
                         context.getString(R.string.oepl_card_forecast));
             case CLOCK_WEATHER:
                 return new SplitContent(new ClockContent(), weather(prefs), 0.45f);

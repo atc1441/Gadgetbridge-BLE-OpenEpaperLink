@@ -102,6 +102,51 @@ public class OeplTodayTest {
                 drawn.toString().contains(yesterday + "|"));
     }
 
+    // ------------------------------------------------------------------ a whole week
+
+    @Test
+    public void aLargePanelCanShowSevenDays() {
+        final OeplWeather week = forecastFrom(0, 7);
+        final java.util.Set<String> labels = new java.util.HashSet<>();
+        for (final OeplInkRecorder.Run run
+                : draw(new OeplForecastCard(week, 7, true), 800, 480).textRuns()) {
+            labels.add(run.what);
+        }
+        int days = 0;
+        for (final OeplWeather.Day day : week.upcomingDays()) {
+            if (labels.contains(week.format("EE").format(new Date(day.epochSeconds * 1000L)))) {
+                days++;
+            }
+        }
+        // six weekdays plus the column that says "Today" instead of its name
+        assertEquals("a poster should hold the whole week, drew " + labels, 6, days);
+        assertTrue("and the first column is today", labels.contains("Today"));
+    }
+
+    @Test
+    public void asmallPanelShowsFewerDaysRatherThanThinnerOnes() {
+        final OeplWeather week = forecastFrom(0, 7);
+        assertTrue("a shelf label cannot hold seven columns",
+                columns(new OeplForecastCard(week, 7, true), 152, 152)
+                        < columns(new OeplForecastCard(week, 7, true), 800, 480));
+    }
+
+    /** How many day labels a card drew, which is how many days it decided it had room for. */
+    private int columns(final CardContent card, final int width, final int height) {
+        final java.util.Set<String> labels = new java.util.HashSet<>();
+        for (final OeplInkRecorder.Run run : draw(card, width, height).textRuns()) {
+            labels.add(run.what);
+        }
+        int days = 0;
+        for (final String weekday : new String[]{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+                "Sun", "Today"}) {
+            if (labels.contains(weekday)) {
+                days++;
+            }
+        }
+        return days;
+    }
+
     // ------------------------------------------------------------------ where the hours are
 
     @Test
@@ -174,11 +219,15 @@ public class OeplTodayTest {
     }
 
     private OeplInkRecorder draw(final CardContent content) {
-        final Bitmap sheet = Bitmap.createBitmap(384, 184, Bitmap.Config.ARGB_8888);
+        return draw(content, 384, 184);
+    }
+
+    private OeplInkRecorder draw(final CardContent content, final int width, final int height) {
+        final Bitmap sheet = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         final OeplInkRecorder recorder = new OeplInkRecorder(sheet);
         recorder.drawColor(0xffffffff);
         content.draw(recorder, new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE,
-                OEPLImageCodec.RED, false), new RectF(0, 0, 384, 184));
+                OEPLImageCodec.RED, false), new RectF(0, 0, width, height));
         return recorder;
     }
 }

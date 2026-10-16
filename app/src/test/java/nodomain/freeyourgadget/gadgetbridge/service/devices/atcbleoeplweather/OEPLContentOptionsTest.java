@@ -40,7 +40,7 @@ public class OEPLContentOptionsTest {
             "oepl_10", "oepl_2", "oepl_3", "oepl_21",
             "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
             "panel_poster", "panel_grid", "panel_hero", "panel_list", "panel_graph",
-            "panel_quad",
+            "panel_quad", "panel_month",
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
             "clock_weather", "weather_notifications", "calendar_notifications", "dashboard",

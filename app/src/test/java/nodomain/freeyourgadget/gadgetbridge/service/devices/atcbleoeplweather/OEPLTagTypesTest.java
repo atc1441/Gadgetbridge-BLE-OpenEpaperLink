@@ -141,6 +141,14 @@ public class OEPLTagTypesTest {
         assertEquals("1.54\"", OEPLTagTypes.inchesOf(0x00));  // M2 1.54"
         assertEquals("5.85\"", OEPLTagTypes.inchesOf(0x41));  // M3 5.85"
         assertEquals("2.2\"", OEPLTagTypes.inchesOf(0x45));   // M3 2.2 Lite"
+
+        // the half of the catalogue that writes its decimals with a comma, which used to be
+        // read as the number behind it: three and a half inches announced as five
+        assertEquals("3.5\"", OEPLTagTypes.inchesOf(0x6D));   // HS BWRY 3,5"
+        assertEquals("2.9\"", OEPLTagTypes.inchesOf(0x6E));   // HS BWRY 2,9"
+        // ...and a round number keeps no trailing zeros, which read as another digit
+        assertEquals("2\"", OEPLTagTypes.inchesOf(0x6C));     // HS BWRY 2,00"
+        assertEquals("2\"", OEPLTagTypes.inchesOf(0x67));     // HS 2.00" BWY
         // not every entry is a panel with a size in its name
         assertNull(OEPLTagTypes.inchesOf(0xFA));             // ConfigMode
         assertNull(OEPLTagTypes.inchesOf(0xE0));             // TFT 320x172
@@ -148,10 +156,14 @@ public class OEPLTagTypesTest {
 
         // whatever the name says, the two have to agree: a name with an inch mark reports one
         for (final OEPLTagTypes.TagType type : OEPLTagTypes.all().values()) {
-            if (type.name.contains("\"")) {
-                assertNotNull(type.name + " names a diagonal but does not report one",
-                        type.inches());
+            if (!type.name.contains("\"")) {
+                continue;
             }
+            final String inches = type.inches();
+            assertNotNull(type.name + " names a diagonal but does not report one", inches);
+            // and it has to be a plausible one: no panel sold is a tenth of an inch or forty
+            final float value = Float.parseFloat(inches.substring(0, inches.length() - 1));
+            assertTrue(type.name + " reported " + inches, value >= 1f && value <= 32f);
         }
     }
 }

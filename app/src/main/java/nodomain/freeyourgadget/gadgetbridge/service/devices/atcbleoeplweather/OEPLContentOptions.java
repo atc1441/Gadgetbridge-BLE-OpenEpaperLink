@@ -100,6 +100,9 @@ public final class OEPLContentOptions {
                 return EnumSet.of(Option.CALENDAR_EVENTS, Option.CALENDAR_TITLE);
             case OeplCardFactory.CALENDAR_WEEK:
                 return EnumSet.of(Option.CALENDAR_DAYS);
+            case OeplCardFactory.MONTH:
+                // the month decides its own span, so only the heading is left to configure
+                return EnumSet.of(Option.CALENDAR_TITLE);
             case OeplCardFactory.RAIN:
                 return EnumSet.of(Option.WEATHER, Option.FORECAST_HOURS);
             case OeplCardFactory.CLOCK:

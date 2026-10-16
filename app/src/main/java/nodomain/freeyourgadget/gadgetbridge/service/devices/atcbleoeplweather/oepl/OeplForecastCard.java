@@ -67,15 +67,24 @@ public class OeplForecastCard extends OeplCard {
         final float h = c.height;
         final float pad = Math.max(2f, w * 0.017f);
 
+        // The place on the left, what it is doing right now on the right. A forecast
+        // without the present is a card that answers the second question and not the first:
+        // somebody standing in front of it wants to know what to put on now, and then what
+        // the week holds.
         final float headSize = h * 0.125f;
-        c.textClipped(weather.location, pad, h * 0.005f, headSize, OeplCanvas.LEFT, c.ink,
-                w - pad * 2);
+        c.rowEnds(weather.location, now(), h * 0.005f, headSize, c.ink,
+                inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
 
-        // a column needs room for two temperatures side by side, so cap the count by the width
-        // from today on: a forecast held over from yesterday would otherwise put a day
-        // that is over into the first column, where the reader takes it for today
+        // From today on: a forecast held over from yesterday would otherwise put a day that
+        // is over into the first column, where the reader takes it for today.
         final List<OeplWeather.Day> forecast = weather.upcomingDays();
-        final float minColumn = h * 0.36f;
+        // How many columns fit is decided by what a column has to hold - two temperatures
+        // beside each other, at the smallest size this panel still shows - rather than by a
+        // fraction of the card's height. The height rule cost a large panel most of its week:
+        // on a 800x480 poster it asked 172 pixels per column and so drew four days where
+        // seven would have been readable, which is most of the reason to hang a large panel.
+        final float smallest = 9f;
+        final float minColumn = Math.max(c.measure("-9 99", smallest) + 6f, smallest / 0.28f);
         int days = Math.min(requestedDays, forecast.size());
         days = Math.max(1, Math.min(days, (int) (w / Math.max(24f, minColumn))));
         final float column = w / days;
@@ -91,9 +100,13 @@ public class OeplForecastCard extends OeplCard {
 
             // today says so, and in the accent colour: which column one is standing in is the
             // first thing read off a forecast and the easiest to get wrong
+            // the day's name is set by the column as much as by the height: a poster is tall
+            // enough for seventy pixel type and no column is seventy pixels wide, so sizing it
+            // off the height alone clipped every name to its first letter
+            final float labelSize = Math.min(h * 0.15f, column * 0.34f);
             final boolean today = weather.isToday(day);
-            c.textClipped(dayLabel(c, weather, day, weekday, h * 0.15f, column - 2), centre, top,
-                    h * 0.15f, OeplCanvas.CENTER, today ? c.accent : c.ink, column - 2);
+            c.textClipped(dayLabel(c, weather, day, weekday, labelSize, column - 2), centre, top,
+                    labelSize, OeplCanvas.CENTER, today ? c.accent : c.ink, column - 2);
 
             final float windY = top + h * 0.175f;
             final String windValue = wind(day.windSpeed);
@@ -151,17 +164,26 @@ public class OeplForecastCard extends OeplCard {
     }
 
     /** One day per line: weekday, sky, rain, wind, low and high. */
+    /** The reading of the moment, which is what the header carries beside the place. */
+    private String now() {
+        return weather.hasData() ? tempFine(weather.current.temperature) + "°" : null;
+    }
+
     private void rows(final OeplCanvas c) {
         final float w = c.width;
         final float h = c.height;
         final float pad = Math.max(2f, w * 0.03f);
 
         final float headSize = Math.min(h * 0.07f, w * 0.16f);
-        c.textClipped(weather.location, pad, 0, headSize, OeplCanvas.LEFT, c.ink, w - pad * 2);
+        c.rowEnds(weather.location, now(), 0, headSize, c.ink,
+                inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
         final float top = headSize * 1.25f;
 
         final List<OeplWeather.Day> forecast = weather.upcomingDays();
-        final int days = Math.max(1, Math.min(requestedDays, forecast.size()));
+        // as with the columns: a row thinner than this holds nothing anybody reads, so a tag
+        // too short for the whole week shows the first days of it instead
+        final int fits = Math.max(1, (int) ((h - top) / 14f));
+        final int days = Math.max(1, Math.min(Math.min(requestedDays, forecast.size()), fits));
         final float row = (h - top) / days;
         final float textSize = Math.min(row * 0.46f, w * 0.17f);
         final SimpleDateFormat weekday = weather.format("EE");

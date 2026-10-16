@@ -25,7 +25,9 @@ import android.graphics.RectF;
 import androidx.annotation.Nullable;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardContent;
@@ -58,6 +60,12 @@ public class CardRenderer {
         public boolean showFooter = true;
         /** Shown when the chosen content has nothing to say. */
         public String emptyHint = "no data";
+        /**
+         * The display's own name, written into the top left corner over everything else, or
+         * null while the identification mode is off.
+         */
+        @Nullable
+        public String nameTag = null;
     }
 
     private final Options options;
@@ -91,19 +99,19 @@ public class CardRenderer {
             } else {
                 drawHint(canvas, whole);
             }
-            return finish(card, rotation, w, h, bufferWidth, bufferHeight);
-        }
-
-        drawHeader(canvas, w, h, content.title());
-        drawFooter(canvas, w, h);
-        final RectF body = bodyArea(w, h);
-
-        if (content.hasData()) {
-            drawClipped(canvas, content, body);
         } else {
-            drawHint(canvas, body);
+            drawHeader(canvas, w, h, content.title());
+            drawFooter(canvas, w, h);
+            final RectF body = bodyArea(w, h);
+
+            if (content.hasData()) {
+                drawClipped(canvas, content, body);
+            } else {
+                drawHint(canvas, body);
+            }
         }
 
+        drawNameTag(canvas, measureNameTag(w, h));
         return finish(card, rotation, w, h, bufferWidth, bufferHeight);
     }
 
@@ -266,6 +274,140 @@ public class CardRenderer {
             canvas.drawText(date, w - text.measureText(date) - pad, baseline, text);
         }
         return footerH;
+    }
+
+    /** A measured name tag: the lines it is broken into and the paint they are written with. */
+    static final class NameTag {
+        final List<String> lines;
+        final Paint paint;
+        final float width;
+        final float height;
+        final float pad;
+        final float border;
+
+        NameTag(final List<String> lines, final Paint paint, final float width,
+                final float height, final float pad, final float border) {
+            this.lines = lines;
+            this.paint = paint;
+            this.width = width;
+            this.height = height;
+            this.pad = pad;
+            this.border = border;
+        }
+
+        /** Everything the tag will put on the panel, which has to be the whole name. */
+        String written() {
+            final StringBuilder all = new StringBuilder();
+            for (final String line : lines) {
+                all.append(line);
+            }
+            return all.toString();
+        }
+    }
+
+    /**
+     * Works out the box that carries the display's own Bluetooth name, or null while the
+     * identification mode is off.
+     * <p>
+     * The name is never shortened. A box reading "Hamb…" cannot be matched against anything,
+     * which is the one job it has, so a name too long for the panel is first set smaller and
+     * then broken across lines - never cut. That is also why nothing here goes through the
+     * ellipsising helpers the rest of the card uses.
+     */
+    @Nullable
+    NameTag measureNameTag(final int w, final int h) {
+        final String name = options.nameTag == null ? "" : options.nameTag.trim();
+        if (name.isEmpty()) {
+            return null;
+        }
+        // Small on purpose, and never more than a dozen pixels however large the panel is.
+        // This is a note to the reader standing in front of the display, not something the
+        // card is about: a name set in the panel's own proportions took a tenth of a 9.7"
+        // panel and read as a headline.
+        final float size = Math.max(7f, Math.min(13f, Math.min(h * 0.085f, w * 0.06f)));
+        final Paint text = style.paint(style.ink, true, size);
+        final float border = Math.max(1f, size * 0.10f);
+        final float pad = border + Math.max(2f, size * 0.24f);
+        final float room = Math.max(4f, w - pad * 2f);
+
+        // smaller first, because one readable line beats two: only a name that would have to
+        // go below the size a panel can still be read at is broken up
+        style.fitNoSmallerThan(text, name, room, Math.max(7f, size * 0.5f));
+        List<String> lines = wrap(name, text, room);
+        int guard = 0;
+        while (lines.size() > 2 && text.getTextSize() > 6f && guard++ < 64) {
+            text.setTextSize(Math.max(6f, text.getTextSize() * 0.94f));
+            lines = wrap(name, text, room);
+        }
+
+        float widest = 0f;
+        for (final String line : lines) {
+            widest = Math.max(widest, text.measureText(line));
+        }
+        return new NameTag(lines, text, Math.min(w, widest + pad * 2f),
+                style.lineHeight(text) * lines.size() + (border + Math.max(1f, size * 0.16f)) * 2f,
+                pad, border);
+    }
+
+    /**
+     * Breaks a name into lines that each fit the given width, dropping nothing: the lines put
+     * back together are the name again, so what the panel shows can be read out in full. A
+     * break is taken after a space, an underscore or a dash where there is one, and otherwise
+     * in the middle of a word, because a name is as likely to be one long word as not.
+     */
+    private static List<String> wrap(final String name, final Paint paint, final float width) {
+        final List<String> lines = new ArrayList<>();
+        int start = 0;
+        while (start < name.length()) {
+            int end = start + 1;
+            while (end < name.length() && paint.measureText(name, start, end + 1) <= width) {
+                end++;
+            }
+            if (end < name.length()) {
+                // back up to the last separator, as long as that leaves a worthwhile line
+                for (int at = end; at > start + (end - start) / 2; at--) {
+                    final char c = name.charAt(at - 1);
+                    if (c == ' ' || c == '_' || c == '-' || c == '.') {
+                        end = at;
+                        break;
+                    }
+                }
+            }
+            lines.add(name.substring(start, end));
+            start = end;
+        }
+        return lines;
+    }
+
+    /**
+     * The identification tag: the display's own Bluetooth name in a small box in the top left
+     * corner, black on white with a black border around it.
+     * <p>
+     * It is drawn last, after the content, because a design that lays out the whole panel
+     * itself would otherwise paint over it - and a tag a design can hide does not do its job,
+     * which is to say which panel this is while standing in front of a shelf of them. White
+     * behind the letters rather than the panel's own background is what keeps it readable on
+     * top of a picture, and the border is what keeps the box visible on a panel that is white
+     * anyway. Drawn before the rotation, so the corner is the one the reader sees rather than
+     * the first corner of the panel buffer.
+     */
+    private void drawNameTag(final Canvas canvas, @Nullable final NameTag tag) {
+        if (tag == null) {
+            return;
+        }
+        final Paint block = new Paint();
+        block.setColor(style.ink);
+        canvas.drawRect(0, 0, tag.width, tag.height, block);
+        block.setColor(style.paper);
+        canvas.drawRect(tag.border, tag.border, tag.width - tag.border,
+                tag.height - tag.border, block);
+
+        final float lineHeight = style.lineHeight(tag.paint);
+        float top = (tag.height - lineHeight * tag.lines.size()) / 2f;
+        for (final String line : tag.lines) {
+            style.drawTop(canvas, line, tag.pad, top, tag.paint);
+            top += lineHeight;
+        }
     }
 
     private void drawHint(final Canvas canvas, final RectF area) {

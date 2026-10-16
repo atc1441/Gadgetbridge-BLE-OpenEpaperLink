@@ -355,9 +355,23 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         final SharedPreferences prefs =
                 GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
         final int hardware = prefs.getInt(OEPLPrefs.DETECTED_HARDWARE_TYPE, -1);
-        final String inches = hardware >= 0 ? OEPLTagTypes.inchesOf(hardware) : null;
-        final int width = prefs.getInt(OEPLPrefs.PANEL_WIDTH, 0);
-        final int height = prefs.getInt(OEPLPrefs.PANEL_HEIGHT, 0);
+        final OEPLTagTypes.TagType type = hardware >= 0
+                ? OEPLTagTypes.byHardwareType(hardware) : null;
+        final String inches = type != null ? type.inches() : null;
+
+        // The panel as it is sold and seen, not the buffer it is written through. On most
+        // tags the two are a quarter turn apart, so taking the stored buffer announced one
+        // display as 384x168 and the one beside it as 184x384 although both are read the same
+        // way round. The catalogue has the panel; the stored pair is the fallback for a tag
+        // the catalogue has never heard of, and is then put long side first for the same
+        // reason.
+        int width = type != null ? type.width : prefs.getInt(OEPLPrefs.PANEL_WIDTH, 0);
+        int height = type != null ? type.height : prefs.getInt(OEPLPrefs.PANEL_HEIGHT, 0);
+        if (width > 0 && height > width) {
+            final int swap = width;
+            width = height;
+            height = swap;
+        }
 
         final StringBuilder name = new StringBuilder(device.getName());
         if (inches != null) {
@@ -368,6 +382,19 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         }
         // nothing known yet: the plain name, rather than a title that says only half of it
         return name.length() > device.getName().length() ? name.toString() : null;
+    }
+
+    /**
+     * When this display last showed something new. Its connections last a few seconds and
+     * happen every quarter of an hour; what somebody wants to know about a display on a wall
+     * is when the picture on it was last brought up to date.
+     */
+    @Override
+    public long getLastUpdateMillis(@NonNull final GBDevice device) {
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+        final long drawn = prefs.getLong(OEPLPrefs.LAST_UPDATE_MILLIS, 0L);
+        return drawn > 0 ? drawn : super.getLastUpdateMillis(device);
     }
 
     /**
@@ -398,10 +425,43 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
     public boolean onPullToRefresh(@NonNull final Context context,
                                    @NonNull final GBDevice device) {
         OEPLContentSync.invalidateAll(device.getAddress());
-        OEPLUpdateScheduler.requestUpdateNow(context, device);
+        redrawNow(context, device, OEPLPrefs.PREF_CONTENT);
         GB.toast(context.getString(R.string.oepl_info_refreshing, device.getAliasOrName()),
                 2000, GB.INFO);
         return true;
+    }
+
+    /**
+     * The name tag mode is one switch for every display at once, so each of them has to be
+     * drawn again and offered the new picture - the one that is turned off is exactly the one
+     * whose tag somebody is looking for, and waiting a quarter of an hour for it would make
+     * the switch look broken.
+     */
+    @Override
+    public boolean onGlobalPreferenceChanged(@NonNull final Context context,
+                                             @NonNull final GBDevice device,
+                                             @NonNull final String key) {
+        if (!GBPrefs.DISPLAY_NAME_TAGS_KEY.equals(key)) {
+            return false;
+        }
+        redrawNow(context, device, key);
+        return true;
+    }
+
+    /**
+     * Draws this display's card again straight away, by whichever route is open.
+     * <p>
+     * The scheduler deliberately steps aside for a link that is already up - cutting in would
+     * disconnect underneath whatever is using it - so a display that happens to be connected
+     * has to be reached through its own service instead. Going only through the scheduler is
+     * how a setting could change nothing at all on the one display that was awake.
+     */
+    private void redrawNow(final Context context, final GBDevice device, final String reason) {
+        if (device.isInitialized()) {
+            GBApplication.deviceService(device).onSendConfiguration(reason);
+        } else {
+            OEPLUpdateScheduler.requestUpdateNow(context, device);
+        }
     }
 
     /**

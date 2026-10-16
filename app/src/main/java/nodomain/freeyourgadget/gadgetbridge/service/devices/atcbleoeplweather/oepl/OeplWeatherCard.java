@@ -69,7 +69,9 @@ public class OeplWeatherCard extends OeplCard {
         final boolean wet = OeplIcons.isWet(now.wmoCode);
         final float headRoom = windWidth + arrowSize * (wet ? 3.2f : 1.8f);
 
-        c.textClipped(weather.location, pad, h * 0.02f, headSize, OeplCanvas.LEFT, c.ink,
+        // set smaller rather than cut: the place is the one word that says which display
+        // this is, and "Hamb…" says nothing at all
+        c.textFitted(weather.location, pad, h * 0.02f, headSize, OeplCanvas.LEFT, c.ink,
                 w - headRoom - pad * 2);
 
         c.text(windValue, w - pad, h * 0.02f, headSize, OeplCanvas.RIGHT,

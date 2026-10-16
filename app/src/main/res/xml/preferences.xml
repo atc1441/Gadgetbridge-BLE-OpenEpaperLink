@@ -60,6 +60,23 @@
             android:title="@string/pref_title_general_reconnectonlytoconnected"
             android:icon="@drawable/ic_bluetooth_connected" />
 
+        <ListPreference
+            android:defaultValue="default"
+            android:entries="@array/device_sort_order"
+            android:entryValues="@array/device_sort_order_values"
+            android:key="general_prefs_key_device_sort_order"
+            android:icon="@drawable/ic_list_numbered"
+            android:summary="@string/pref_summary_device_sort_order"
+            android:title="@string/pref_title_device_sort_order" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="general_prefs_key_display_name_tags"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_summary_display_name_tags"
+            android:title="@string/pref_title_display_name_tags"
+            android:icon="@drawable/ic_label_24px" />
+
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:key="general_prefs_key_sort_by_last_connected_ts"

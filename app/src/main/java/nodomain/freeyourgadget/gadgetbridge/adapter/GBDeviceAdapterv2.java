@@ -37,6 +37,7 @@ import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.text.Editable;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Pair;
@@ -229,6 +230,31 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
      * design, so the greyed out version would be the one almost always on screen. The connection
      * state is on the card anyway, in the status dot and in words next to it.
      */
+    /**
+     * What the card says under the name: the state, and when this device last did what it is
+     * there for.
+     * <p>
+     * "Not connected" is the whole truth about a tag that is woken for a few seconds a day
+     * and says nothing at all about whether it is working. The time beside it does: a display
+     * that last showed something new a quarter of an hour ago is fine, one from last Tuesday
+     * is not, and that difference is the thing somebody is looking for when they open this
+     * list. A connected device is left alone - what it is doing now is already on the card.
+     */
+    private String stateWithLastUpdate(final GBDevice device) {
+        final String state = device.getStateString(context);
+        if (device.isInitialized() || device.isConnected()) {
+            return state;
+        }
+        final long when = device.getDeviceCoordinator().getLastUpdateMillis(device);
+        if (when <= 0 || when > System.currentTimeMillis() + DateUtils.MINUTE_IN_MILLIS) {
+            return state;
+        }
+        // the phone's own wording for a moment: "16:42", "Yesterday 16:42", "14 Oct, 16:42"
+        final CharSequence stamp = DateUtils.getRelativeDateTimeString(context, when,
+                DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0);
+        return context.getString(R.string.controlcenter_state_and_time, state, stamp);
+    }
+
     private static void setDevicePicture(final ViewHolder holder, final Bitmap picture) {
         holder.deviceImageView.setImageBitmap(picture);
         holder.deviceImageView.setBackground(AppCompatResources.getDrawable(
@@ -371,7 +397,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         if (device.isBusy()) {
             holder.deviceStatusLabel.setText(device.getBusyTask());
         } else {
-            holder.deviceStatusLabel.setText(device.getStateString(context));
+            holder.deviceStatusLabel.setText(stateWithLastUpdate(device));
         }
         DeviceStatusDot.apply(holder.deviceStatusDot, device);
 

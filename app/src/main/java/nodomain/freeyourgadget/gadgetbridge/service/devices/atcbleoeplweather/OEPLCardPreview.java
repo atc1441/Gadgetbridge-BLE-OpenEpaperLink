@@ -75,6 +75,9 @@ public final class OEPLCardPreview {
         if (emptyHint != null) {
             options.emptyHint = emptyHint;
         }
+        // the preview is what the panel gets, name tag included, so that the mode can be seen
+        // to be on without walking up to a display
+        options.nameTag = OEPLPrefs.nameTag(device);
 
         final CardContent content = CardContentFactory.create(context, device, prefs, id);
         final Bitmap card = new CardRenderer(options).render(width, height, 0, content);

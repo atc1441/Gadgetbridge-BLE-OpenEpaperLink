@@ -24,7 +24,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import androidx.annotation.Nullable;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 /** Preference keys and the few derived values the weather display needs. */
 public final class OEPLPrefs {
@@ -169,6 +172,24 @@ public final class OEPLPrefs {
     }
 
     /**
+     * What the identification mode writes into the corner of this display, or null while the
+     * mode is off.
+     * <p>
+     * The Bluetooth name rather than the alias: the alias is what the user called the display
+     * and is already on the card in the device list, while the name is what a scan shows and
+     * what the list has to be matched against when a panel and its entry have been mixed up.
+     * An unnamed display falls back to its address, which is the only thing left to go by.
+     */
+    @Nullable
+    public static String nameTag(final GBDevice device) {
+        if (!GBApplication.getPrefs().getShowDisplayNameTags()) {
+            return null;
+        }
+        final String name = device.getName();
+        return name == null || name.trim().isEmpty() ? device.getAddress() : name.trim();
+    }
+
+    /**
      * How often a new picture is drawn and offered to the tag. Fifteen minutes by default: an
      * update only costs a connection when the picture has actually changed and the display is
      * in range, so a short interval mostly buys a clock and a current reading that are right,
@@ -197,8 +218,15 @@ public final class OEPLPrefs {
         return parseInt(prefs.getString(PREF_MODEL, "-1"), -1);
     }
 
+    /**
+     * How many days of forecast a card draws - the number on the setting, not a number derived
+     * from it. Five by default, which is what the cards showed before this was the days
+     * themselves, and up to the seven Open-Meteo delivers: a week on a panel large enough to
+     * hold it is most of the reason to hang a large panel.
+     */
     public static int forecastDays(final SharedPreferences prefs) {
-        return parseInt(prefs.getString(PREF_FORECAST_DAYS, "3"), 3);
+        final int days = parseInt(prefs.getString(PREF_FORECAST_DAYS, "5"), 5);
+        return Math.max(0, Math.min(7, days));
     }
 
     /** Which card the display shows; see CardContentFactory for the known values. */

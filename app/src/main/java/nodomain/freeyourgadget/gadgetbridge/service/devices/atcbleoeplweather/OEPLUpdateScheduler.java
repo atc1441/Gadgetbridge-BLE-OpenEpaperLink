@@ -314,6 +314,15 @@ public final class OEPLUpdateScheduler {
 
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
 
+        final String waitingFor = CardContentFactory.waitingForSource(prefs);
+        if (waitingFor != null) {
+            // not even worth waking the display for: there is nothing to put on it yet
+            LOG.info("{} for {}, skipping this update", waitingFor, address);
+            OEPLStatusStore.recordWaiting(address, waitingFor);
+            armNext(context, address, false);
+            return;
+        }
+
         // Fetched before the link comes up, never after: the tag hangs up by itself after a few
         // seconds of silence, so a picture must be ready to send the moment it answers.
         try {

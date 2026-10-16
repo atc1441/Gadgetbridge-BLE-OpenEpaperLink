@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -169,43 +170,93 @@ public class DeviceManager {
         // device support threads while this sort runs, and re-reading it mid-sort can
         // make compare() inconsistent between calls, which violates the contract TimSort
         // relies on (IllegalArgumentException: Comparison method violates its general contract!).
-        final boolean sortByLastConnectedTs = GBApplication.getPrefs().getSortByLastConnectedTs();
+        final String order = GBApplication.getPrefs().getDeviceSortOrder();
+        final boolean byState = GBPrefs.DEVICE_SORT_DEFAULT.equals(order);
+        final boolean byLastUpdate = GBPrefs.DEVICE_SORT_LAST_UPDATE.equals(order);
+        final boolean byType = GBPrefs.DEVICE_SORT_TYPE.equals(order);
+        final boolean sortByLastConnectedTs = byState
+                && GBApplication.getPrefs().getSortByLastConnectedTs();
         final Collator collator = Collator.getInstance();
         final Map<GBDevice, DeviceSortKey> sortKeys = new HashMap<>();
         for (GBDevice device : deviceList) {
-            final long lastConnectedTs;
-            if (sortByLastConnectedTs) {
-                lastConnectedTs = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
+            final long timestamp;
+            if (byLastUpdate) {
+                // what the device last did, which for a display that is woken to be written
+                // to is the picture rather than the connection; its coordinator decides
+                timestamp = device.getDeviceCoordinator().getLastUpdateMillis(device);
+            } else if (sortByLastConnectedTs) {
+                timestamp = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
                         .getLong(GBPrefs.LAST_CONNECTED_TS, 0L);
             } else {
-                lastConnectedTs = 0L;
+                timestamp = 0L;
             }
-            sortKeys.put(device, new DeviceSortKey(device.getStateOrdinal(), lastConnectedTs, device.getAliasOrName()));
+            final String type = byType ? typeNameOf(device) : "";
+            sortKeys.put(device, new DeviceSortKey(device.getStateOrdinal(), timestamp,
+                    device.getAliasOrName(), type));
         }
 
-        Collections.sort(deviceList, (lhs, rhs) -> {
-            final DeviceSortKey lhsKey = Objects.requireNonNull(sortKeys.get(lhs));
-            final DeviceSortKey rhsKey = Objects.requireNonNull(sortKeys.get(rhs));
-
-            int stateDiff = rhsKey.stateOrdinal - lhsKey.stateOrdinal;
-            if (stateDiff != 0) {
-                return stateDiff;
-            }
-
-            if (sortByLastConnectedTs) {
-                int lastConnDiff = Long.compare(rhsKey.lastConnectedTs, lhsKey.lastConnectedTs); // più recente prima
-                if (lastConnDiff != 0) {
-                    return lastConnDiff;
-                }
-            }
-            return collator.compare(lhsKey.aliasOrName, rhsKey.aliasOrName);
-        });
+        Collections.sort(deviceList, comparator(order, sortByLastConnectedTs, sortKeys,
+                collator));
         notifyDevicesChanged();
     }
 
-    private record DeviceSortKey(int stateOrdinal,
-                                 long lastConnectedTs,
-                                 String aliasOrName) {
+    /** What kind of device this is, as the list groups it: its own name for its type. */
+    private String typeNameOf(final GBDevice device) {
+        try {
+            return context.getString(device.getDeviceCoordinator().getDeviceNameResource());
+        } catch (final Exception e) {
+            // a type without a readable name still has to sort somewhere
+            return device.getType().name();
+        }
+    }
+
+    /**
+     * The order the list is put in, given the keys of the devices in it.
+     * <p>
+     * Only the default order puts whatever is connected on top. The other three were chosen
+     * for a reason - which came last, what it is called, what kind it is - and a device
+     * jumping to the front because it happens to be connected at that second is exactly what
+     * they are meant to stop. The name decides every tie, so the order never depends on which
+     * device the list happened to hold first.
+     */
+    static Comparator<GBDevice> comparator(final String order,
+                                           final boolean sortByLastConnectedTs,
+                                           final Map<GBDevice, DeviceSortKey> keys,
+                                           final Collator collator) {
+        final boolean byState = GBPrefs.DEVICE_SORT_DEFAULT.equals(order);
+        final boolean byLastUpdate = GBPrefs.DEVICE_SORT_LAST_UPDATE.equals(order);
+        final boolean byType = GBPrefs.DEVICE_SORT_TYPE.equals(order);
+        return (lhs, rhs) -> {
+            final DeviceSortKey lhsKey = Objects.requireNonNull(keys.get(lhs));
+            final DeviceSortKey rhsKey = Objects.requireNonNull(keys.get(rhs));
+
+            if (byState) {
+                final int stateDiff = rhsKey.stateOrdinal - lhsKey.stateOrdinal;
+                if (stateDiff != 0) {
+                    return stateDiff;
+                }
+            }
+            if (byType) {
+                final int typeDiff = collator.compare(lhsKey.type, rhsKey.type);
+                if (typeDiff != 0) {
+                    return typeDiff;
+                }
+            }
+            if (byLastUpdate || sortByLastConnectedTs) {
+                // the most recent first
+                final int whenDiff = Long.compare(rhsKey.timestamp, lhsKey.timestamp);
+                if (whenDiff != 0) {
+                    return whenDiff;
+                }
+            }
+            return collator.compare(lhsKey.aliasOrName, rhsKey.aliasOrName);
+        };
+    }
+
+    record DeviceSortKey(int stateOrdinal,
+                         long timestamp,
+                         String aliasOrName,
+                         String type) {
     }
 
     /**

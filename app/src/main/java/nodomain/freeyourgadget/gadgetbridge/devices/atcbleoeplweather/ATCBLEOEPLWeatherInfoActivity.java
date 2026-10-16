@@ -373,6 +373,11 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
     private void contentSection(final SharedPreferences p) {
         header(R.string.oepl_info_section_content);
         row(getString(R.string.oepl_info_card), contentLabel(OEPLPrefs.contentType(p)));
+        final String tag = OEPLPrefs.nameTag(device);
+        if (tag != null) {
+            // only while the mode is on: a row saying "off" on every display would be noise
+            row(getString(R.string.oepl_info_name_tag), tag);
+        }
         row(getString(R.string.oepl_info_frame), OEPLPrefs.frame(p).name());
         row(getString(R.string.oepl_info_weather_source), OEPLPrefs.useOpenMeteo(p)
                 ? "Open-Meteo" : "Gadgetbridge");

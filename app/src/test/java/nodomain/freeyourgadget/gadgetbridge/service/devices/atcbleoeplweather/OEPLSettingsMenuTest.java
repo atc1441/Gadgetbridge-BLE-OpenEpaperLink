@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.view.ContextThemeWrapper;
 
@@ -49,6 +50,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCardFactory;
 import nodomain.freeyourgadget.gadgetbridge.devices.atcbleoeplweather.ATCBLEOEPLWeatherSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -83,6 +85,84 @@ public class OEPLSettingsMenuTest {
         root = manager.inflateFromResource(context,
                 R.xml.devicesettings_oepl_weather_display, null);
         handler = new StubHandler(root, context);
+    }
+
+    /**
+     * Every list the settings offer, in every language the app has them in: as many entries
+     * as values.
+     * <p>
+     * A translated list is a second copy of the same list, and a copy left behind is a list
+     * that silently ends early - the forecast stopped at four days in German while it went to
+     * seven in English, because only one of the two files had been extended. Android does not
+     * complain about that: it shows whichever entries it has.
+     */
+    @Test
+    public void everyTranslatedListHasAsManyEntriesAsItHasValues() {
+        final int[][] lists = {
+                {R.array.oepl_weather_content, R.array.oepl_weather_content_values},
+                {R.array.oepl_weather_quad, R.array.oepl_weather_quad_values},
+                {R.array.oepl_weather_forecast_days, R.array.oepl_weather_forecast_days_values},
+                {R.array.oepl_weather_forecast_hours, R.array.oepl_weather_forecast_hours_values},
+                {R.array.oepl_weather_calendar_days, R.array.oepl_weather_calendar_days_values},
+                {R.array.oepl_weather_calendar_events, R.array.oepl_weather_calendar_events_values},
+                {R.array.oepl_weather_notification_count,
+                        R.array.oepl_weather_notification_count_values},
+                {R.array.oepl_weather_reading_groups, R.array.oepl_weather_reading_groups_values},
+                {R.array.oepl_weather_update_interval, R.array.oepl_weather_update_interval_values},
+                {R.array.oepl_weather_min_gap, R.array.oepl_weather_min_gap_values},
+                {R.array.oepl_weather_connect_window, R.array.oepl_weather_connect_window_values},
+                {R.array.oepl_weather_connect_attempts,
+                        R.array.oepl_weather_connect_attempts_values},
+                {R.array.oepl_weather_source, R.array.oepl_weather_source_values},
+                {R.array.oepl_weather_wind_unit, R.array.oepl_weather_wind_unit_values},
+                {R.array.oepl_weather_frame, R.array.oepl_weather_frame_values},
+                {R.array.oepl_weather_accent, R.array.oepl_weather_accent_values},
+                {R.array.oepl_weather_rotation, R.array.oepl_weather_rotation_values},
+                {R.array.oepl_weather_image_dither, R.array.oepl_weather_image_dither_values},
+                {R.array.oepl_weather_image_fit, R.array.oepl_weather_image_fit_values},
+        };
+        for (final String language : new String[]{"en", "de"}) {
+            RuntimeEnvironment.setQualifiers(language);
+            final Resources resources = RuntimeEnvironment.getApplication().getResources();
+            for (final int[] list : lists) {
+                final String name = resources.getResourceEntryName(list[0]);
+                assertEquals(name + " in " + language,
+                        resources.getStringArray(list[1]).length,
+                        resources.getStringArray(list[0]).length);
+            }
+        }
+        RuntimeEnvironment.setQualifiers("en");
+    }
+
+    /**
+     * What can be drawn and what can be chosen are the same set - in both directions. A design
+     * the factory knows but the list does not is a design nobody can reach, and an id in the
+     * list that nothing draws is a card that comes out blank.
+     */
+    @Test
+    public void everyDesignIsReachableAndEveryEntryIsADesign() {
+        final List<String> offered = Arrays.asList(context.getResources()
+                .getStringArray(R.array.oepl_weather_content_values));
+        final List<String> drawable = Arrays.asList(OeplDemo.IDS);
+        for (final String id : drawable) {
+            assertTrue(id + " can be drawn but cannot be chosen", offered.contains(id));
+        }
+        for (final String id : offered) {
+            assertTrue(id + " can be chosen but nothing draws it", drawable.contains(id));
+        }
+
+        // and a quarter may hold any of them except another quartered card, or nothing at all
+        final List<String> quarters = Arrays.asList(context.getResources()
+                .getStringArray(R.array.oepl_weather_quad_values));
+        assertTrue("a quarter may be left empty", quarters.contains(""));
+        for (final String id : offered) {
+            if (OeplCardFactory.QUAD.equals(id)) {
+                assertFalse("a quarter cannot hold another quartered card",
+                        quarters.contains(id));
+            } else {
+                assertTrue(id + " should be available for a quarter", quarters.contains(id));
+            }
+        }
     }
 
     @Test

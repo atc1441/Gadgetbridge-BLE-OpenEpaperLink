@@ -41,6 +41,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.TimeZone;
 import java.util.concurrent.ScheduledExecutorService;
@@ -238,9 +239,16 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                 finishTransfer(true, true);
                 return true;
             case OEPLProtocol.ERR_FILE_TOO_BIG:
-                GB.toast(getContext().getString(R.string.oepl_weather_image_too_big),
-                        Toast.LENGTH_LONG, GB.ERROR);
-                finishTransfer(false, false);
+                // The display keeps one slot per picture in its own memory and refuses
+                // anything that does not fit. How big a picture turns out is a question of
+                // what is on it - a drawn card is a few kilobytes, a dithered photograph can
+                // be fifty times that - which is why this looks like a transfer that works
+                // one time and not the next. The size goes into the message and into the
+                // info screen, because without it there is nothing to go on.
+                final int kilobytes = (payload == null ? 0 : payload.length) / 1024;
+                GB.toast(getContext().getString(R.string.oepl_weather_image_too_big)
+                        + " (" + kilobytes + " kB)", Toast.LENGTH_LONG, GB.ERROR);
+                finishTransfer(false, false, "picture too big, " + kilobytes + " kB");
                 return true;
             default:
                 return false;
@@ -338,6 +346,15 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
         final String address = getDevice().getAddress();
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+
+        final String waitingFor = CardContentFactory.waitingForSource(prefs);
+        if (waitingFor != null) {
+            LOG.info("{} for {}, leaving the panel as it is", waitingFor, address);
+            OEPLStatusStore.recordWaiting(address, waitingFor);
+            cancelWatchdog();
+            disconnectIfTransient();
+            return;
+        }
 
         // The last word on freshness, and the only one every push goes through. The scheduler
         // normally has the forecast in hand before the radio even comes up, so this returns
@@ -484,6 +501,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         options.batteryMillivolts = prefs.getInt(OEPLPrefs.LAST_BATTERY_MV, CardRenderer.NO_VALUE);
         options.panelTemperature = prefs.getInt(OEPLPrefs.LAST_PANEL_TEMPERATURE, CardRenderer.NO_VALUE);
         options.emptyHint = emptyHint(prefs);
+        options.nameTag = OEPLPrefs.nameTag(getDevice());
 
         final CardContent content = CardContentFactory.create(getContext(), getDevice(), prefs);
         return new CardRenderer(options)
@@ -581,7 +599,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         blockData = OEPLProtocol.encodeBlock(payload, currentBlock);
         if (blockData == null) {
             LOG.error("tag asked for block {} which is past the end of the payload", currentBlock);
-            finishTransfer(false, false);
+            finishTransfer(false, false, "asked for block " + currentBlock + " of " + blockCount);
             return;
         }
         final TransactionBuilder builder = createTransactionBuilder("block " + currentBlock);
@@ -610,6 +628,18 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
     }
 
     private void finishTransfer(final boolean success, final boolean alreadyShown) {
+        finishTransfer(success, alreadyShown, "failed");
+    }
+
+    /**
+     * Ends the transfer, and says why when it did not work.
+     * <p>
+     * The reason is what the info screen shows afterwards. "Failed" on its own leaves nothing
+     * to do but try again and hope, which is exactly the position a transfer that works every
+     * other time puts somebody in.
+     */
+    private void finishTransfer(final boolean success, final boolean alreadyShown,
+                                final String reason) {
         if (alreadyShown) {
             LOG.info("the tag already shows this picture");
         }
@@ -628,7 +658,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                     transferStarted > 0 ? System.currentTimeMillis() - transferStarted : 0,
                     OEPLPrefs.contentType(settings));
         } else if (!success) {
-            OEPLStatusStore.recordFailure(getDevice().getAddress(), "failed");
+            OEPLStatusStore.recordFailure(getDevice().getAddress(), reason);
         }
         cancelWatchdog();
         clearProgress();
@@ -663,7 +693,12 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             LOG.warn("the display stopped answering, giving this connection up");
             clearProgress();
             final String address = getDevice().getAddress();
-            OEPLStatusStore.recordFailure(address, "no answer");
+            // where it stopped, which is the difference between a tag that never took the
+            // picture and one that broke off halfway through it
+            final String where = blockCount < 0 ? "no answer"
+                    : String.format(Locale.ROOT, "no answer at block %d/%d part %d",
+                            currentBlock + 1, blockCount, currentChunk);
+            OEPLStatusStore.recordFailure(address, where);
             synchronized (ATCBLEOEPLWeatherDeviceSupport.this) {
                 payload = null;
                 blockData = null;

@@ -73,6 +73,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.maps.MapsSettingsActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.preferences.HealthConnectPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.quicksettings.QuickSettingsPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.TimeChangeReceiver;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.comaps.CoMapsNavigationReceiverFactory;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksController;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
@@ -685,6 +686,31 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
         /*
          * delayed execution so that the preferences are applied first
          */
+        /**
+         * The name tag switch is one switch for every display there is, so flipping it has to
+         * reach all of them. Writing the value and waiting would leave the panels showing
+         * yesterday's picture, which is indistinguishable from a setting that does nothing.
+         */
+        @Override
+        protected void onSharedPreferenceChanged(final Preference preference) {
+            if (!GBPrefs.DISPLAY_NAME_TAGS_KEY.equals(preference.getKey())) {
+                return;
+            }
+            final Context context = requireContext().getApplicationContext();
+            int taken = 0;
+            for (final GBDevice device : GBApplication.app().getDeviceManager().getDevices()) {
+                if (device.getDeviceCoordinator().onGlobalPreferenceChanged(context, device,
+                        GBPrefs.DISPLAY_NAME_TAGS_KEY)) {
+                    taken++;
+                }
+            }
+            if (taken > 0) {
+                GB.toast(context, getResources().getQuantityString(
+                                R.plurals.pref_display_name_tags_applying, taken, taken),
+                        2000, GB.INFO);
+            }
+        }
+
         private void invokeLater(Runnable runnable) {
             getListView().post(runnable);
         }

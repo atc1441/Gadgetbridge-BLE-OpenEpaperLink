@@ -35,9 +35,17 @@ import java.util.Map;
  */
 public final class OEPLTagTypes {
 
-    /** A number followed by an inch mark, with at most one word in between ("2.2 Lite\""). */
-    private static final java.util.regex.Pattern INCHES =
-            java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(?:[A-Za-z]+\\s*)?\"");
+    /**
+     * A number followed by an inch mark, with at most one word in between ("2.2 Lite\"").
+     * <p>
+     * Two things about the catalogue make this less obvious than it looks. Half of the names
+     * write the decimal with a comma, the way these displays are sold in Europe ("HS BWRY
+     * 3,5\""), and reading only digits and a point found the "5" in it - so a three and a half
+     * inch panel was announced as five inches, and "2,00\"" as zero. The number may also not
+     * start in the middle of another one, which is what the lookbehind is for.
+     */
+    private static final java.util.regex.Pattern INCHES = java.util.regex.Pattern.compile(
+            "(?<![\\d.,])(\\d{1,2}(?:[.,]\\d{1,2})?)\\s*(?:[A-Za-z]+\\s*)?\"");
 
     public static class TagType {
         public final int hardwareType;
@@ -78,7 +86,21 @@ public final class OEPLTagTypes {
         @Nullable
         public String inches() {
             final java.util.regex.Matcher m = INCHES.matcher(name);
-            return m.find() ? m.group(1) + "\"" : null;
+            if (!m.find()) {
+                return null;
+            }
+            // one spelling for the card, whatever the catalogue used: a point for the
+            // decimal, and no trailing zeros to read past ("2,00" is two inches)
+            String number = m.group(1).replace(',', '.');
+            if (number.contains(".")) {
+                while (number.endsWith("0")) {
+                    number = number.substring(0, number.length() - 1);
+                }
+                if (number.endsWith(".")) {
+                    number = number.substring(0, number.length() - 1);
+                }
+            }
+            return number + "\"";
         }
 
         public int rotationDegrees() {

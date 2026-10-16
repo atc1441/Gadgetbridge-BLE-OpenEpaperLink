@@ -61,8 +61,10 @@ public class OeplRangeCard extends OeplCard {
         final boolean head = headSize > 0f && !weather.location.isEmpty() && h >= 72f;
         final float top = head ? c.lineHeight(headSize) * 1.05f : Math.max(1f, h * 0.02f);
         if (head) {
-            c.textClipped(weather.location, pad, 0f, headSize, OeplCanvas.LEFT, c.ink,
-                    w - pad * 2f);
+            // the place and the reading of the moment, as on the forecast card
+            c.rowEnds(weather.location, tempFine(weather.current.temperature) + "°", 0f,
+                    headSize, c.ink, inkOrAccent(c, weather.current.temperature < 0f), pad,
+                    w - pad, pad * 2f);
         }
 
         // a row has to stay thick enough for a readable figure, so the number of days follows

@@ -229,6 +229,18 @@ public final class OEPLStatusStore {
                 .apply();
     }
 
+    /**
+     * Nothing was sent because there is nothing to send yet - a picture card without a picture
+     * - which is neither a success nor a failure. It goes into the last result so the info
+     * screen can say what the display is waiting for, and into no tally at all: counting it as
+     * a failure would make the scheduler back off from a display that is working perfectly.
+     */
+    public static void recordWaiting(final String address, final String reason) {
+        prefs(address).edit().putString(LAST_RESULT, reason)
+                .putLong(LAST_RESULT_MILLIS, System.currentTimeMillis())
+                .apply();
+    }
+
     public static void recordFailure(final String address, final String reason) {
         final SharedPreferences p = prefs(address);
         p.edit().putString(LAST_RESULT, reason == null ? "failed" : reason)

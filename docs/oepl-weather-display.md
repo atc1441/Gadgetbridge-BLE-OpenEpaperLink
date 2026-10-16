@@ -55,6 +55,14 @@ first card is drawn with a real battery reading and the right panel geometry.
   not the link is up. Gadgetbridge greys out the icon of a disconnected device, which reads
   correctly for a symbol but not for a photograph of a panel - least of all here, where being
   disconnected is the normal state.
+- **The order of the list** is a setting of its own, under *Settings → Order of the device
+  list*: connected first (as before), **last update first**, by name, or by kind of device -
+  which groups the displays of one type together. The other three deliberately ignore the
+  connection state: a shelf of tags that are asleep nearly all of the time is a list in which
+  that state says nothing.
+- **The time beside the state** on each card is when the device last did what it is there for
+  - for a display, when its picture was last brought up to date, not when it last connected.
+  "Not connected · 16:42" says a display is working; "Not connected" on its own says nothing.
 - **Pulling the list down** refreshes the display. Every cached source is thrown away, so the
   weather, the headlines and a picture from a URL are fetched again, the card is drawn, and the
   tag is contacted - but only if the new picture differs from the one it already shows. The
@@ -106,7 +114,7 @@ the firmware would otherwise draw a clock of its own over the picture every minu
 
 ## The cards
 
-Forty-two of them, in four families, which the ids say apart:
+Forty-three of them, in four families, which the ids say apart:
 
 - `oepl_*` — the OpenEPaperLink layouts. The number is the content number that access point
   uses, so the two can be compared side by side.
@@ -118,12 +126,13 @@ Forty-two of them, in four families, which the ids say apart:
 | Id | Card | Reads |
 | --- | --- | --- |
 | `oepl_4` | Current weather (default) | weather, wind unit |
-| `oepl_8` | Forecast, one column per day | weather, wind unit, days |
+| `oepl_8` | Forecast, one column per day, with the current reading in its header | weather, wind unit, days |
 | `oepl_16` | Rain graph for the coming hours | weather, hours |
 | `oepl_1` | Date, with sunrise, sunset and moon | weather, sun times |
 | `oepl_29` | Clock | — |
 | `oepl_11` | Appointment list | calendar, caption |
 | `oepl_11w` | Week view, falls back to a list on a small panel | calendar days |
+| `panel_month` | The month as a sheet, today filled, a dot per appointment | caption |
 | `oepl_9` | News feed (RSS or Atom) | feed |
 | `oepl_10` | QR code | QR content |
 | `oepl_2` | Countdown in days | countdown |
@@ -154,8 +163,8 @@ Forty-two of them, in four families, which the ids say apart:
 | `image` | A picture from the phone | picture, dithering, fit |
 | `image_url` | A picture from a URL | picture, dithering, fit |
 
-The twelve `oepl_*` cards, the eleven `panel_*` cards and the two picture cards own the whole
-panel. The others are drawn inside a frame with a title bar and a status strip, which is what
+The twelve `oepl_*` cards, the twelve `panel_*` cards and the two picture cards own the
+whole panel. The others are drawn inside a frame with a title bar and a status strip, which is what
 the *Appearance* settings apply to.
 
 ### Picking one
@@ -174,7 +183,7 @@ cannot drift apart.
 
 | Screen | What is in it |
 | --- | --- |
-| **Weather** | source (Open-Meteo or Gadgetbridge), location, forecast days, hours, wind unit, sun times |
+| **Weather** | source (Open-Meteo or Gadgetbridge), location, forecast days (up to seven), hours, wind unit, sun times |
 | **Calendar** | read the calendar on or off, which calendars, how far ahead, birthdays, appointments shown, days in the week view, caption |
 | **News feed** | feed address, caption, summaries |
 | **QR code** | content, caption |
@@ -189,6 +198,25 @@ cannot drift apart.
 | **Updates** | interval, live updates and their minimum gap, connection attempts, reachability |
 | **Power and radio** | keep connection open, advertising interval, OEPL protocol flag |
 | **Hardware** | read the configuration from the display, display type |
+
+### The month sheet
+
+`panel_month` is the view the other calendar cards do not have: it answers *when* rather than
+*what next*. A cell per day, today filled in the accent colour, and a dot for every appointment
+that day holds - at the size a day gets on a tag, a title would be two letters and an ellipsis,
+while a row of dots is read from across the room. The month decides its own span, so the
+*calendar lookahead* setting does not limit it: the card asks for the days that are left in the
+month however the other cards are configured. A panel too small for seven columns shows the
+list of what is coming up instead.
+
+### How many days
+
+*Forecast days* is the number of days a card draws, from today on, and it goes up to the seven
+Open-Meteo delivers. Five by default. A card never draws more than its panel can hold at a
+readable size: the columns of the forecast card are as narrow as two temperatures beside each
+other allow and no narrower, so a shelf label shows the first three or four days of the week
+and a poster shows all seven. Asking for seven on a small tag is therefore not a mistake - it
+is simply as much of the week as fits.
 
 ### The dashboard cards
 
@@ -270,6 +298,15 @@ photograph of a person, where the point is the face rather than the edges - and 
 beforehand, in another app, for a panel whose proportions nobody remembers, is not a
 reasonable thing to ask.
 
+**Nothing is sent until there is something to send.** Choosing *picture* and choosing the
+picture are two steps, and in between the card carries nothing but the words "no picture".
+Sending that would wipe what the panel was showing, cost a connection and a full refresh of
+the display, and be replaced a few seconds later - so the display is left alone, and the
+scheduled updates skip it, until a picture has been chosen. The same holds for the other cards
+whose content is handed over by hand: the picture from a URL, the QR code, the feed and the
+text poster. A source that was set but does not answer is a different matter - there the card
+saying so is the useful answer.
+
 ### A second display
 
 Pairing another display takes the settings of one that is already set up: the weather location,
@@ -279,6 +316,29 @@ is work nobody should be asked to do twice. What is copied is an ordinary settin
 the new display can be pointed somewhere else, and nothing remembers where its values came
 from. What it *shows* is deliberately not copied, nor its picture, rotation or colours, so a
 second display starts as ready to use as the first one but not as a copy of it.
+
+### Telling the displays apart
+
+*Settings → Name tags on every display* is one switch for all of them at once. While it is
+on, every display carries its own Bluetooth name in a small box in its top left corner, black
+on white with a black border around it, drawn over whatever the card shows.
+
+The text is deliberately small - a dozen pixels at most, however large the panel - because this
+is a note to whoever is standing in front of the display rather than part of the card, and the
+box is only as wide as the name needs.
+
+The name is never shortened. A box reading `Hamb…` cannot be matched against anything, which is
+the one job it has, so a name too long for the panel is set smaller and then broken across
+lines - and never cut. The Bluetooth name is used rather than the alias: that is what a scan
+shows and what the device list has to be matched against, while the alias is the name *you*
+gave the display and is already on its card in the list. An unnamed display falls back to its
+address.
+
+Flipping the switch draws every display again at once and offers each of them the new picture,
+so the boxes appear - and disappear again - without waiting for the next scheduled update. A
+display that is out of range gets its box the next time it is reached. The name is written
+before the card is turned into the panel buffer, so the corner is the one you are looking at,
+and the design picker shows the box too, which is the quickest way to see that the mode is on.
 
 ### The quartered card
 

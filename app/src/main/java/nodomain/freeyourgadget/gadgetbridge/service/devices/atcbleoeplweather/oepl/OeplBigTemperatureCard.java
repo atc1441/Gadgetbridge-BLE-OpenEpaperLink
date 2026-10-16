@@ -68,7 +68,7 @@ public class OeplBigTemperatureCard extends OeplCard {
             final float iconW = c.iconWidth(sky, iconH);
             c.iconCentered(sky, w - pad - iconW / 2f, c.lineHeight(headSize) * 0.5f, iconH,
                     inkOrAccent(c, OeplIcons.isSevere(now.wmoCode)));
-            c.textClipped(weather.location, pad, 0f, headSize, OeplCanvas.LEFT, c.ink,
+            c.textFitted(weather.location, pad, 0f, headSize, OeplCanvas.LEFT, c.ink,
                     w - pad * 2f - iconW - pad);
             top = Math.max(c.lineHeight(headSize), iconH) * 1.02f;
         }

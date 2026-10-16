@@ -43,7 +43,7 @@
                 android:summary="@string/pref_oepl_weather_location_summary"
                 android:dialogTitle="@string/pref_oepl_weather_location_title" />
             <ListPreference
-                android:defaultValue="3"
+                android:defaultValue="5"
                 android:entries="@array/oepl_weather_forecast_days"
                 android:entryValues="@array/oepl_weather_forecast_days_values"
                 android:key="pref_oepl_weather_forecast_days"
