@@ -67,10 +67,10 @@ It is built from the `mainlineNopebble` flavour, so its application id is
 `nodomain.freeyourgadget.gadgetbridge.nightly_nopebble` and it installs **alongside** a normal
 Gadgetbridge rather than replacing it. The app shows up as *Gadgetbridge OEPL*.
 
-> **Signing:** without release signing secrets the workflow falls back to a debug key, and a
-> debug key generated on a CI runner is different every time — Android then refuses to install
-> an update over an older build. See [docs/releases.md](docs/releases.md) for the two commands
-> that give the repository a stable signing key.
+> **Updating:** every release is signed with the same key, so a new APK installs over the one
+> already on the phone. Releases built before October 2026 used a throwaway debug key, so going
+> from one of those to a current build needs the old app uninstalled once. See
+> [docs/releases.md](docs/releases.md).
 
 ### Setting a display up
 
@@ -113,8 +113,8 @@ really cover, so it sees a collision that a pixel count cannot, and its report i
 
 - [docs/oepl-weather-display.md](docs/oepl-weather-display.md) — what the device does, every
   setting, the card catalogue, the protocol and how to add a card of your own.
-- [docs/releases.md](docs/releases.md) — how the automatic release build works and how to give
-  it a signing key.
+- [docs/releases.md](docs/releases.md) — how the automatic release build works and how it is
+  signed.
 - [CREDITS.md](CREDITS.md) — who made the pieces this is built on.
 - [README-Gadgetbridge.md](README-Gadgetbridge.md) — the upstream project's own README.
 
