@@ -329,10 +329,25 @@ public class ControlCenterv2 extends AppCompatActivity
         swipeLayout.setOnRefreshListener(() -> {
             if (prefs.refreshOnSwipe()) {
                 List<GBDevice> devices1 = GBApplication.app().getDeviceManager().getDevices();
+
+                // Devices that refresh without being connected first - a display that is woken
+                // for a few seconds to be written to is never "connected" when the gesture
+                // happens, and used to be told so instead of being refreshed.
+                boolean anyTookTheGesture = false;
+                for (final GBDevice device : devices1) {
+                    if (device.getDeviceCoordinator().onPullToRefresh(ControlCenterv2.this, device)) {
+                        anyTookTheGesture = true;
+                    }
+                }
+
                 final boolean anyConnected = devices1.stream().anyMatch(GBDevice::isInitialized);
                 if (!anyConnected) {
-                    // No devices are connected at all
-                    GB.toast(getString(R.string.info_no_devices_connected), Toast.LENGTH_LONG, GB.WARN);
+                    if (!anyTookTheGesture) {
+                        // No devices are connected at all
+                        GB.toast(getString(R.string.info_no_devices_connected), Toast.LENGTH_LONG, GB.WARN);
+                    }
+                    // what was started above happens over the radio and reports on the device
+                    // card, so the spinner has nothing left to wait for
                     swipeLayout.setRefreshing(false);
                     return;
                 }
@@ -344,7 +359,9 @@ public class ControlCenterv2 extends AppCompatActivity
                         .anyMatch(dev -> dev.getDeviceCoordinator().supportsDataFetching(dev));
                 if (!anySupported) {
                     swipeLayout.setRefreshing(false);
-                    GB.toast(getString(R.string.info_no_devices_to_sync), Toast.LENGTH_LONG, GB.WARN);
+                    if (!anyTookTheGesture) {
+                        GB.toast(getString(R.string.info_no_devices_to_sync), Toast.LENGTH_LONG, GB.WARN);
+                    }
                 }
             } else {
                 swipeLayout.setRefreshing(false);

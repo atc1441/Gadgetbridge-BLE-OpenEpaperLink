@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import androidx.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +107,22 @@ public final class OEPLContentSync {
                     "picture");
         }
         return ok;
+    }
+
+    /**
+     * Throws every cached source away, so that the next {@link #freshen} really asks the
+     * network again. The caches exist so the same question is not asked twice within minutes,
+     * which is right for a timed update and wrong for a refresh somebody asked for by hand.
+     *
+     * @param address the display whose picture cache goes as well, may be null
+     */
+    public static void invalidateAll(@Nullable final String address) {
+        OpenMeteoClient.invalidate();
+        OeplRssClient.invalidate();
+        final Context context = GBApplication.getContext();
+        if (context != null && address != null) {
+            OEPLImageSource.invalidate(context, address);
+        }
     }
 
     /**

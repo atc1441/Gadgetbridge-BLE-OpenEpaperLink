@@ -32,6 +32,7 @@ import androidx.annotation.NonNull;
 import java.util.ArrayList;
 import java.util.List;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -88,6 +89,18 @@ public class DeviceCandidateAdapter extends ArrayAdapter<GBDeviceCandidate> {
         deviceImageView.setImageResource(coordinator.getDefaultIconResource());
 
         final List<String> statusLines = new ArrayList<>();
+        // A device that has already been added keeps turning up here: the scan shows what is in
+        // range, not what is new. Saying so is what tells the three identical labels on the wall
+        // apart from the one that is not set up yet - and bonding cannot stand in for it, since
+        // plenty of devices are driven without ever being bonded.
+        final GBDevice known = GBApplication.app().getDeviceManager()
+                .getDeviceByAddress(device.getMacAddress());
+        if (known != null) {
+            final String alias = known.getAlias();
+            statusLines.add(TextUtils.isEmpty(alias)
+                    ? getContext().getString(R.string.device_already_added)
+                    : getContext().getString(R.string.device_already_added_as, alias));
+        }
         if (device.isBonded()) {
             statusLines.add(getContext().getString(R.string.device_is_currently_bonded));
         }

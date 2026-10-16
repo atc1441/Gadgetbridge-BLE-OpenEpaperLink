@@ -22,6 +22,24 @@ That is also why the tag already tells you a lot before it is ever connected to:
 type, firmware version, battery voltage and panel temperature are in its advertisement, so the
 first card is drawn with a real battery reading and the right panel geometry.
 
+## On the device card
+
+- **The title** is the tag's Bluetooth name with the panel behind it, as in
+  `ATC_8F3A21 · 2.9" · 384×168`. "ATC_" plus four characters of the MAC address places
+  nothing once a second display is on the wall, while the diagonal and the resolution say what
+  kind of display this is. Give the device a name of your own and that name is used instead,
+  untouched.
+- **The icon** is the picture the display is showing, and it stays in its own colours whether or
+  not the link is up. Gadgetbridge greys out the icon of a disconnected device, which reads
+  correctly for a symbol but not for a photograph of a panel - least of all here, where being
+  disconnected is the normal state.
+- **Pulling the list down** refreshes the display. Every cached source is thrown away, so the
+  weather, the headlines and a picture from a URL are fetched again, the card is drawn, and the
+  tag is contacted - but only if the new picture differs from the one it already shows. The
+  gesture normally means "fetch the recorded data of what is connected" and would otherwise
+  only report that nothing is connected, which for a tag that is woken for a few seconds at a
+  time is almost always true.
+
 ## The cards
 
 Thirty-seven of them, in four families, which the ids say apart:
@@ -88,7 +106,7 @@ cannot drift apart.
 | Screen | What is in it |
 | --- | --- |
 | **Weather** | source (Open-Meteo or Gadgetbridge), location, forecast days, hours, wind unit, sun times |
-| **Calendar** | appointments shown, days in the week view, caption |
+| **Calendar** | read the calendar on or off, which calendars, how far ahead, birthdays, appointments shown, days in the week view, caption |
 | **News feed** | feed address, caption, summaries |
 | **QR code** | content, caption |
 | **Countdown** | target date, caption, accent threshold |
@@ -99,6 +117,34 @@ cannot drift apart.
 | **Updates** | interval, live updates and their minimum gap, connection attempts, reachability |
 | **Power and radio** | keep connection open, advertising interval, OEPL protocol flag |
 | **Hardware** | read the configuration from the display, display type |
+
+### Showing a Google (or any other) calendar
+
+Gadgetbridge never talks to Google. It reads the phone's own calendar database, which is where
+the Android calendar app keeps everything that any account syncs into it - Google, Exchange,
+Nextcloud, a local calendar. So a Google calendar reaches the panel the moment the phone has
+it:
+
+1. In Android's settings, make sure the account is added and its calendar sync is on. A
+   calendar that the phone itself does not show will not reach the display either.
+2. Grant Gadgetbridge the calendar permission. It is one of the permissions on the first-run
+   screen, and can be given later under Android's app permissions. Without it the switch in the
+   next step stays greyed out and says so.
+3. In the display's settings, open **Calendar** and turn on **Sync calendar events**.
+4. Still in **Calendar**, open **Choose calendars to be synced** and leave only the ones that
+   belong on this panel. An account usually carries a handful - holidays, birthdays, a shared
+   family calendar - and a wall display rarely wants all of them.
+5. Pick a card that shows appointments: `oepl_11` (list), `oepl_11w` (the week), `panel_board`
+   (the appointment board), or one of the split cards that pairs the weather or the date with
+   the next appointments.
+
+**How far ahead** decides how much the card may look into the future, seven days by default.
+The week view needs seven to fill itself; a list of the next four appointments is happy with
+less. **Birthdays** adds the ones from the contacts, which needs the contacts permission as
+well.
+
+While the calendar is off, an appointment card says so on the panel rather than claiming there
+is nothing in the diary.
 
 ## How updates are scheduled
 
@@ -126,6 +172,13 @@ letting an app do anything in the background. The schedule is built around both:
   is heard. Only used where the controller can batch scans in hardware.
 - **Live updates**: a notification or a track change pushes immediately instead of waiting for
   the interval, coalesced and rate limited so a burst cannot thrash the panel.
+- **Every setting draws again at once.** Changing anything that affects the picture - the card,
+  a caption, which calendars are read, the frame, the rotation - redraws and offers the result
+  to the display right away, so a setting can be judged by looking at the panel. Only the three
+  settings that belong to the display itself and the few about how the link is opened do not.
+  This is the default rather than a list of known settings: a forgotten setting would look
+  broken, while a redraw too many costs a drawing and no connection, because an unchanged
+  picture is never sent and a run already under way is never cut into.
 - A **checksum of the last picture** means an unchanged card is never sent twice.
 
 Android's battery optimisation will hold alarms back whatever the app does, so the status page

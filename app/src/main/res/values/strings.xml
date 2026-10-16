@@ -2982,6 +2982,8 @@
     <string name="app_crash_notification_title">%1s has crashed</string>
     <string name="app_crash_share_stacktrace">Share error</string>
     <string name="device_is_currently_bonded">ALREADY BONDED</string>
+    <string name="device_already_added">ALREADY ADDED</string>
+    <string name="device_already_added_as">ALREADY ADDED AS %1$s</string>
     <string name="device_unsupported">UNSUPPORTED</string>
     <string name="device_experimental">EXPERIMENTAL</string>
     <string name="error_background_service_reason">Starting the background service failed because of an exception - click here for more information.\n\nError:</string>
@@ -5410,6 +5412,7 @@
     <string name="oepl_info_action_read_config">Read the hardware again</string>
     <string name="oepl_info_action_reset">Reset the counters</string>
     <string name="oepl_info_queued">Queued: the display is contacted as soon as it answers</string>
+    <string name="oepl_info_refreshing">%1$s: refreshing the content, the display follows as soon as it answers</string>
     <string name="oepl_info_not_connected">Only possible while the display is connected</string>
     <string name="oepl_info_ago_seconds">%d s ago</string>
     <string name="oepl_info_ago_minutes">%d min ago</string>
@@ -5466,6 +5469,7 @@
     <string name="oepl_weather_no_music">nothing playing</string>
     <string name="oepl_weather_no_weather">no weather data yet</string>
     <string name="oepl_weather_no_calendar">no upcoming appointments</string>
+    <string name="oepl_weather_calendar_off">calendar sync is off in the settings</string>
     <string name="oepl_weather_no_text">no text configured</string>
     <string name="pref_oepl_weather_category_card">Layout</string>
     <string name="pref_oepl_weather_category_power">Power</string>

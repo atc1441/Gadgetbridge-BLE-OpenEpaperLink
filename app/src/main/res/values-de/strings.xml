@@ -817,6 +817,8 @@
     <string name="pref_check_permission_status_summary">Prüfen und nachfragen von fehlenden Berechtigungen, auch wenn sie nicht direkt benötigt werden. Nur deaktivieren, wenn dieses Gerät eine der Features nicht unterstützen soll. Eine Berechtigung nicht zu erteilen kann zu Problemen führen!</string>
     <string name="pref_check_permission_status">Berechtigungsstatus prüfen</string>
     <string name="device_is_currently_bonded">BEREITS VERBUNDEN</string>
+    <string name="device_already_added">SCHON HINZUGEFÜGT</string>
+    <string name="device_already_added_as">SCHON HINZUGEFÜGT ALS %1$s</string>
     <string name="companiondevice_pairing">Begleitgerätepaarung</string>
     <string name="require_location_provider">Standort muss aktiviert sein</string>
     <string name="activity_detail_show_gps_label">GPS-Strecke anzeigen</string>
@@ -4549,6 +4551,7 @@
     <string name="oepl_info_preview">Aktuelle Karte</string>
     <string name="oepl_info_preview_note">%1$s Pixel, übergeben %2$s</string>
     <string name="oepl_info_queued">Eingereiht: das Display wird kontaktiert, sobald es antwortet</string>
+    <string name="oepl_info_refreshing">%1$s: Inhalte werden aktualisiert, das Display folgt, sobald es antwortet</string>
     <string name="oepl_info_reported">Gemeldet</string>
     <string name="oepl_info_result">Ergebnis</string>
     <string name="oepl_info_result_failed">fehlgeschlagen</string>
@@ -4589,6 +4592,7 @@
     <string name="oepl_weather_image_too_big">Das Bild passt nicht in den Speicher des Displays</string>
     <string name="oepl_weather_model_auto">Automatisch (erkannt)</string>
     <string name="oepl_weather_no_calendar">keine anstehenden Termine</string>
+    <string name="oepl_weather_calendar_off">Kalender in den Einstellungen nicht aktiviert</string>
     <string name="oepl_weather_no_feed">kein Feed eingerichtet</string>
     <string name="oepl_weather_no_music">nichts läuft</string>
     <string name="oepl_weather_no_notifications">keine Benachrichtigungen</string>

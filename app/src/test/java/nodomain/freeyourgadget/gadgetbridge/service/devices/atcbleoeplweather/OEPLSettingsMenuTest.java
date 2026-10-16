@@ -31,9 +31,16 @@ import androidx.activity.result.ActivityResultRegistry;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.NonNull;
 import androidx.preference.Preference;
+import androidx.preference.PreferenceCategory;
+import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -301,5 +308,55 @@ public class OEPLSettingsMenuTest {
                 @NonNull final ActivityResultCallback<O> callback) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    /**
+     * Every setting in the file reaches the service when it changes. A key the settings screen
+     * does not notify about is changed, nothing happens, and the panel keeps showing the old
+     * picture until the next scheduled update - which looks exactly like a broken setting.
+     * <p>
+     * Buttons that act when they are pressed, and the settings Gadgetbridge itself handles for
+     * every device, are listed here as the known exceptions.
+     */
+    @Test
+    public void everySettingInTheFileIsOneTheDisplayHearsAbout() {
+        final Set<String> handledElsewhere = new HashSet<>(Arrays.asList(
+                // buttons: they notify when pressed, there is no value to watch
+                OEPLPrefs.PREF_IMAGE_PICK,
+                OEPLPrefs.PREF_READ_CONFIG,
+                "pref_oepl_weather_pick_design",
+                "pref_oepl_weather_info",
+                // the shared calendar settings, registered by the fragment for every device
+                "sync_calendar",
+                "calendar_blacklist",
+                "calendar_lookahead_days",
+                "sync_birthdays"));
+
+        final List<String> forgotten = new ArrayList<>();
+        for (final Preference preference : all(root)) {
+            final String key = preference.getKey();
+            if (key == null || key.isEmpty() || preference instanceof PreferenceScreen
+                    || preference instanceof PreferenceCategory
+                    || handledElsewhere.contains(key)
+                    || OEPLPrefs.NOTIFYING_KEYS.contains(key)) {
+                continue;
+            }
+            forgotten.add(key);
+        }
+        assertEquals("settings in the file that the display is never told about: " + forgotten,
+                0, forgotten.size());
+    }
+
+    /** Every preference in the tree, sub-menus included. */
+    private static List<Preference> all(final PreferenceGroup group) {
+        final List<Preference> found = new ArrayList<>();
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            final Preference preference = group.getPreference(i);
+            found.add(preference);
+            if (preference instanceof PreferenceGroup) {
+                found.addAll(all((PreferenceGroup) preference));
+            }
+        }
+        return found;
     }
 }

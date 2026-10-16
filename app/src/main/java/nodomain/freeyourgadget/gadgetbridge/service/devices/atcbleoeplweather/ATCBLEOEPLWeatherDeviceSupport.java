@@ -49,6 +49,7 @@ import java.util.zip.CRC32;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
@@ -442,7 +443,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if (OeplCardFactory.CALENDAR.equals(content)
                 || OeplCardFactory.CALENDAR_WEEK.equals(content)
                 || OeplCardFactory.BOARD.equals(content)) {
-            return getContext().getString(R.string.oepl_weather_no_calendar);
+            return calendarHint(prefs);
         }
         if (OeplCardFactory.needsWeather(content)) {
             return getContext().getString(R.string.oepl_weather_no_weather);
@@ -454,12 +455,24 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             return getContext().getString(R.string.oepl_weather_no_music);
         }
         if (content.contains(CardContentFactory.CALENDAR)) {
-            return getContext().getString(R.string.oepl_weather_no_calendar);
+            return calendarHint(prefs);
         }
         if (CardContentFactory.TEXT.equals(content) || OeplCardFactory.POSTER.equals(content)) {
             return getContext().getString(R.string.oepl_weather_no_text);
         }
         return getContext().getString(R.string.oepl_weather_no_weather);
+    }
+
+    /**
+     * An empty appointment card has two quite different reasons, and the panel should say which
+     * one it is: there is nothing in the calendar, or the calendar is not being read at all.
+     * Reading it is off until it is asked for, as everywhere else in Gadgetbridge, so a card
+     * that only ever says "no appointments" would be telling the wrong story.
+     */
+    private String calendarHint(final SharedPreferences prefs) {
+        return getContext().getString(prefs.getBoolean(
+                DeviceSettingsPreferenceConst.PREF_SYNC_CALENDAR, false)
+                ? R.string.oepl_weather_no_calendar : R.string.oepl_weather_calendar_off);
     }
 
     private byte[] encode(final Bitmap bitmap, final SharedPreferences prefs) {
@@ -743,13 +756,31 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             OEPLUpdateScheduler.reschedule(getContext(), getDevice());
             return;
         }
-        // Everything that only changes what we draw: redraw and send, without touching the tag.
-        // The content choice itself lives here, so this list has to grow with every new setting.
-        if (PRESENTATION_PREFS.contains(config)) {
-            redrawNow(prefs, config);
+
+        if (LINK_PREFS.contains(config)) {
+            return; // how the link is opened, which the next update reads for itself
+        }
+
+        if (HARDWARE_PREFS.contains(config)) {
+            sendHardwareSetting(config, prefs);
+            if (OEPLPrefs.PREF_MODEL.equals(config)) {
+                // a different display type is a different panel, so what was drawn for the old
+                // one no longer fits and has to be drawn again
+                redrawNow(prefs, config);
+            }
             return;
         }
 
+        // Everything else changes what is drawn, so draw it again and offer it to the tag. This
+        // is deliberately the default rather than a list of known settings: a setting left off
+        // such a list looks broken - it is changed and the panel keeps showing the old picture
+        // until the next interval - while a redraw too many costs a drawing and no connection,
+        // because an unchanged picture is never sent.
+        redrawNow(prefs, config);
+    }
+
+    /** The three settings that are the display's own and have to be written to it. */
+    private void sendHardwareSetting(final String config, final SharedPreferences prefs) {
         try {
             final TransactionBuilder builder = performInitialized("configuration " + config);
             switch (config) {
@@ -786,34 +817,24 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
     }
 
-    /** Settings that change the picture but say nothing to the display itself. */
-    private static final java.util.Set<String> PRESENTATION_PREFS = new java.util.HashSet<>(
+    /** Settings the display itself has to be told about. */
+    private static final java.util.Set<String> HARDWARE_PREFS = new java.util.HashSet<>(
             java.util.Arrays.asList(
-                    OEPLPrefs.PREF_CONTENT,
-                    OEPLPrefs.PREF_CUSTOM_TEXT,
-                    OEPLPrefs.PREF_CALENDAR_EVENTS,
-                    OEPLPrefs.PREF_NOTIFICATION_COUNT,
-                    OEPLPrefs.PREF_FORECAST_HOURS,
-                    OEPLPrefs.PREF_FORECAST_DAYS,
-                    OEPLPrefs.PREF_FRAME,
-                    OEPLPrefs.PREF_ROTATION,
-                    OEPLPrefs.PREF_ACCENT_COLOR,
-                    OEPLPrefs.PREF_SHOW_FOOTER,
-                    OEPLPrefs.PREF_INVERT,
-                    OEPLPrefs.PREF_WEATHER_SOURCE,
-                    OEPLPrefs.PREF_WEATHER_LOCATION,
-                    OEPLPrefs.PREF_WIND_UNIT,
-                    OEPLPrefs.PREF_SHOW_SUN,
-                    OEPLPrefs.PREF_COUNTER_TARGET,
-                    OEPLPrefs.PREF_COUNTER_THRESHOLD,
-                    OEPLPrefs.PREF_COUNTER_CAPTION,
-                    OEPLPrefs.PREF_RSS_URL,
-                    OEPLPrefs.PREF_RSS_TITLE,
-                    OEPLPrefs.PREF_RSS_SUMMARY,
-                    OEPLPrefs.PREF_QR_CONTENT,
-                    OEPLPrefs.PREF_QR_TITLE,
-                    OEPLPrefs.PREF_CALENDAR_TITLE,
-                    OEPLPrefs.PREF_CALENDAR_DAYS));
+                    OEPLPrefs.PREF_MODEL,
+                    OEPLPrefs.PREF_ADV_INTERVAL,
+                    OEPLPrefs.PREF_OEPL_PROTOCOL));
+
+    /**
+     * Settings about how the link is opened. They change neither the picture nor the schedule:
+     * the next update reads them when it runs.
+     */
+    private static final java.util.Set<String> LINK_PREFS = new java.util.HashSet<>(
+            java.util.Arrays.asList(
+                    OEPLPrefs.PREF_STAY_CONNECTED,
+                    OEPLPrefs.PREF_CONNECT_WINDOW,
+                    OEPLPrefs.PREF_CONNECT_ATTEMPTS,
+                    OEPLPrefs.PREF_LIVE_UPDATES,
+                    OEPLPrefs.PREF_MIN_GAP));
 
     /**
      * Redraws and sends after a setting changed. The display is disconnected almost all of the

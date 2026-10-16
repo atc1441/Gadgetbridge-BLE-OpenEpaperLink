@@ -1159,6 +1159,38 @@ public interface DeviceCoordinator {
         return true;
     }
 
+    /**
+     * The name this device's card carries as long as nobody has given it one of their own: a
+     * Bluetooth name is often only a model and four characters of the MAC address, and a
+     * coordinator usually knows something that places the device better than that.
+     * <p>
+     * Only consulted while the device has no alias. A name the user typed is never second
+     * guessed.
+     *
+     * @return the name to show, or null to use the device's own
+     */
+    @Nullable
+    default String getDeviceDisplayName(@NonNull final Context context,
+                                        @NonNull final GBDevice device) {
+        return null;
+    }
+
+    /**
+     * The user pulled the device list down to refresh. The gesture otherwise means "fetch the
+     * recorded data of everything that is connected", which passes by a device that is only
+     * ever connected for the moment it takes to push something to it: pulling down with such a
+     * device paired would only report that nothing is connected.
+     * <p>
+     * A coordinator that takes the gesture is expected to do whatever its device understands as
+     * a refresh, and to say so on screen itself - only it knows what is now happening.
+     *
+     * @return true when this device was given something to do
+     */
+    default boolean onPullToRefresh(@NonNull final Context context,
+                                    @NonNull final GBDevice device) {
+        return false;
+    }
+
     @DrawableRes
     int getDefaultIconResource();
 

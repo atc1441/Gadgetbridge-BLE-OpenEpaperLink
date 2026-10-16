@@ -54,11 +54,13 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.ATCBLEOEPLWeatherDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLTagTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLUpdateScheduler;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 
@@ -153,6 +155,56 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
     @Override
     public int getBondingStyle() {
         return BONDING_STYLE_LAZY;
+    }
+
+    /**
+     * The card's title, while the display has no name of its own: the tag's Bluetooth name
+     * followed by the diagonal and the resolution of the panel it carries, as in
+     * {@code ATC_8F3A21 · 2.9" · 384×168}.
+     * <p>
+     * The Bluetooth name of these tags is "ATC_" and four characters of the MAC address, which
+     * places nothing at all once there is more than one of them on the wall. What matters about
+     * a display is how big it is and how many pixels it has, and both are known from the moment
+     * it is paired - the advertisement carries the hardware type, and the catalogue the rest.
+     * A name the user typed in is left alone.
+     */
+    @Nullable
+    @Override
+    public String getDeviceDisplayName(@NonNull final Context context,
+                                       @NonNull final GBDevice device) {
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+        final int hardware = prefs.getInt(OEPLPrefs.DETECTED_HARDWARE_TYPE, -1);
+        final String inches = hardware >= 0 ? OEPLTagTypes.inchesOf(hardware) : null;
+        final int width = prefs.getInt(OEPLPrefs.PANEL_WIDTH, 0);
+        final int height = prefs.getInt(OEPLPrefs.PANEL_HEIGHT, 0);
+
+        final StringBuilder name = new StringBuilder(device.getName());
+        if (inches != null) {
+            name.append(" · ").append(inches);
+        }
+        if (width > 0 && height > 0) {
+            name.append(" · ").append(width).append('×').append(height);
+        }
+        // nothing known yet: the plain name, rather than a title that says only half of it
+        return name.length() > device.getName().length() ? name.toString() : null;
+    }
+
+    /**
+     * A pull down on the device list refreshes this display. The gesture asks for what is on
+     * screen to be brought up to date, and for a panel that is woken for a few seconds at a
+     * time that means: throw the cached weather, headlines and pictures away, draw the card
+     * again, and go to the display with it - but only if the picture actually came out
+     * different, because a redraw costs the tag seconds of radio and battery either way.
+     */
+    @Override
+    public boolean onPullToRefresh(@NonNull final Context context,
+                                   @NonNull final GBDevice device) {
+        OEPLContentSync.invalidateAll(device.getAddress());
+        OEPLUpdateScheduler.requestUpdateNow(context, device);
+        GB.toast(context.getString(R.string.oepl_info_refreshing, device.getAliasOrName()),
+                2000, GB.INFO);
+        return true;
     }
 
     /**

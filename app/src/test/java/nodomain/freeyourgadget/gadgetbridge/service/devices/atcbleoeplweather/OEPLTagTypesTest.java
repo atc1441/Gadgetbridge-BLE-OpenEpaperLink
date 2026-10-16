@@ -129,4 +129,29 @@ public class OEPLTagTypesTest {
         // a type the catalogue has never heard of still has to say something useful
         assertEquals("Unknown (0xF7)", OEPLTagTypes.describe(0xF7));
     }
+
+    /**
+     * The diagonal, which the catalogue keeps inside the model name. It is what places a
+     * display for a reader - 2.9 inches or 7.5 is the difference between a shelf label and a
+     * poster - so the card title asks the catalogue for it.
+     */
+    @Test
+    public void readsTheDiagonalOutOfTheModelName() {
+        assertEquals("2.9\"", OEPLTagTypes.inchesOf(0x2B));   // M3 2.9" BWRY
+        assertEquals("1.54\"", OEPLTagTypes.inchesOf(0x00));  // M2 1.54"
+        assertEquals("5.85\"", OEPLTagTypes.inchesOf(0x41));  // M3 5.85"
+        assertEquals("2.2\"", OEPLTagTypes.inchesOf(0x45));   // M3 2.2 Lite"
+        // not every entry is a panel with a size in its name
+        assertNull(OEPLTagTypes.inchesOf(0xFA));             // ConfigMode
+        assertNull(OEPLTagTypes.inchesOf(0xE0));             // TFT 320x172
+        assertNull(OEPLTagTypes.inchesOf(0x1234));           // not in the catalogue at all
+
+        // whatever the name says, the two have to agree: a name with an inch mark reports one
+        for (final OEPLTagTypes.TagType type : OEPLTagTypes.all().values()) {
+            if (type.name.contains("\"")) {
+                assertNotNull(type.name + " names a diagonal but does not report one",
+                        type.inches());
+            }
+        }
+    }
 }

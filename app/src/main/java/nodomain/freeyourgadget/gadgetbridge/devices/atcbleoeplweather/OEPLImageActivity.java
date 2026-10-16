@@ -63,6 +63,8 @@ public class OEPLImageActivity extends AbstractGBActivity {
     private RadioGroup fit;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private volatile boolean stopped;
+    /** Set once the picture or one of its two options changed, cleared when the display is told. */
+    private boolean changed;
 
     private final ActivityResultLauncher<String[]> pick = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(), this::chosen);
@@ -106,6 +108,20 @@ public class OEPLImageActivity extends AbstractGBActivity {
         refresh();
     }
 
+    /**
+     * Sends the new picture once this screen is left, rather than on every radio button: the
+     * preview above already shows what was chosen, and the display is better handed the finished
+     * answer than each step on the way to it.
+     */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (changed) {
+            changed = false;
+            GBApplication.deviceService(device).onSendConfiguration(OEPLPrefs.PREF_IMAGE_URI);
+        }
+    }
+
     @Override
     protected void onDestroy() {
         stopped = true;
@@ -130,6 +146,7 @@ public class OEPLImageActivity extends AbstractGBActivity {
             LOG.info("no lasting permission for {}", uri, e);
         }
         prefs().edit().putString(OEPLPrefs.PREF_IMAGE_URI, uri.toString()).apply();
+        changed = true;
         refresh();
     }
 
@@ -182,6 +199,7 @@ public class OEPLImageActivity extends AbstractGBActivity {
                 .putString(OEPLPrefs.PREF_IMAGE_DITHER, ditherValue)
                 .putString(OEPLPrefs.PREF_IMAGE_FIT, fitValue)
                 .apply();
+        changed = true;
     }
 
     /** Draws the card the display would get, on a thread, and shows it. */

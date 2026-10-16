@@ -35,6 +35,10 @@ import java.util.Map;
  */
 public final class OEPLTagTypes {
 
+    /** A number followed by an inch mark, with at most one word in between ("2.2 Lite\""). */
+    private static final java.util.regex.Pattern INCHES =
+            java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(?:[A-Za-z]+\\s*)?\"");
+
     public static class TagType {
         public final int hardwareType;
         public final String name;
@@ -65,6 +69,18 @@ public final class OEPLTagTypes {
          * OpenEPaperLink states the rotation from the buffer to the panel, and we go the other
          * way round, so this is the inverse.
          */
+        /**
+         * The screen diagonal as the catalogue spells it, for example 2.9". It is part of the
+         * model name rather than a figure of its own, because that is how these displays are
+         * named and sold - and a few of them, the segment displays and the examples, have no
+         * diagonal in their name at all, which is what the null is for.
+         */
+        @Nullable
+        public String inches() {
+            final java.util.regex.Matcher m = INCHES.matcher(name);
+            return m.find() ? m.group(1) + "\"" : null;
+        }
+
         public int rotationDegrees() {
             return ((4 - (rotateBuffer % 4)) % 4) * 90;
         }
@@ -215,6 +231,13 @@ public final class OEPLTagTypes {
     public static String nameOf(final int hardwareType) {
         final TagType t = TYPES.get(hardwareType);
         return t != null ? t.name : String.format("Unknown (0x%02X)", hardwareType);
+    }
+
+    /** The diagonal of a hardware type, or null when the catalogue does not name one. */
+    @Nullable
+    public static String inchesOf(final int hardwareType) {
+        final TagType t = TYPES.get(hardwareType);
+        return t != null ? t.inches() : null;
     }
 
     /**

@@ -74,6 +74,41 @@
         <PreferenceScreen
             android:key="pref_oepl_weather_screen_calendar"
             android:title="@string/pref_oepl_weather_screen_calendar">
+            <!-- Reading the calendar at all is off until it is asked for, and which calendars
+                 are read is chosen here as well: the phone's calendar app holds an account's
+                 worth of them and a wall display usually wants one. Same keys as every other
+                 device in Gadgetbridge, so the same screens and the permission request behind
+                 them do the work. -->
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:icon="@drawable/ic_calendar_sync"
+                android:key="sync_calendar"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_summary_sync_calendar"
+                android:title="@string/pref_title_sync_caldendar" />
+            <Preference
+                android:dependency="sync_calendar"
+                android:icon="@drawable/ic_calendar_month"
+                android:key="calendar_blacklist"
+                android:summary="@string/pref_summary_calendar_sync_choose"
+                android:title="@string/pref_title_calendar_sync_choose" />
+            <EditTextPreference
+                android:defaultValue="7"
+                android:dependency="sync_calendar"
+                android:icon="@drawable/ic_calendar_to"
+                android:inputType="number"
+                android:key="calendar_lookahead_days"
+                android:maxLength="3"
+                android:title="@string/pref_title_calendar_lookahead"
+                app:useSimpleSummaryProvider="true" />
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:dependency="sync_calendar"
+                android:icon="@drawable/ic_person"
+                android:key="sync_birthdays"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_summary_sync_birthdays"
+                android:title="@string/pref_title_sync_birthdays" />
             <ListPreference
                 android:defaultValue="4"
                 android:entries="@array/oepl_weather_calendar_events"

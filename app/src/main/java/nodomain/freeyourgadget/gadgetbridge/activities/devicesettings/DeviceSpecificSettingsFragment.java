@@ -1205,39 +1205,11 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_ATC_BLE_OEPL_BLE_ADV_INTERVAL);
         addPreferenceHandlerFor(PREF_ATC_BLE_OEPL_OEPL_PROTOCOL_ENABLE);
 
-        addPreferenceHandlerFor(OEPLPrefs.PREF_UPDATE_INTERVAL);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_ROTATION);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_ACCENT_COLOR);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_FORECAST_DAYS);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_SHOW_FOOTER);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_INVERT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_CONTENT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_CUSTOM_TEXT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_CALENDAR_EVENTS);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_NOTIFICATION_COUNT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_FORECAST_HOURS);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_FRAME);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_LIVE_UPDATES);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_MIN_GAP);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_WEATHER_SOURCE);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_WEATHER_LOCATION);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_WIND_UNIT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_SHOW_SUN);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_COUNTER_TARGET);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_COUNTER_THRESHOLD);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_COUNTER_CAPTION);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_RSS_URL);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_RSS_TITLE);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_RSS_SUMMARY);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_QR_CONTENT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_QR_TITLE);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_CALENDAR_TITLE);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_CALENDAR_DAYS);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_OPPORTUNISTIC);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_REQUIRE_ADVERTISEMENT);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_MODEL);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_ADV_INTERVAL);
-        addPreferenceHandlerFor(OEPLPrefs.PREF_OEPL_PROTOCOL);
+        // The weather display keeps the list of its own settings, so that a setting added to
+        // its screens cannot be forgotten here and then silently fail to reach the display.
+        for (final String oeplKey : OEPLPrefs.NOTIFYING_KEYS) {
+            addPreferenceHandlerFor(oeplKey);
+        }
 
         final Preference oeplInfo = findPreference("pref_oepl_weather_info");
         if (oeplInfo != null) {

@@ -36,6 +36,7 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Pair;
@@ -220,18 +221,19 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         }
     }
 
-    private static void setDevicePicture(final ViewHolder holder, final Bitmap picture,
-                                         final boolean connected) {
+    /**
+     * A device that shows a picture of itself gets that picture in its own colours, connected or
+     * not. Draining the colour out of an icon says "not connected" because the icon never meant
+     * anything else; draining it out of a photograph of a display says the display is showing
+     * grey, which it is not. Devices like these are disconnected nearly all of the time by
+     * design, so the greyed out version would be the one almost always on screen. The connection
+     * state is on the card anyway, in the status dot and in words next to it.
+     */
+    private static void setDevicePicture(final ViewHolder holder, final Bitmap picture) {
         holder.deviceImageView.setImageBitmap(picture);
         holder.deviceImageView.setBackground(AppCompatResources.getDrawable(
                 holder.deviceImageView.getContext(), R.drawable.device_card_icon_bg));
-        if (connected) {
-            holder.deviceImageView.setColorFilter(null);
-        } else {
-            final ColorMatrix colorMatrix = new ColorMatrix();
-            colorMatrix.setSaturation(0);
-            holder.deviceImageView.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
-        }
+        holder.deviceImageView.setColorFilter(null);
     }
 
     private void showDeviceFolder(ViewHolder holder, final GBDeviceFolder folder){
@@ -358,7 +360,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         // the generic icon
         final Bitmap picture = device.getDeviceCoordinator().getDevicePicture(device, context);
         if (picture != null) {
-            setDevicePicture(holder, picture, device.isInitialized());
+            setDevicePicture(holder, picture);
         } else {
             setDeviceIcon(holder, device.getDeviceCoordinator().getDefaultIconResource(),
                     device.isInitialized());
@@ -892,6 +894,16 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
 
     private String getUniqueDeviceName(GBDevice device) {
         String deviceName = device.getAliasOrName();
+
+        // Without a name of the user's own, the coordinator may describe the device better than
+        // its Bluetooth name does - for a display, what kind of display it is.
+        if (TextUtils.isEmpty(device.getAlias())) {
+            final String described =
+                    device.getDeviceCoordinator().getDeviceDisplayName(context, device);
+            if (!TextUtils.isEmpty(described)) {
+                deviceName = described;
+            }
+        }
 
         if (!isUniqueDeviceName(device, deviceName)) {
             if (device.getModel() != null) {

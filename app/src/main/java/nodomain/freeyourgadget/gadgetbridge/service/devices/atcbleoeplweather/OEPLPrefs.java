@@ -20,6 +20,10 @@ import android.content.SharedPreferences;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.ImageContent;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 
 /** Preference keys and the few derived values the weather display needs. */
@@ -69,6 +73,58 @@ public final class OEPLPrefs {
     public static final String PREF_QR_TITLE = "pref_oepl_weather_qr_title";
     public static final String PREF_CALENDAR_TITLE = "pref_oepl_weather_calendar_title";
     public static final String PREF_CALENDAR_DAYS = "pref_oepl_weather_calendar_days";
+
+    /**
+     * Every setting of this display that the service has to hear about when it changes. The
+     * settings screen notifies the device for the keys on this list and for no others, and
+     * {@code ATCBLEOEPLWeatherDeviceSupport.onSendConfiguration} then decides what to do with
+     * each - which for almost all of them means drawing the card again and offering it to the
+     * tag, so that a setting can be judged by looking at the panel instead of by reading the
+     * option. A new setting belongs here; {@code OEPLSettingsMenuTest} fails if one is left out.
+     * <p>
+     * The picture chooser and the hardware read are not values but buttons, and notify
+     * themselves when they are pressed.
+     */
+    public static final List<String> NOTIFYING_KEYS = Collections.unmodifiableList(Arrays.asList(
+            PREF_CONTENT,
+            PREF_WEATHER_SOURCE,
+            PREF_WEATHER_LOCATION,
+            PREF_FORECAST_DAYS,
+            PREF_FORECAST_HOURS,
+            PREF_WIND_UNIT,
+            PREF_SHOW_SUN,
+            PREF_CALENDAR_EVENTS,
+            PREF_CALENDAR_DAYS,
+            PREF_CALENDAR_TITLE,
+            PREF_NOTIFICATION_COUNT,
+            PREF_CUSTOM_TEXT,
+            PREF_COUNTER_TARGET,
+            PREF_COUNTER_THRESHOLD,
+            PREF_COUNTER_CAPTION,
+            PREF_RSS_URL,
+            PREF_RSS_TITLE,
+            PREF_RSS_SUMMARY,
+            PREF_QR_CONTENT,
+            PREF_QR_TITLE,
+            PREF_IMAGE_URL,
+            PREF_IMAGE_DITHER,
+            PREF_IMAGE_FIT,
+            PREF_FRAME,
+            PREF_SHOW_FOOTER,
+            PREF_ACCENT_COLOR,
+            PREF_ROTATION,
+            PREF_INVERT,
+            PREF_UPDATE_INTERVAL,
+            PREF_LIVE_UPDATES,
+            PREF_MIN_GAP,
+            PREF_CONNECT_WINDOW,
+            PREF_CONNECT_ATTEMPTS,
+            PREF_OPPORTUNISTIC,
+            PREF_REQUIRE_ADVERTISEMENT,
+            PREF_STAY_CONNECTED,
+            PREF_ADV_INTERVAL,
+            PREF_OEPL_PROTOCOL,
+            PREF_MODEL));
 
     // values cached between connections so that the scheduler can work without a link
     public static final String PANEL_WIDTH = "oepl_weather_panel_width";

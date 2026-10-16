@@ -42,6 +42,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLTagTypes;
@@ -100,7 +101,9 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
         findViewById(R.id.oepl_info_force).setOnClickListener(v -> {
             // forgetting the checksum is what makes the next push go out even if nothing changed
             prefs().edit().putLong(OEPLPrefs.LAST_IMAGE_CRC, 0L).apply();
-            OpenMeteoClient.invalidate();
+            // every source, not only the weather: a forced redraw is asked for when something
+            // on screen looks wrong, and the headlines or the picture are as likely to be it
+            OEPLContentSync.invalidateAll(device.getAddress());
             OEPLUpdateScheduler.requestUpdateNow(this, device);
             GB.toast(getString(R.string.oepl_info_queued), 2000, GB.INFO);
         });
