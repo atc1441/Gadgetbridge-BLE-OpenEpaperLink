@@ -14,10 +14,13 @@ normally do happens on the phone.
 
 A new device type, **OEPL Weather Display**, alongside the existing ATC_BLE_OEPL support:
 
-- **31 card designs.** Twelve in the style of the OpenEPaperLink layouts (current weather,
+- **37 card designs.** Twelve in the style of the OpenEPaperLink layouts (current weather,
   forecast, rain graph, date, clock, appointments, week view, news feed, QR code, two
-  countdowns, display info), seventeen drawn inside a Gadgetbridge frame (weather, calendar,
-  notifications, music, temperature curve, dashboard …), and two picture cards.
+  countdowns, display info), six of this project's own that take the whole panel (the
+  temperature at poster size, the week as bars, the sun's day as a diagram, today in tiles, an
+  appointment board, your own text as a poster), seventeen drawn inside a Gadgetbridge frame
+  (weather, calendar, notifications, music, temperature curve, dashboard …), and two picture
+  cards.
 - **Pictures.** A photo from the phone or an image from a URL, reduced to the colours the panel
   really has — with error diffusion, an ordered pattern, or no dithering at all, previewed
   before it is sent.
@@ -45,6 +48,12 @@ on a 960×768 panel.
 
 ![Card designs, part one](docs/images/designs-1.png)
 ![Card designs, part two](docs/images/designs-2.png)
+
+The six that are this project's own rather than a version of an OpenEPaperLink layout — their
+ids begin with `panel_`, and each goes in a different direction: one figure read from across the
+room, a chart, a diagram, tiles, a board, and type:
+
+![The six designs of this project's own](docs/images/designs-new.png)
 
 The three ways a picture can be reduced to the panel's colours, bottom row:
 
@@ -92,6 +101,13 @@ off the panel:
 The drawing tests write contact sheets of every design, at six panel shapes, to
 `app/build/oepl-gallery/` — which is where the pictures above come from. If you change a layout,
 look at them.
+
+Alongside them runs an audit that draws every design on **every panel geometry in the tag
+catalogue, in both orientations** — 52 designs across 77 shapes, four thousand cards — and
+fails on two things a layout written for one panel keeps doing on another: ink outside the area
+the card was given, and two pieces of text in the same place. It works on the boxes the glyphs
+really cover, so it sees a collision that a pixel count cannot, and its report is written to
+`app/build/oepl-gallery/layout-audit.txt`.
 
 ## Documentation
 

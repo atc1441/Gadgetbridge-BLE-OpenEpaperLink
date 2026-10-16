@@ -43,15 +43,21 @@ import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarManager;
 
 /**
- * Builds the cards that follow the OpenEPaperLink layouts. Their ids carry the content numbers
- * the access point uses, so "oepl_4" is its current weather card and "oepl_8" its forecast;
- * that makes the mapping between the two systems obvious when comparing them side by side.
+ * Builds the cards that own the whole panel, with no title bar and no status strip around them.
+ * <p>
+ * Two families live here. The ids beginning with "oepl_" follow the OpenEPaperLink layouts and
+ * carry the content numbers the access point uses, so "oepl_4" is its current weather card and
+ * "oepl_8" its forecast; that makes the mapping between the two systems obvious when comparing
+ * them side by side. The ids beginning with "panel_" are this project's own designs and follow
+ * nothing but themselves - the prefix is what keeps the two apart at a glance.
  */
 public final class OeplCardFactory {
     private static final Logger LOG = LoggerFactory.getLogger(OeplCardFactory.class);
 
-    /** Every content id here starts with this, which is how the main factory spots them. */
+    /** The ids that copy an OpenEPaperLink layout, named after its content number. */
     public static final String PREFIX = "oepl_";
+    /** The ids of our own full panel designs, which owe the access point nothing. */
+    public static final String OWN_PREFIX = "panel_";
 
     public static final String DATE = "oepl_1";
     public static final String COUNT_DAYS = "oepl_2";
@@ -66,16 +72,30 @@ public final class OeplCardFactory {
     public static final String INFO = "oepl_21";
     public static final String CLOCK = "oepl_29";
 
+    /** Our own designs: the temperature alone, as large as the panel can hold it. */
+    public static final String BIG = "panel_big";
+    /** The week as bars on one shared temperature scale. */
+    public static final String RANGE = "panel_bars";
+    /** The sun's way across the sky, with the time of day marked on it. */
+    public static final String SUN = "panel_sun";
+    /** Today in four tiles of a pictogram and a figure. */
+    public static final String TILES = "panel_tiles";
+    /** The appointments as a departure board. */
+    public static final String BOARD = "panel_board";
+    /** Your own text as a poster, for a door sign or a name plate. */
+    public static final String POSTER = "panel_poster";
+
     private OeplCardFactory() {
     }
 
     public static boolean handles(final String id) {
-        return id != null && id.startsWith(PREFIX);
+        return id != null && (id.startsWith(PREFIX) || id.startsWith(OWN_PREFIX));
     }
 
     /** True for the cards that need a weather forecast to say anything. */
     public static boolean needsWeather(final String id) {
-        return WEATHER.equals(id) || FORECAST.equals(id) || RAIN.equals(id) || DATE.equals(id);
+        return WEATHER.equals(id) || FORECAST.equals(id) || RAIN.equals(id) || DATE.equals(id)
+                || BIG.equals(id) || RANGE.equals(id) || SUN.equals(id) || TILES.equals(id);
     }
 
     public static boolean needsFeed(final String id) {
@@ -118,10 +138,34 @@ public final class OeplCardFactory {
                 return info(context, device, prefs);
             case CLOCK:
                 return new OeplClockCard();
+            case BIG:
+                return new OeplBigTemperatureCard(weather(prefs), beaufort);
+            case RANGE:
+                return new OeplRangeCard(weather(prefs), OEPLPrefs.forecastDays(prefs) + 2);
+            case SUN:
+                return new OeplSunCard(weather(prefs));
+            case TILES:
+                return new OeplTilesCard(weather(prefs), beaufort);
+            case BOARD:
+                return new OeplBoardCard(events(context, device),
+                        OEPLPrefs.calendarEvents(prefs), caption(context, prefs));
+            case POSTER:
+                return new OeplPosterCard(lines(OEPLPrefs.customText(prefs)));
             case WEATHER:
             default:
                 return new OeplWeatherCard(weather(prefs), beaufort);
         }
+    }
+
+    /** The text card's own lines, trimmed and without the empty ones. */
+    private static List<String> lines(final String raw) {
+        final List<String> lines = new ArrayList<>();
+        for (final String line : (raw == null ? "" : raw).split("\r?\n")) {
+            if (!line.trim().isEmpty()) {
+                lines.add(line.trim());
+            }
+        }
+        return lines;
     }
 
     private static String caption(final Context context, final SharedPreferences prefs) {

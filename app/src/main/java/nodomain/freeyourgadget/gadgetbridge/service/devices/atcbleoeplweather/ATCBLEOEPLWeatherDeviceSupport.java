@@ -440,7 +440,8 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             return getContext().getString(R.string.oepl_image_none);
         }
         if (OeplCardFactory.CALENDAR.equals(content)
-                || OeplCardFactory.CALENDAR_WEEK.equals(content)) {
+                || OeplCardFactory.CALENDAR_WEEK.equals(content)
+                || OeplCardFactory.BOARD.equals(content)) {
             return getContext().getString(R.string.oepl_weather_no_calendar);
         }
         if (OeplCardFactory.needsWeather(content)) {
@@ -455,7 +456,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if (content.contains(CardContentFactory.CALENDAR)) {
             return getContext().getString(R.string.oepl_weather_no_calendar);
         }
-        if (CardContentFactory.TEXT.equals(content)) {
+        if (CardContentFactory.TEXT.equals(content) || OeplCardFactory.POSTER.equals(content)) {
             return getContext().getString(R.string.oepl_weather_no_text);
         }
         return getContext().getString(R.string.oepl_weather_no_weather);

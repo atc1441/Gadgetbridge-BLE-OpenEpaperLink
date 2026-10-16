@@ -94,10 +94,9 @@ public class CardRenderer {
             return finish(card, rotation, w, h, bufferWidth, bufferHeight);
         }
 
-        final float headerH = drawHeader(canvas, w, h, content.title());
-        final float footerH = drawFooter(canvas, w, h);
-        final float pad = Math.max(2f, h * 0.02f);
-        final RectF body = new RectF(0, headerH + pad, w, h - footerH - pad);
+        drawHeader(canvas, w, h, content.title());
+        drawFooter(canvas, w, h);
+        final RectF body = bodyArea(w, h);
 
         if (content.hasData()) {
             drawClipped(canvas, content, body);
@@ -143,6 +142,32 @@ public class CardRenderer {
         return exact;
     }
 
+    /**
+     * The rectangle a framed content is given: what is left between the title bar and the
+     * status strip. Measured rather than drawn, so that the design audit can ask for it without
+     * a panel, and so that the drawing code and the check can never disagree about it.
+     */
+    public RectF bodyArea(final int w, final int h) {
+        final float pad = Math.max(2f, h * 0.02f);
+        return new RectF(0, headerHeight(w, h) + pad, w, h - footerHeight(w, h) - pad);
+    }
+
+    /** How much of the panel the title bar takes, including the rule under a clean one. */
+    private float headerHeight(final int w, final int h) {
+        if (options.frame == Frame.CLEAN) {
+            return Math.max(9f, h * 0.13f) + Math.max(1f, h * 0.008f);
+        }
+        return Math.max(10f, h * (options.frame == Frame.BOLD ? 0.26f : 0.155f));
+    }
+
+    /** How much the status strip takes; nothing at all on a short panel or a bold frame. */
+    private float footerHeight(final int w, final int h) {
+        if (!options.showFooter || h < 96 || options.frame == Frame.BOLD) {
+            return 0f; // the bold frame already carries the status in its title block
+        }
+        return Math.max(9f, h * 0.105f);
+    }
+
     private float drawHeader(final Canvas canvas, final int w, final int h,
                              @Nullable final String title) {
         final float pad = Math.max(2f, w * 0.018f);
@@ -166,7 +191,7 @@ public class CardRenderer {
         }
 
         final boolean bold = options.frame == Frame.BOLD;
-        final float headerH = Math.max(10f, h * (bold ? 0.26f : 0.155f));
+        final float headerH = headerHeight(w, h);
         final Paint bar = new Paint();
         bar.setColor(style.ink);
         canvas.drawRect(0, 0, w, headerH, bar);
@@ -208,11 +233,11 @@ public class CardRenderer {
     }
 
     private float drawFooter(final Canvas canvas, final int w, final int h) {
-        if (!options.showFooter || h < 96 || options.frame == Frame.BOLD) {
-            return 0f; // the bold frame already carries the status in its title block
+        final float footerH = footerHeight(w, h);
+        if (footerH <= 0f) {
+            return 0f;
         }
         final boolean clean = options.frame == Frame.CLEAN;
-        final float footerH = Math.max(9f, h * 0.105f);
         final Paint bar = new Paint();
         bar.setColor(style.ink);
         if (clean) {

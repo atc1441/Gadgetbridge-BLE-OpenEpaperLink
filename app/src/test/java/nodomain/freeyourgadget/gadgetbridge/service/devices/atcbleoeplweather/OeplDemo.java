@@ -42,6 +42,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.co
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.StatusContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.TextContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.WeatherContent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplBigTemperatureCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplBoardCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCalendarListCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCalendarWeekCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCardFactory;
@@ -51,10 +53,14 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplForecastCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplInfoCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplPosterCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplQrCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRainCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRangeCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRssCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRssClient;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplSunCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplTilesCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeather;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeatherCard;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
@@ -75,6 +81,9 @@ public final class OeplDemo {
             // the OpenEPaperLink style cards
             "oepl_4", "oepl_8", "oepl_16", "oepl_1", "oepl_29", "oepl_11", "oepl_11w",
             "oepl_9", "oepl_10", "oepl_2", "oepl_3", "oepl_21",
+            // our own designs, which own the whole panel as well
+            "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
+            "panel_poster",
             // the cards with the Gadgetbridge frame around them
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
@@ -88,6 +97,7 @@ public final class OeplDemo {
             "oepl_4:night", "oepl_8:ms", "oepl_1:plain", "oepl_9:summary", "oepl_3:big",
             "oepl_11:long", "text:long", "status:many", "notifications:long",
             "image:none", "image:ordered", "image:stretch",
+            "panel_sun:night", "panel_poster:one", "panel_bars:week",
     };
 
     private OeplDemo() {
@@ -152,6 +162,29 @@ public final class OeplDemo {
                 return "big".equals(variant)
                         ? new OeplCounterCard(123456, 10, "Stunden ohne Zwischenfall")
                         : new OeplCounterCard(7, 1000000, null);
+            case OeplCardFactory.BIG:
+                return new OeplBigTemperatureCard(weather(), true);
+            case OeplCardFactory.RANGE:
+                return new OeplRangeCard(weather(), "week".equals(variant) ? 7 : 5);
+            case OeplCardFactory.SUN:
+                if ("night".equals(variant)) {
+                    // the sun long down, so the moon takes its place on the arc
+                    final OeplWeather night = weather();
+                    final long now = System.currentTimeMillis() / 1000L;
+                    night.sunrise = now - 10 * 3600L;
+                    night.sunset = now - 2 * 3600L;
+                    return new OeplSunCard(night);
+                }
+                return new OeplSunCard(weather());
+            case OeplCardFactory.TILES:
+                return new OeplTilesCard(weather(), true);
+            case OeplCardFactory.BOARD:
+                return new OeplBoardCard(events(), 6, "Termine");
+            case OeplCardFactory.POSTER:
+                return "one".equals(variant)
+                        ? new OeplPosterCard(Arrays.asList("Zimmer 4"))
+                        : new OeplPosterCard(Arrays.asList("Werkstatt",
+                        "!Bitte klingeln", "Mo - Fr 8 bis 17 Uhr"));
             case OeplCardFactory.INFO:
                 return new OeplInfoCard("Kueche", Arrays.asList(
                         new OeplInfoCard.Row("Typ", "HS BWRY 3,5"),

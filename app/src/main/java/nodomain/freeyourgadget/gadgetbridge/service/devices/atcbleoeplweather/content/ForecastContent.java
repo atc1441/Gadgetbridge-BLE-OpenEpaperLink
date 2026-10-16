@@ -143,21 +143,52 @@ public class ForecastContent implements CardContent {
         final Paint day = style.paint(style.ink, true, Math.min(rowH * 0.46f, area.width() * 0.16f));
         final Paint hi = style.paint(style.accent, true, rowH * 0.42f);
         final Paint lo = style.paint(style.ink, false, rowH * 0.42f);
+        final float gap = Math.max(2f, area.width() * 0.04f);
+
+        // A row holds a weekday, the sky and two figures, and on a tall narrow panel the rows
+        // are high enough to make the figures wide enough to reach the weekday. So the figures
+        // are measured first, over all the days, and the rest of the row is what is left: the
+        // weekday gets a budget, and the pictogram only appears while there is room for it.
+        float figures = 0f;
+        for (int guard = 0; guard < 24; guard++) {
+            figures = 0f;
+            for (int i = 0; i < count; i++) {
+                final WeatherSpec.Daily d = spec.getForecasts().get(i);
+                figures = Math.max(figures,
+                        hi.measureText(style.shortTemperature(d.getMaxTemp())) + gap
+                                + lo.measureText(style.shortTemperature(d.getMinTemp())));
+            }
+            if (figures <= area.width() * 0.52f || hi.getTextSize() <= 7f) {
+                break;
+            }
+            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+        }
+
+        final float figuresLeft = area.right - pad - figures;
+        final float dayLeft = area.left + pad;
+        final float room = figuresLeft - dayLeft - gap;
+        float iconSize = Math.min(Math.min(rowH * 0.66f, area.width() * 0.2f), room * 0.42f);
+        if (iconSize < 9f) {
+            iconSize = 0f; // a pictogram smaller than this says nothing anyway
+        }
+        final float dayRoom = room - (iconSize > 0f ? iconSize + gap : 0f);
 
         for (int i = 0; i < count; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);
             final float base = area.top + rowH * (i + 0.68f);
-            canvas.drawText(dayName(i + 1), area.left + pad, base, day);
+            style.drawEllipsised(canvas, dayName(i + 1), dayLeft, base, dayRoom, day);
 
-            WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
-                    area.left + area.width() * 0.45f, base - rowH * 0.22f,
-                    Math.min(rowH * 0.66f, area.width() * 0.2f), style.ink, style.accent);
+            if (iconSize > 0f) {
+                WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()),
+                        false, figuresLeft - gap - iconSize * 0.5f, base - rowH * 0.22f,
+                        iconSize, style.ink, style.accent);
+            }
 
             final String l = style.shortTemperature(d.getMinTemp());
             final String h = style.shortTemperature(d.getMaxTemp());
+            canvas.drawText(h, figuresLeft, base, hi);
             canvas.drawText(l, area.right - pad - lo.measureText(l), base, lo);
-            canvas.drawText(h, area.right - pad - lo.measureText(l) - hi.measureText(h)
-                    - area.width() * 0.04f, base, hi);
         }
     }
 

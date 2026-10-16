@@ -126,7 +126,9 @@ public class OeplWeatherCard extends OeplCard {
         final float windRow = Math.min(h * 0.12f, w * 0.26f);
         final float tempRow = Math.min(h * 0.22f, w * 0.44f);
         final float iconRoom = h - y - windRow * 1.3f - tempRow * 1.25f;
-        final float icon = Math.min(iconRoom, w * 0.78f);
+        // a little air, so that neither the pictogram nor the reading under it can be the one
+        // pixel of rounding that makes the two touch
+        final float icon = Math.min(iconRoom * 0.92f, w * 0.78f);
         if (icon > 8f) {
             c.iconCentered(OeplIcons.weather(now.wmoCode, !now.day), w / 2f, y + iconRoom / 2f,
                     icon, inkOrAccent(c, OeplIcons.isSevere(now.wmoCode)));

@@ -5420,6 +5420,12 @@
         <item>@string/oepl_content_oepl_count_days</item>
         <item>@string/oepl_content_oepl_count_hours</item>
         <item>@string/oepl_content_oepl_info</item>
+        <item>@string/oepl_content_panel_big</item>
+        <item>@string/oepl_content_panel_bars</item>
+        <item>@string/oepl_content_panel_sun</item>
+        <item>@string/oepl_content_panel_tiles</item>
+        <item>@string/oepl_content_panel_board</item>
+        <item>@string/oepl_content_panel_poster</item>
         <item>@string/oepl_content_weather</item>
         <item>@string/oepl_content_date</item>
         <item>@string/oepl_content_calendar</item>
@@ -5453,6 +5459,12 @@
         <item>oepl_2</item>
         <item>oepl_3</item>
         <item>oepl_21</item>
+        <item>panel_big</item>
+        <item>panel_bars</item>
+        <item>panel_sun</item>
+        <item>panel_tiles</item>
+        <item>panel_board</item>
+        <item>panel_poster</item>
         <item>weather</item>
         <item>date</item>
         <item>calendar</item>

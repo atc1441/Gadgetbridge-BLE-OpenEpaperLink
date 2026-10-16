@@ -78,7 +78,6 @@ public class OeplForecastCard extends OeplCard {
         final float top = h * 0.16f;
 
         final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
-        final boolean showRain = h >= 110;
 
         for (int i = 0; i < days; i++) {
             final OeplWeather.Day day = weather.days.get(i);
@@ -89,33 +88,51 @@ public class OeplForecastCard extends OeplCard {
 
             final float windY = top + h * 0.175f;
             final String windValue = wind(day.windSpeed);
-            // arrow and number are placed from their measured widths: a wide arrow glyph used
-            // to be drawn straight over a two digit wind
+            // Arrow and number are placed from their measured widths. The arrow is an icon
+            // glyph, and those are nowhere near square, so the space it needs has to be asked
+            // for rather than assumed from its height - a wide arrow was drawn over the wind.
             final float windSize = Math.min(h * 0.13f, column * 0.3f);
-            final float arrow = Math.min(h * 0.11f, column * 0.26f);
+            final String arrowGlyph = OeplIcons.windDirection(day.windDirection);
+            final float arrowH = Math.min(h * 0.11f, column * 0.26f);
+            final float arrowW = c.iconWidth(arrowGlyph, arrowH);
             final float numberWidth = c.measure(windValue, windSize);
-            final float block = arrow + numberWidth + 2f;
-            c.iconCentered(OeplIcons.windDirection(day.windDirection),
-                    centre - block / 2f + arrow / 2f, windY + c.lineHeight(windSize) * 0.45f,
-                    arrow, c.ink);
-            c.text(windValue, centre - block / 2f + arrow + 2f, windY, windSize,
+            final float gap = arrowW > 0f ? Math.max(2f, column * 0.03f) : 0f;
+            final float block = arrowW + gap + numberWidth;
+            c.iconCentered(arrowGlyph, centre - block / 2f + arrowW / 2f,
+                    windY + c.lineHeight(windSize) * 0.45f, arrowH, c.ink);
+            c.text(windValue, centre - block / 2f + arrowW + gap, windY, windSize,
                     OeplCanvas.LEFT, inkOrAccent(c, OeplIcons.beaufort(day.windSpeed) > 5));
 
-            c.iconCentered(OeplIcons.weather(day.wmoCode, false), centre,
-                    h * (showRain ? 0.60f : 0.64f), h * 0.26f,
-                    inkOrAccent(c, OeplIcons.isSevere(day.wmoCode)));
-
-            if (showRain && day.precipitation > 0.05f) {
-                c.textFitted(Math.round(day.precipitation) + "mm", centre, h * 0.765f,
-                        h * 0.105f, OeplCanvas.CENTER,
+            // The bottom of the column is stacked from the bottom edge up: the two temperatures
+            // sit on the edge, the rain goes above them and only when a line fits there, and
+            // the sky pictogram takes whatever is left between the wind and that. Fixed
+            // fractions of the height had the rain written through the temperatures on every
+            // panel just short of the next size up.
+            final float tempSize = Math.min(h * 0.15f, column * 0.28f);
+            final float tempTop = h - c.lineHeight(tempSize);
+            final float rainSize = Math.min(h * 0.105f, column * 0.2f);
+            final float windBottom = windY + c.lineHeight(windSize);
+            final boolean rain = day.precipitation > 0.05f
+                    && tempTop - c.lineHeight(rainSize) - windBottom > h * 0.18f;
+            final float rainTop = tempTop - c.lineHeight(rainSize);
+            if (rain) {
+                c.textFitted(Math.round(day.precipitation) + "mm", centre, rainTop,
+                        rainSize, OeplCanvas.CENTER,
                         inkOrAccent(c, day.precipitation > 10f), column * 0.8f);
             }
 
-            final float tempY = h - h * 0.165f;
-            final float tempSize = Math.min(h * 0.15f, column * 0.28f);
-            c.text(temp(day.minTemperature) + " ", centre, tempY, tempSize, OeplCanvas.RIGHT,
+            final float skyTop = windBottom;
+            final float skyBottom = rain ? rainTop : tempTop;
+            if (skyBottom - skyTop > 8f) {
+                c.iconCentered(OeplIcons.weather(day.wmoCode, false), centre,
+                        (skyTop + skyBottom) / 2f,
+                        Math.min(skyBottom - skyTop, Math.min(h * 0.26f, column * 0.62f)),
+                        inkOrAccent(c, OeplIcons.isSevere(day.wmoCode)));
+            }
+
+            c.text(temp(day.minTemperature) + " ", centre, tempTop, tempSize, OeplCanvas.RIGHT,
                     inkOrAccent(c, day.minTemperature < 0));
-            c.text(" " + temp(day.maxTemperature), centre, tempY, tempSize, OeplCanvas.LEFT,
+            c.text(" " + temp(day.maxTemperature), centre, tempTop, tempSize, OeplCanvas.LEFT,
                     inkOrAccent(c, day.maxTemperature < 0));
 
             if (i > 0) {

@@ -124,36 +124,55 @@ public class HourlyWeatherContent implements CardContent {
         }
         canvas.drawPath(path, line);
 
-        // mark and label every point, thinning out when the panel is narrow
-        final int every = Math.max(1, (int) Math.ceil(n * 34f / Math.max(1f, plot.width())));
         for (int i = 0; i < n; i++) {
             final float x = plot.left + stepX * i;
             final float t = (points.get(i).getTemp() - min) / (float) (max - min);
             final float y = plot.bottom - t * plot.height();
             canvas.drawCircle(x, y, line.getStrokeWidth() * 0.9f, dot);
-            if (i % every != 0) {
-                continue;
-            }
+        }
+
+        // Three rows of marks along the curve, each thinned out on its own: a reading goes in
+        // only when it clears the one before it. Thinning by a guessed label width is what let
+        // the readings run into each other as soon as the panel was large enough to make them
+        // big, and the rows do not need the same spacing - an hour is far narrower than a
+        // reading with its degree sign.
+        final float breath = Math.max(3f, area.width() * 0.012f);
+        float lastValue = Float.NEGATIVE_INFINITY;
+        float lastHour = Float.NEGATIVE_INFINITY;
+        float lastIcon = Float.NEGATIVE_INFINITY;
+        for (int i = 0; i < n; i++) {
+            final float x = plot.left + stepX * i;
+            final float t = (points.get(i).getTemp() - min) / (float) (max - min);
+            final float y = plot.bottom - t * plot.height();
+
             final String temp = style.shortTemperature(points.get(i).getTemp());
-            final float tx = clamp(x - value.measureText(temp) / 2f,
-                    area.left, area.right - value.measureText(temp));
-            // the reading sits above its point, but never above the top of the card
-            canvas.drawText(temp, tx, Math.max(area.top - value.getFontMetrics().ascent,
-                    y - line.getStrokeWidth() * 2.2f), value);
+            final float tw = value.measureText(temp);
+            final float tx = clamp(x - tw / 2f, area.left, area.right - tw);
+            if (tx >= lastValue + breath) {
+                // the reading sits above its point, but never above the top of the card
+                canvas.drawText(temp, tx, Math.max(area.top - value.getFontMetrics().ascent,
+                        y - line.getStrokeWidth() * 2.2f), value);
+                lastValue = tx + tw;
+            }
 
             final String hour = new SimpleDateFormat("HH", Locale.getDefault())
                     .format(new Date(points.get(i).getTimestamp() * 1000L));
-            canvas.drawText(hour, clamp(x - label.measureText(hour) / 2f,
-                            area.left, area.right - label.measureText(hour)),
-                    style.baselineAbove(area.bottom, label), label);
+            final float hw = label.measureText(hour);
+            final float hx = clamp(x - hw / 2f, area.left, area.right - hw);
+            if (hx >= lastHour + breath) {
+                canvas.drawText(hour, hx, style.baselineAbove(area.bottom, label), label);
+                lastHour = hx + hw;
+            }
 
-            if (iconH > 0) {
+            if (iconH > 0 && x - iconH * 0.5f >= lastIcon + breath) {
                 // the first and the last pictogram are wider than the padding beside the plot,
                 // so they have to be pulled back inside the card
+                final float ix = clamp(x, area.left + iconH * 0.5f, area.right - iconH * 0.5f);
                 WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(
                                 points.get(i).getConditionCode()), false,
-                        clamp(x, area.left + iconH * 0.5f, area.right - iconH * 0.5f),
-                        area.top + labelH * 0.4f + iconH * 0.5f, iconH, style.ink, style.accent);
+                        ix, area.top + labelH * 0.4f + iconH * 0.5f, iconH, style.ink,
+                        style.accent);
+                lastIcon = ix + iconH * 0.5f;
             }
         }
     }

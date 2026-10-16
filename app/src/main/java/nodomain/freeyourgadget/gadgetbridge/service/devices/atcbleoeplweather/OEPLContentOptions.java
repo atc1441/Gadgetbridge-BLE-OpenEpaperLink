@@ -21,9 +21,9 @@ import java.util.EnumSet;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCardFactory;
 
 /**
- * Which options a given card actually reads. There are twenty-nine kinds of content and about as
- * many options between them, but no single card uses more than four, so showing all of them at
- * once says almost nothing about the display in front of you.
+ * Which options a given card actually reads. There are thirty-seven kinds of content and about
+ * as many options between them, but no single card uses more than four, so showing all of them
+ * at once says almost nothing about the display in front of you.
  * <p>
  * This is the one place that knows the answer: the settings screen asks it what to show, and the
  * two card factories are the only other things that may need to agree with it. Whenever a card
@@ -99,6 +99,19 @@ public final class OEPLContentOptions {
             case OeplCardFactory.CLOCK:
             case OeplCardFactory.INFO:
                 return EnumSet.noneOf(Option.class);
+
+            // ------------------------------------------------- our own full panel designs
+            case OeplCardFactory.BIG:
+            case OeplCardFactory.TILES:
+                return EnumSet.of(Option.WEATHER, Option.WIND_UNIT);
+            case OeplCardFactory.RANGE:
+                return EnumSet.of(Option.WEATHER, Option.FORECAST_DAYS);
+            case OeplCardFactory.SUN:
+                return EnumSet.of(Option.WEATHER, Option.SUN_TIMES);
+            case OeplCardFactory.BOARD:
+                return EnumSet.of(Option.CALENDAR_EVENTS, Option.CALENDAR_TITLE);
+            case OeplCardFactory.POSTER:
+                return EnumSet.of(Option.TEXT);
 
             // ------------------------------------------------- the framed cards
             case CardContentFactory.DATE:

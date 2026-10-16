@@ -143,8 +143,11 @@ public class OeplCalendarWeekCard extends OeplCard {
             final float top = headerBottom + row * bandRow + 1f;
             c.fillRect(left, top, width, bandRow - 2f, c.paper);
             c.strokeRect(left, top, width, bandRow - 2f, c.accent, 1f);
-            c.textClipped(e.getTitle(), left + 2f, top, bandRow * 0.82f, OeplCanvas.LEFT,
-                    c.ink, width - 4f);
+            final float bandSize = c.sizeForHeight(bandRow * 0.82f, bandRow - 2f, 6f);
+            if (bandSize > 0f) {
+                c.textClipped(e.getTitle(), left + 2f, top, bandSize, OeplCanvas.LEFT,
+                        c.ink, width - 4f);
+            }
             row++;
         }
         if (bands > 0) {
@@ -191,9 +194,13 @@ public class OeplCalendarWeekCard extends OeplCard {
             final float width = columnWidth - 4f;
             c.fillRect(left, top, width, boxHeight, c.paper);
             c.strokeRect(left, top, width, boxHeight, c.ink, 1f);
-            // only label a box that something legible actually fits into
-            final float titleSize = Math.max(7f, Math.min(h * 0.085f, boxHeight - 2f));
-            if (boxHeight >= titleSize) {
+            // Only label a box that a whole line actually fits into, measured against both
+            // the box and the panel edge: the line a label occupies is a quarter taller than
+            // its size, which is what used to push the last appointment of the day over the
+            // bottom of the panel.
+            final float titleSize = c.sizeForHeight(h * 0.085f,
+                    Math.min(boxHeight - 2f, h - top - 2f), 7f);
+            if (titleSize > 0f) {
                 c.textClipped(e.getTitle(), left + 2f, top + 1f, titleSize, OeplCanvas.LEFT,
                         c.ink, width - 4f);
             }

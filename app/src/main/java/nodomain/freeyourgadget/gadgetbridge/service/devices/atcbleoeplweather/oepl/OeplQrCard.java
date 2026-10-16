@@ -73,14 +73,26 @@ public class OeplQrCard extends OeplCard {
         }
         final int modules = matrix.getWidth();
         final float room = Math.min(w, h - top);
+        if (modules > room) {
+            // one pixel per module would still not fit, and a code at less than that cannot be
+            // scanned at all, so the panel is better off showing what it would have said
+            c.textBox(content, w * 0.03f, top, w * 0.94f, h - top, h * 0.12f, c.ink, 1.1f,
+                    OeplCanvas.LEFT);
+            return;
+        }
         final int dot = Math.max(1, (int) (room / modules));
         final float size = dot * modules;
         final float left = (w - size) / 2f;
         final float topLeft = top + (h - top - size) / 2f;
 
-        // a quiet zone in the paper colour, because the panel around it may not be white
-        c.fillRect(Math.max(0, left - dot), Math.max(0, topLeft - dot),
-                Math.min(w, size + dot * 2), Math.min(h, size + dot * 2), c.paper);
+        // A quiet zone in the paper colour, because the panel around it may not be white. Its
+        // edges are clamped to the panel rather than its width and height: a module is a whole
+        // number of pixels, so the code rarely ends exactly where the room does, and the
+        // leftover used to push the zone off the bottom edge.
+        final float zoneLeft = Math.max(0f, left - dot);
+        final float zoneTop = Math.max(0f, topLeft - dot);
+        c.fillRect(zoneLeft, zoneTop, Math.min(w, left + size + dot) - zoneLeft,
+                Math.min(h, topLeft + size + dot) - zoneTop, c.paper);
         for (int y = 0; y < modules; y++) {
             for (int x = 0; x < modules; x++) {
                 if (matrix.get(x, y) == 1) {

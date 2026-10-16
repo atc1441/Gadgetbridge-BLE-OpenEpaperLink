@@ -5426,6 +5426,12 @@
     <string name="oepl_content_oepl_count_days">OEPL: countdown in days</string>
     <string name="oepl_content_oepl_count_hours">OEPL: countdown in hours</string>
     <string name="oepl_content_oepl_info">OEPL: display info</string>
+    <string name="oepl_content_panel_big">Temperature, large</string>
+    <string name="oepl_content_panel_bars">Week as bars</string>
+    <string name="oepl_content_panel_sun">The sun’s day</string>
+    <string name="oepl_content_panel_tiles">Today in tiles</string>
+    <string name="oepl_content_panel_board">Appointment board</string>
+    <string name="oepl_content_panel_poster">Text poster</string>
     <string name="oepl_wind_beaufort">Beaufort</string>
     <string name="oepl_wind_ms">Metres per second</string>
     <string name="pref_oepl_weather_category_oepl">OpenEPaperLink cards</string>

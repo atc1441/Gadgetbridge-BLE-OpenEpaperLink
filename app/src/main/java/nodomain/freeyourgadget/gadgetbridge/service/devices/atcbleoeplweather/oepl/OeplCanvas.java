@@ -102,6 +102,15 @@ public class OeplCanvas {
                 text = text.substring(0, text.length() - 1);
             }
             text = text + "…";
+            if (paint.measureText(text) > maxWidth) {
+                // not even one letter and an ellipsis fit into the space. Drawing it anyway is
+                // what pushed labels out of their column and over the edge of the panel, so
+                // the mark alone goes in, and nothing at all when even that is too wide.
+                text = "…";
+                if (paint.measureText(text) > maxWidth) {
+                    return;
+                }
+            }
         }
         draw(text, x, y, align, paint);
     }
@@ -141,20 +150,46 @@ public class OeplCanvas {
      */
     public void textFilling(final String text, final float cx, final float cy,
                             final float maxWidth, final float maxHeight, final int color) {
-        if (text == null || text.isEmpty()) {
+        textFillingAt(text, cx, cy, fillingSize(text, maxWidth, maxHeight), color);
+    }
+
+    /**
+     * Draws text at a size that was worked out elsewhere, centred on its ink the way
+     * {@link #textFilling} centres it. Several figures that belong together are set in one size
+     * this way - four tiles whose numbers are each as large as their own tile allows cannot be
+     * compared with a glance, which is the only thing a tile is for.
+     */
+    public void textFillingAt(final String text, final float cx, final float cy,
+                              final float size, final int color) {
+        if (text == null || text.isEmpty() || size <= 0f) {
             return;
         }
-        final Paint paint = textPaint(Math.max(8f, maxHeight), color);
+        final Paint paint = textPaint(size, color);
+        final android.graphics.Rect bounds = new android.graphics.Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        canvas.drawText(text, cx - bounds.width() / 2f - bounds.left,
+                cy + bounds.height() / 2f - bounds.bottom, paint);
+    }
+
+    /** The size {@link #textFilling} would set this text in, or 0 when there is none. */
+    public float fillingSize(final String text, final float maxWidth, final float maxHeight) {
+        if (text == null || text.isEmpty()) {
+            return 0f;
+        }
+        final Paint paint = textPaint(Math.max(8f, maxHeight), ink);
         final android.graphics.Rect bounds = new android.graphics.Rect();
         // Converge on the size where the drawn glyphs just touch the box, from either side:
         // the cap height of a face is well under its em size, so the first guess is too small.
+        // Both the fit and the centring go by the ink the glyphs cover, never by the advance
+        // width - a face carries side bearings, and a line sized to its advance width reaches
+        // past the box it was given.
         for (int step = 0; step < 24; step++) {
             paint.getTextBounds(text, 0, text.length(), bounds);
-            final float wide = paint.measureText(text);
-            if (bounds.height() <= 0 || wide <= 0) {
+            if (bounds.height() <= 0 || bounds.width() <= 0) {
                 break;
             }
-            final float factor = Math.min(maxHeight / bounds.height(), maxWidth / wide);
+            final float factor = Math.min(maxHeight / bounds.height(),
+                    maxWidth / bounds.width());
             if (factor > 0.99f && factor < 1.02f) {
                 break;
             }
@@ -165,10 +200,15 @@ public class OeplCanvas {
             }
             paint.setTextSize(next);
         }
+        // the floor above may still be too wide for a very narrow panel, and a line that does
+        // not fit has to be made to fit rather than be allowed over the edge
         paint.getTextBounds(text, 0, text.length(), bounds);
-        final float left = cx - paint.measureText(text) / 2f;
-        final float baseline = cy + bounds.height() / 2f - bounds.bottom;
-        canvas.drawText(text, left, baseline, paint);
+        for (int guard = 0; guard < 32 && paint.getTextSize() > 4f
+                && (bounds.width() > maxWidth || bounds.height() > maxHeight); guard++) {
+            paint.setTextSize(Math.max(4f, paint.getTextSize() * 0.94f));
+            paint.getTextBounds(text, 0, text.length(), bounds);
+        }
+        return paint.getTextSize();
     }
 
     /** How far a line of this size reaches above its baseline. */
@@ -200,17 +240,53 @@ public class OeplCanvas {
         if (glyph == null || glyph.isEmpty() || !OeplFonts.hasIcons()) {
             return;
         }
-        final Paint paint = iconPaint(size, color);
+        // scaled so that the drawn glyph, not its em box, matches the requested height
         final android.graphics.Rect bounds = new android.graphics.Rect();
-        paint.getTextBounds(glyph, 0, glyph.length(), bounds);
-        if (bounds.height() > 0 && bounds.height() != size) {
-            // scale so that the drawn glyph, not its em box, matches the requested height
-            paint.setTextSize(paint.getTextSize() * size / bounds.height());
-            paint.getTextBounds(glyph, 0, glyph.length(), bounds);
-        }
+        final Paint paint = fitIcon(glyph, size, color, bounds);
         final float left = cx - bounds.width() / 2f - bounds.left;
         final float baseline = cy + bounds.height() / 2f - bounds.bottom;
         canvas.drawText(glyph, left, baseline, paint);
+    }
+
+    /**
+     * How wide a pictogram ends up when it is drawn at a given height with
+     * {@link #iconCentered}. The icon face is far from square, so a layout that reserves the
+     * height for an icon and puts a number beside it has them overlap on every panel where the
+     * glyph happens to be wide. Returns 0 when there is no icon face, which is also how much
+     * room the gap then needs.
+     */
+    public float iconWidth(final String glyph, final float size) {
+        if (glyph == null || glyph.isEmpty() || !OeplFonts.hasIcons()) {
+            return 0f;
+        }
+        final android.graphics.Rect bounds = new android.graphics.Rect();
+        fitIcon(glyph, size, ink, bounds);
+        return bounds.width();
+    }
+
+    /**
+     * A paint whose glyph is as close to the requested height as the face allows, and never
+     * taller. One correction step is not enough - scaling a face by the ratio of two measured
+     * heights lands next to the target rather than on it, and a pictogram a few pixels taller
+     * than the room it was given is a pictogram touching the line below it.
+     */
+    private Paint fitIcon(final String glyph, final float size, final int color,
+                          final android.graphics.Rect bounds) {
+        final Paint paint = iconPaint(size, color);
+        paint.getTextBounds(glyph, 0, glyph.length(), bounds);
+        for (int step = 0; step < 6; step++) {
+            if (bounds.height() <= 0 || Math.abs(bounds.height() - size) <= 0.5f) {
+                break;
+            }
+            paint.setTextSize(Math.max(4f, paint.getTextSize() * size / bounds.height()));
+            paint.getTextBounds(glyph, 0, glyph.length(), bounds);
+        }
+        for (int guard = 0; guard < 12 && bounds.height() > size
+                && paint.getTextSize() > 4f; guard++) {
+            paint.setTextSize(Math.max(4f, paint.getTextSize() * 0.96f));
+            paint.getTextBounds(glyph, 0, glyph.length(), bounds);
+        }
+        return paint;
     }
 
     private void draw(final String text, final float x, final float y, final int align,
@@ -300,6 +376,20 @@ public class OeplCanvas {
         if (left != null && !left.isEmpty()) {
             textClipped(left, x0, y, size, LEFT, leftColor, x1 - x0 - used);
         }
+    }
+
+    /**
+     * The largest text size, no larger than the one asked for, whose line fits into the room
+     * given - or 0 when not even the smallest legible line does, which is a caller's cue to
+     * leave the label out. A line occupies about a quarter more than its size, so a label sized
+     * to the box it sits in reaches out of the bottom of it.
+     */
+    public float sizeForHeight(final float wanted, final float available, final float floor) {
+        float size = Math.max(floor, wanted);
+        for (int guard = 0; guard < 48 && size > floor && lineHeight(size) > available; guard++) {
+            size = Math.max(floor, size * 0.93f);
+        }
+        return lineHeight(size) <= available ? size : 0f;
     }
 
     /** True while a line of this size still fits above the bottom edge. */

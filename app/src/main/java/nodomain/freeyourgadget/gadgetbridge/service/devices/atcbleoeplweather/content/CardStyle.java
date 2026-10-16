@@ -73,6 +73,14 @@ public class CardStyle {
                 text = text.substring(0, text.length() - 1);
             }
             text = text + "…";
+            if (paint.measureText(text) > maxWidth) {
+                // one letter and an ellipsis are wider than the space: the mark alone, or
+                // nothing. Drawing it regardless is how a label left its own column.
+                text = "…";
+                if (paint.measureText(text) > maxWidth) {
+                    return;
+                }
+            }
         }
         canvas.drawText(text, x, y, paint);
     }

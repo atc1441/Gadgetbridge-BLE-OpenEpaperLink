@@ -66,11 +66,16 @@ public class OeplDateCard extends OeplCard {
 
         // Both times, their pictograms and the gaps between them have to share one line, so the
         // size comes from what actually fits rather than from the panel height alone: on a
-        // narrow tag the two used to be drawn straight through each other.
+        // narrow tag the two used to be drawn straight through each other. The pictograms are
+        // measured as well - an icon face is nowhere near square, so the room one needs cannot
+        // be taken from its height.
+        final String riseGlyph = String.valueOf(OeplIcons.SUNRISE);
+        final String setGlyph = String.valueOf(OeplIcons.SUNSET);
         float size = h * 0.19f;
         for (int guard = 0; guard < 48; guard++) {
-            final float need = size * 1.8f + c.measure(rise, size) + c.measure(set, size)
-                    + gap * 4f;
+            final float need = c.iconWidth(riseGlyph, size * 0.8f)
+                    + c.iconWidth(setGlyph, size * 0.8f)
+                    + c.measure(rise, size) + c.measure(set, size) + gap * 4f;
             if (need <= w - pad * 2 || size <= 7f) {
                 break;
             }
@@ -78,22 +83,24 @@ public class OeplDateCard extends OeplCard {
         }
         final float y = h - c.lineHeight(size) - Math.max(1f, h * 0.015f);
         final float middle = y + c.lineHeight(size) * 0.45f;
+        final float riseIcon = c.iconWidth(riseGlyph, size * 0.8f);
+        final float setIcon = c.iconWidth(setGlyph, size * 0.8f);
 
-        c.iconCentered(String.valueOf(OeplIcons.SUNRISE), pad + size * 0.45f, middle,
-                size * 0.8f, c.ink);
-        final float riseLeft = pad + size * 0.9f + gap;
+        c.iconCentered(riseGlyph, pad + riseIcon / 2f, middle, size * 0.8f, c.ink);
+        final float riseLeft = pad + riseIcon + gap;
         c.text(rise, riseLeft, y, size, OeplCanvas.LEFT, c.ink);
 
         final float setRight = w - pad;
         final float setLeft = setRight - c.measure(set, size);
-        c.iconCentered(String.valueOf(OeplIcons.SUNSET), setLeft - gap - size * 0.45f, middle,
-                size * 0.8f, c.ink);
+        c.iconCentered(setGlyph, setLeft - gap - setIcon / 2f, middle, size * 0.8f, c.ink);
         c.text(set, setRight, y, size, OeplCanvas.RIGHT, c.ink);
 
         // the moon only gets a place when one is left between the two times
         final float freeFrom = riseLeft + c.measure(rise, size);
-        final float freeTo = setLeft - gap - size * 0.9f;
-        if (weather.moonPhase >= 0 && freeTo - freeFrom > size * 1.6f) {
+        final float freeTo = setLeft - gap - setIcon;
+        final float moon = c.iconWidth(OeplIcons.moonPhase(
+                OeplIcons.moonAge(weather.moonPhase)), size * 0.95f);
+        if (weather.moonPhase >= 0 && freeTo - freeFrom > moon + gap * 2f) {
             c.iconCentered(OeplIcons.moonPhase(OeplIcons.moonAge(weather.moonPhase)),
                     (freeFrom + freeTo) / 2f, middle, size * 0.95f, c.ink);
         }

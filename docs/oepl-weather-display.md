@@ -18,8 +18,14 @@ drawn with a real battery reading and the right panel geometry.
 
 ## The cards
 
-Thirty-one of them. The ids of the first twelve carry the content numbers an OpenEPaperLink
-access point uses, so the two can be compared side by side.
+Thirty-seven of them, in four families, which the ids say apart:
+
+- `oepl_*` — the OpenEPaperLink layouts. The number is the content number that access point
+  uses, so the two can be compared side by side.
+- `panel_*` — this project's own full panel designs. They owe the access point nothing; the
+  prefix is there so that nothing of ours is mistaken for one of its layouts.
+- `image`, `image_url` — the two picture cards, which also take the whole panel.
+- everything else — drawn inside the Gadgetbridge frame, with a title bar and a status strip.
 
 | Id | Card | Reads |
 | --- | --- | --- |
@@ -35,6 +41,12 @@ access point uses, so the two can be compared side by side.
 | `oepl_2` | Countdown in days | countdown |
 | `oepl_3` | Countdown in hours | countdown |
 | `oepl_21` | Display info | — |
+| `panel_big` | The temperature at poster size, with the day's range and the wind | weather, wind unit |
+| `panel_bars` | The week as bars on one shared scale; figures only on a narrow tag | weather, days |
+| `panel_sun` | The sun's way across the sky, the moon after dark | weather, sun times |
+| `panel_tiles` | Today in tiles of a pictogram and a figure | weather, wind unit |
+| `panel_board` | The appointments as a departure board | calendar, caption |
+| `panel_poster` | Your own text as a poster, for a door sign | text |
 | `weather` | Weather with a short forecast | weather, days |
 | `date`, `clock` | Date, clock | — |
 | `calendar` | Appointments | calendar |
@@ -49,9 +61,9 @@ access point uses, so the two can be compared side by side.
 | `image` | A picture from the phone | picture, dithering, fit |
 | `image_url` | A picture from a URL | picture, dithering, fit |
 
-The twelve `oepl_*` cards and the two picture cards own the whole panel. The others are drawn
-inside a frame with a title bar and a status strip, which is what the *Appearance* settings
-apply to.
+The twelve `oepl_*` cards, the six `panel_*` cards and the two picture cards own the whole
+panel. The others are drawn inside a frame with a title bar and a status strip, which is what
+the *Appearance* settings apply to.
 
 ### Picking one
 
@@ -148,6 +160,9 @@ service/devices/atcbleoeplweather/
 ├── CardContentFactory.java               id → content
 ├── content/                              the framed cards
 └── oepl/                                 the full bleed cards, the canvas and the fonts
+    ├── OeplCanvas.java                   measured text, pictograms, rules and bars
+    ├── Oepl*Card.java                    the twelve OpenEPaperLink layouts
+    └── Oepl{BigTemperature,Range,Sun,Tiles,Board,Poster}Card.java   our own six
 
 devices/atcbleoeplweather/
 ├── ATCBLEOEPLWeatherCoordinator.java     registration, defaults, device picture
@@ -163,7 +178,9 @@ devices/atcbleoeplweather/
    rectangle you are given — the same card runs from 122×250 to 960×768.
 2. Add one case to `CardContentFactory` or `OeplCardFactory`.
 3. Add the id and its name to `oepl_weather_content` / `oepl_weather_content_values`, in both
-   `values/` and `values-de/`.
+   `values/` and `values-de/`. A full panel card needs an id beginning with `oepl_` (a layout
+   taken from the access point) or `panel_` (one of our own) — that prefix is what routes it to
+   `OeplCardFactory` and keeps the frame settings away from it.
 4. Say which settings it reads in `OEPLContentOptions`.
 5. Add it to `OeplDemo.IDS` in the tests. That alone puts it into the contact sheets, the
    out-of-bounds check and the design picker test.
@@ -180,5 +197,19 @@ devices/atcbleoeplweather/
   solid block (the picture cards are exempt from the upper bound, since a photograph may well
   cover everything).
 
-Overlaps between two pieces of text are not something an assertion catches well, which is what
-the contact sheets are for. Look at them after changing a layout.
+`OeplLayoutAuditTest` is the sweep: every design on **every geometry in the tag catalogue, in
+both orientations**, which is 52 designs across 77 shapes and about four thousand cards a run.
+It draws through `OeplInkRecorder`, a canvas that writes down the box every piece of ink really
+covers, and fails on two things:
+
+- **No run of ink may leave the area the card was given.** The box the layout asked for is kept
+  apart from the box that survived the clip, so an overflow is still caught where the renderer's
+  clip would have hidden it - and a clipped letter is a letter the reader does not get.
+- **No two pieces of text may share more than a square pixel or two.** Ink over ink looks
+  exactly like ink to a pixel count, so this is measured from the glyph boxes. Both thresholds
+  are nearly zero; every design currently passes at a single square pixel, and what is allowed
+  is for the rounding a different build of a font brings, not for anything anybody could see.
+
+The report of a run is written to `app/build/oepl-gallery/layout-audit.txt`, whether it passed
+or not. Between the two, what is left for the contact sheets is the question no assertion
+answers: whether a card is worth looking at. Look at them after changing a layout.

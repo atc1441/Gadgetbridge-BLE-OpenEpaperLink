@@ -4485,6 +4485,12 @@
     <string name="oepl_content_oepl_rain">OEPL: Regenverlauf</string>
     <string name="oepl_content_oepl_rss">OEPL: Nachrichten-Feed</string>
     <string name="oepl_content_oepl_weather">OEPL: aktuelles Wetter</string>
+    <string name="oepl_content_panel_big">Temperatur, groß</string>
+    <string name="oepl_content_panel_bars">Woche als Balken</string>
+    <string name="oepl_content_panel_sun">Sonnenlauf</string>
+    <string name="oepl_content_panel_tiles">Heute in Kacheln</string>
+    <string name="oepl_content_panel_board">Terminanzeige</string>
+    <string name="oepl_content_panel_poster">Textplakat</string>
     <string name="oepl_content_status">Akkustände der Geräte</string>
     <string name="oepl_content_text">Eigener Text</string>
     <string name="oepl_content_weather">Wetter</string>
