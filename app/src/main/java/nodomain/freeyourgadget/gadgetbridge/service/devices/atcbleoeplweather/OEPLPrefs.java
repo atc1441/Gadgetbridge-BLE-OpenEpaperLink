@@ -58,6 +58,11 @@ public final class OEPLPrefs {
     public static final String PREF_IMAGE_DITHER = "pref_oepl_weather_image_dither";
     public static final String PREF_IMAGE_FIT = "pref_oepl_weather_image_fit";
     public static final String PREF_IMAGE_PICK = "pref_oepl_weather_image_pick";
+    /** How far the picture is magnified beyond the fit, 1 for none. */
+    public static final String PREF_IMAGE_ZOOM = "pref_oepl_weather_image_zoom";
+    /** Where the magnified picture sits, -1 to 1 across the room it has to move in. */
+    public static final String PREF_IMAGE_PAN_X = "pref_oepl_weather_image_pan_x";
+    public static final String PREF_IMAGE_PAN_Y = "pref_oepl_weather_image_pan_y";
     public static final String PREF_CONNECT_WINDOW = "pref_oepl_weather_connect_window";
     public static final String PREF_CONNECT_ATTEMPTS = "pref_oepl_weather_connect_attempts";
     // the settings the OpenEPaperLink style cards need
@@ -79,6 +84,8 @@ public final class OEPLPrefs {
     public static final String PREF_HA_URL = "pref_oepl_weather_ha_url";
     public static final String PREF_HA_TOKEN = "pref_oepl_weather_ha_token";
     public static final String PREF_HA_ENTITIES = "pref_oepl_weather_ha_entities";
+    /** Opens the picker that lists what the instance has, rather than typing ids out. */
+    public static final String PREF_HA_PICK = "pref_oepl_weather_ha_pick";
     /** The four slots of the quartered card, each holding the id of another card. */
     public static final String[] PREF_QUAD = {
             "pref_oepl_weather_quad_1", "pref_oepl_weather_quad_2",
@@ -257,6 +264,20 @@ public final class OEPLPrefs {
     public static String imageUri(final SharedPreferences prefs) {
         final String value = prefs.getString(PREF_IMAGE_URI, "");
         return value == null ? "" : value.trim();
+    }
+
+    /** How far into the picture the panel looks; 1 is the whole of it, as the fit chose it. */
+    public static float imageZoom(final SharedPreferences prefs) {
+        return Math.max(1f, Math.min(8f, prefs.getFloat(PREF_IMAGE_ZOOM, 1f)));
+    }
+
+    /** Which part of it: -1 is hard left or top, 1 hard right or bottom, 0 the middle. */
+    public static float imagePanX(final SharedPreferences prefs) {
+        return Math.max(-1f, Math.min(1f, prefs.getFloat(PREF_IMAGE_PAN_X, 0f)));
+    }
+
+    public static float imagePanY(final SharedPreferences prefs) {
+        return Math.max(-1f, Math.min(1f, prefs.getFloat(PREF_IMAGE_PAN_Y, 0f)));
     }
 
     public static String imageUrl(final SharedPreferences prefs) {

@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -61,6 +62,25 @@ public class OeplImageCardTest {
         return card;
     }
 
+    /** The same, with the picture framed by hand rather than by the fit. */
+    private static Bitmap draw(final ImageContent.Fit fit, final float zoom, final float panX,
+                               final float panY) {
+        final Bitmap card = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+        final Canvas canvas = new Canvas(card);
+        canvas.drawColor(0xffffffff);
+        final CardStyle style = new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE,
+                OEPLImageCodec.RED, false);
+        new ImageContent(OeplDemo.picture(), ImageContent.Dither.NONE, fit, OeplDemo.palette(),
+                zoom, panX, panY).draw(canvas, style, new RectF(0, 0, W, H));
+        return card;
+    }
+
+    private static int[] pixels(final Bitmap card) {
+        final int[] pixels = new int[W * H];
+        card.getPixels(pixels, 0, W, 0, 0, W, H);
+        return pixels;
+    }
+
     private static Set<Integer> coloursOf(final Bitmap card) {
         final int[] pixels = new int[W * H];
         card.getPixels(pixels, 0, W, 0, 0, W, H);
@@ -69,6 +89,51 @@ public class OeplImageCardTest {
             colours.add(pixel & 0xffffff);
         }
         return colours;
+    }
+
+    // ------------------------------------------------------------------ framing by hand
+
+    @Test
+    public void zoomingInShowsLessOfThePicture() {
+        final int[] whole = pixels(draw(ImageContent.Fit.COVER, 1f, 0f, 0f));
+        final int[] closer = pixels(draw(ImageContent.Fit.COVER, 2f, 0f, 0f));
+        assertFalse("twice as close has to look different",
+                java.util.Arrays.equals(whole, closer));
+    }
+
+    @Test
+    public void movingTheCutOutShowsAnotherPart() {
+        final int[] left = pixels(draw(ImageContent.Fit.COVER, 2f, -1f, 0f));
+        final int[] right = pixels(draw(ImageContent.Fit.COVER, 2f, 1f, 0f));
+        final int[] top = pixels(draw(ImageContent.Fit.COVER, 2f, 0f, -1f));
+        final int[] bottom = pixels(draw(ImageContent.Fit.COVER, 2f, 0f, 1f));
+        assertFalse(java.util.Arrays.equals(left, right));
+        assertFalse(java.util.Arrays.equals(top, bottom));
+    }
+
+    @Test
+    public void aFramedPictureFillsThePanelWhateverTheFitWas() {
+        // "contain" leaves paper beside a picture of the wrong shape; a cut-out never does,
+        // because the part the user framed is what the panel is filled with
+        final Bitmap framed = draw(ImageContent.Fit.CONTAIN, 2f, 0f, 0f);
+        final int[] pixels = pixels(framed);
+        int paper = 0;
+        for (final int pixel : pixels) {
+            if ((pixel & 0xffffff) == (OEPLImageCodec.WHITE & 0xffffff)) {
+                paper++;
+            }
+        }
+        assertTrue("a framed picture should not leave the panel half empty",
+                paper < pixels.length * 0.7f);
+    }
+
+    @Test
+    public void framingIsIgnoredUntilItIsUsed() {
+        // zoom 1 and no movement must draw exactly what the fit alone would have drawn
+        assertArrayEquals(pixels(draw(ImageContent.Dither.NONE, ImageContent.Fit.CONTAIN)),
+                pixels(draw(ImageContent.Fit.CONTAIN, 1f, 0f, 0f)));
+        assertArrayEquals(pixels(draw(ImageContent.Dither.NONE, ImageContent.Fit.COVER)),
+                pixels(draw(ImageContent.Fit.COVER, 1f, 0f, 0f)));
     }
 
     @Test

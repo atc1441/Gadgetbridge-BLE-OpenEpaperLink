@@ -228,6 +228,32 @@ public class OeplDashboardTest {
     }
 
     @Test
+    public void theAreasOfAnInstanceAreReadOutOfItsAnswer() {
+        final java.util.Map<String, String> areas = HomeAssistantClient.parseAreas(
+                "sensor.wohnzimmer_temperatur~Wohnzimmer\r\n"
+                        + "light.kueche_decke~Kueche\n"
+                        + "  binary_sensor.haustuer ~ Flur \n"
+                        + "nonsense without a tilde\n"
+                        + "~Kueche\n"
+                        + "sensor.ohne_raum~\n");
+        assertEquals(3, areas.size());
+        assertEquals("Wohnzimmer", areas.get("sensor.wohnzimmer_temperatur"));
+        assertEquals("Kueche", areas.get("light.kueche_decke"));
+        assertEquals("the spaces around a name are the template's, not the user's",
+                "Flur", areas.get("binary_sensor.haustuer"));
+    }
+
+    @Test
+    public void anInstanceWithoutAreasLeavesTheGroupingToTheDomain() {
+        assertTrue(HomeAssistantClient.parseAreas("").isEmpty());
+        assertTrue(HomeAssistantClient.parseAreas(null).isEmpty());
+        // which is what the picker falls back to, and a domain is read off the id
+        final HomeAssistantClient.Listed listed =
+                new HomeAssistantClient.Listed("binary_sensor.haustuer", "Haustuer", "on");
+        assertEquals("binary_sensor", listed.domain());
+    }
+
+    @Test
     public void anEntityGetsTheSymbolItsOwnerWouldExpect() {
         assertEquals(OeplGlyphs.Glyph.BATTERY,
                 OeplGlyphs.forEntity("sensor.phone_battery", "battery", "%"));

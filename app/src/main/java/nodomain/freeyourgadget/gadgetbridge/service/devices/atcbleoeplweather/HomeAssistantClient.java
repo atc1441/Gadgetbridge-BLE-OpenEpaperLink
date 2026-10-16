@@ -18,19 +18,23 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
 import androidx.annotation.Nullable;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 
 /**
@@ -245,6 +249,155 @@ public final class HomeAssistantClient {
         }
     }
 
+    // ------------------------------------------------------------------ browsing
+
+    /** An entity as the picker lists it: what it is called, what it is doing, where it is. */
+    public static class Listed {
+        public final String entityId;
+        public final String name;
+        public final String state;
+        /** The area Home Assistant has it in, or an empty string when it is in none. */
+        public String area = "";
+
+        Listed(final String entityId, final String name, final String state) {
+            this.entityId = entityId;
+            this.name = name;
+            this.state = state;
+        }
+
+        /** The domain, which is what the entities are grouped by when there are no areas. */
+        public String domain() {
+            return entityId.contains(".") ? entityId.substring(0, entityId.indexOf('.'))
+                    : entityId;
+        }
+    }
+
+    /**
+     * Everything the instance has, for choosing from rather than typing out.
+     * <p>
+     * Two requests: the states, which is the list itself, and one template that asks Home
+     * Assistant which area each entity sits in. The second one is what makes the list usable -
+     * a thousand entity ids sorted alphabetically is not something anybody picks from, while
+     * "Wohnzimmer: temperature, humidity, lamp" is. A template is used because the registries
+     * the areas live in are not reachable over the plain REST interface, and this is: it is
+     * the same Jinja a dashboard card is written with.
+     *
+     * @return the entities, sorted by area and name, or an empty list when nothing answered
+     */
+    public static List<Listed> browse(@Nullable final String baseUrl,
+                                      @Nullable final String token) throws Exception {
+        if (baseUrl == null || baseUrl.trim().isEmpty() || token == null
+                || token.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        final String base = normalise(baseUrl);
+        final String bearer = token.trim();
+        final List<Listed> entities = new ArrayList<>();
+        final JSONArray states = new JSONArray(get(base + "/api/states", bearer));
+        for (int i = 0; i < states.length(); i++) {
+            final JSONObject state = states.optJSONObject(i);
+            if (state == null) {
+                continue;
+            }
+            final String id = state.optString("entity_id", "");
+            if (id.isEmpty()) {
+                continue;
+            }
+            final JSONObject attributes = state.optJSONObject("attributes");
+            final String friendly = attributes == null ? null
+                    : attributes.optString("friendly_name", null);
+            entities.add(new Listed(id, friendly != null && !friendly.isEmpty() ? friendly
+                    : shortName(id), state.optString("state", "")));
+        }
+
+        final Map<String, String> areas = areasOf(base, bearer);
+        for (final Listed entity : entities) {
+            final String area = areas.get(entity.entityId);
+            entity.area = area == null ? "" : area;
+        }
+        Collections.sort(entities, (a, b) -> {
+            // the ones in a room first, by room, then everything else by name
+            final boolean aHas = !a.area.isEmpty();
+            final boolean bHas = !b.area.isEmpty();
+            if (aHas != bHas) {
+                return aHas ? -1 : 1;
+            }
+            final int byArea = a.area.compareToIgnoreCase(b.area);
+            return byArea != 0 ? byArea : a.name.compareToIgnoreCase(b.name);
+        });
+        return entities;
+    }
+
+    /**
+     * Which area each entity belongs to, asked for in one go. An instance that does not answer
+     * the template endpoint - an old one, or a token without the rights - simply has no areas
+     * as far as the picker is concerned, and the entities are then grouped by their domain.
+     */
+    private static Map<String, String> areasOf(final String base, final String token) {
+        final Map<String, String> areas = new HashMap<>();
+        try {
+            final String template = "{% for a in areas() %}"
+                    + "{% for e in area_entities(a) %}{{ e }}~{{ area_name(a) }}\n{% endfor %}"
+                    + "{% endfor %}";
+            final JSONObject body = new JSONObject();
+            body.put("template", template);
+            areas.putAll(parseAreas(post(base + "/api/template", token, body)));
+        } catch (final Exception e) {
+            LOG.info("no areas from this instance, grouping by domain instead", e);
+        }
+        return areas;
+    }
+
+    /**
+     * The answer to that template: one line per entity, its id and the area's name with a
+     * tilde between them. Anything else in the answer is ignored rather than guessed at - an
+     * instance that renders it differently ends up with no areas, and the picker then groups
+     * the entities by their domain, which is still a great deal better than a flat list.
+     */
+    static Map<String, String> parseAreas(final String body) {
+        final Map<String, String> areas = new HashMap<>();
+        if (body == null) {
+            return areas;
+        }
+        for (final String line : body.split("\r?\n")) {
+            final int tilde = line.indexOf('~');
+            if (tilde <= 0 || tilde >= line.length() - 1) {
+                continue;
+            }
+            final String entity = line.substring(0, tilde).trim();
+            final String area = line.substring(tilde + 1).trim();
+            if (entity.contains(".") && !area.isEmpty()) {
+                areas.put(entity, area);
+            }
+        }
+        return areas;
+    }
+
+    private static String post(final String url, final String token, final JSONObject body)
+            throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(TIMEOUT_MILLIS);
+            connection.setReadTimeout(TIMEOUT_MILLIS);
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + token);
+            try (OutputStream out = connection.getOutputStream()) {
+                out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            if (connection.getResponseCode() != 200) {
+                throw new IllegalStateException("answered " + connection.getResponseCode());
+            }
+            return read(connection.getInputStream());
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     /** "sensor.wohnzimmer_temperatur" with nothing to go by becomes "Wohnzimmer temperatur". */
     private static String shortName(final String entityId) {
         final String tail = entityId.substring(entityId.indexOf('.') + 1).replace('_', ' ');
@@ -284,19 +437,23 @@ public final class HomeAssistantClient {
             if (status != 200) {
                 throw new IllegalStateException("answered " + status);
             }
-            try (InputStream in = connection.getInputStream()) {
-                final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                final byte[] buf = new byte[4096];
-                int read;
-                while ((read = in.read(buf)) > 0) {
-                    out.write(buf, 0, read);
-                }
-                return out.toString(StandardCharsets.UTF_8.name());
-            }
+            return read(connection.getInputStream());
         } finally {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    private static String read(final InputStream in) throws Exception {
+        try (InputStream stream = in) {
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+            final byte[] buf = new byte[4096];
+            int count;
+            while ((count = stream.read(buf)) > 0) {
+                out.write(buf, 0, count);
+            }
+            return out.toString(StandardCharsets.UTF_8.name());
         }
     }
 }

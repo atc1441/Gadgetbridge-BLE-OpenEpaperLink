@@ -1207,6 +1207,12 @@
             android:parentActivityName=".activities.ControlCenterv2" />
 
         <activity
+            android:name=".devices.atcbleoeplweather.OEPLHomeAssistantActivity"
+            android:exported="false"
+            android:label="@string/oepl_ha_pick_title"
+            android:parentActivityName=".activities.ControlCenterv2" />
+
+        <activity
             android:name=".devices.atcbleoeplweather.OEPLDesignPickerActivity"
             android:exported="false"
             android:label="@string/pref_oepl_weather_pick_design_title"

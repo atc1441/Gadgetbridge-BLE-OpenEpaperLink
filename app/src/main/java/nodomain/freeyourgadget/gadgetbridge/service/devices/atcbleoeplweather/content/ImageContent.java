@@ -57,16 +57,39 @@ public class ImageContent implements CardContent {
 
     @Nullable
     private final Bitmap picture;
+    private final float zoom;
+    private final float panX;
+    private final float panY;
     private final Dither dither;
     private final Fit fit;
     private final int[] palette;
 
     public ImageContent(@Nullable final Bitmap picture, final Dither dither, final Fit fit,
                         final int[] palette) {
+        this(picture, dither, fit, palette, 1f, 0f, 0f);
+    }
+
+    /**
+     * @param zoom how far into the picture the panel looks: 1 shows what the fit chose, 2 half
+     *             of it across and down, and so on
+     * @param panX where that cut-out sits, -1 hard left, 0 centred, 1 hard right
+     * @param panY the same from top to bottom
+     */
+    public ImageContent(@Nullable final Bitmap picture, final Dither dither, final Fit fit,
+                        final int[] palette, final float zoom, final float panX,
+                        final float panY) {
         this.picture = picture;
         this.dither = dither == null ? Dither.DIFFUSION : dither;
         this.fit = fit == null ? Fit.CONTAIN : fit;
         this.palette = palette;
+        this.zoom = Math.max(1f, Math.min(8f, zoom));
+        this.panX = Math.max(-1f, Math.min(1f, panX));
+        this.panY = Math.max(-1f, Math.min(1f, panY));
+    }
+
+    /** True once the user has chosen a part of the picture rather than the whole of it. */
+    private boolean cropped() {
+        return picture != null && (zoom > 1.001f || panX != 0f || panY != 0f);
     }
 
     @Nullable
@@ -123,6 +146,22 @@ public class ImageContent implements CardContent {
     /** Which part of the picture is used, which is all of it unless it is being cropped. */
     @Nullable
     private Rect source(final int width, final int height) {
+        if (cropped()) {
+            // Zoomed or moved by hand, which is a crop whatever the fit says: the part the
+            // user framed fills the panel, and nothing of it is left to a rule about aspect
+            // ratios. A cut-out can never be larger than the picture it comes from, so it is
+            // kept inside it rather than allowed to reach past an edge.
+            final float cover = Math.min(picture.getWidth() / (float) width,
+                    picture.getHeight() / (float) height);
+            final float w = Math.min(picture.getWidth(), width * cover / zoom);
+            final float h = Math.min(picture.getHeight(), height * cover / zoom);
+            final float freeX = picture.getWidth() - w;
+            final float freeY = picture.getHeight() - h;
+            final float left = freeX * (panX + 1f) / 2f;
+            final float top = freeY * (panY + 1f) / 2f;
+            return new Rect(Math.round(left), Math.round(top),
+                    Math.round(left + w), Math.round(top + h));
+        }
         if (fit != Fit.COVER || picture == null) {
             return null;
         }
@@ -137,7 +176,7 @@ public class ImageContent implements CardContent {
 
     /** Where it lands on the panel. */
     private RectF target(final int width, final int height) {
-        if (picture == null || fit != Fit.CONTAIN) {
+        if (picture == null || fit != Fit.CONTAIN || cropped()) {
             return new RectF(0, 0, width, height);
         }
         final float scale = Math.min(width / (float) picture.getWidth(),

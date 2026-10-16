@@ -84,7 +84,142 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         editor.putBoolean(GBPrefs.DEVICE_AUTO_RECONNECT, false);
         editor.putBoolean(GBPrefs.DEVICE_CONNECT_BACK, false);
         editor.putBoolean(DeviceSettingsPreferenceConst.PREF_CONNECTION_PRIORITY_LOW_POWER, false);
+        inheritFromAConfiguredDisplay(editor);
     }
+
+    /**
+     * What a second display starts with: the settings of the first one.
+     * <p>
+     * The place the weather is for, which calendars are read, the news feed, the Home
+     * Assistant instance, how often a picture goes out - none of that is about the panel, it
+     * is about the household. Typing it in again for every tag on the wall is work nobody
+     * should be asked to do twice, and getting it subtly different is worse than that: two
+     * displays showing the weather of two different towns look like a bug.
+     * <p>
+     * What is copied is an ordinary setting afterwards. The new display can be pointed
+     * somewhere else, and nothing remembers where its values came from. Deliberately left out
+     * is everything that belongs to the panel rather than to the household - what it shows,
+     * its picture, its rotation, its colours - so a second display is not a copy of the first,
+     * only as ready to use.
+     */
+    private void inheritFromAConfiguredDisplay(final SharedPreferences.Editor editor) {
+        try {
+            final GBDevice source = configuredDisplay();
+            if (source == null) {
+                return;
+            }
+            final SharedPreferences from =
+                    GBApplication.getDeviceSpecificSharedPrefs(source.getAddress());
+            int taken = 0;
+            for (final String key : INHERITED_SETTINGS) {
+                final Object value = from.getAll().get(key);
+                if (value == null) {
+                    continue;
+                }
+                if (value instanceof String) {
+                    editor.putString(key, (String) value);
+                } else if (value instanceof Boolean) {
+                    editor.putBoolean(key, (Boolean) value);
+                } else if (value instanceof Integer) {
+                    editor.putInt(key, (Integer) value);
+                } else if (value instanceof Long) {
+                    editor.putLong(key, (Long) value);
+                } else if (value instanceof Float) {
+                    editor.putFloat(key, (Float) value);
+                } else if (value instanceof java.util.Set) {
+                    //noinspection unchecked
+                    editor.putStringSet(key, new java.util.LinkedHashSet<>(
+                            (java.util.Set<String>) value));
+                } else {
+                    continue;
+                }
+                taken++;
+            }
+            if (taken == 0) {
+                return;
+            }
+            LOG.info("new display takes {} settings from {}", taken, source.getAddress());
+            final Context context = GBApplication.getContext();
+            if (context != null) {
+                GB.toast(context.getString(R.string.oepl_inherited, source.getAliasOrName()),
+                        3000, GB.INFO);
+            }
+        } catch (final Exception e) {
+            // a fresh display with stock settings is a perfectly good outcome
+            LOG.warn("could not take the settings of another display", e);
+        }
+    }
+
+    /**
+     * Another display that somebody has already set up, or null when this is the first one.
+     * "Set up" means it has been told where it is - a place for the weather, a feed, or a Home
+     * Assistant instance; a display that was only ever paired has nothing worth copying.
+     */
+    @Nullable
+    private GBDevice configuredDisplay() {
+        final List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        // backwards: the display set up most recently is the one whose settings are current
+        for (int i = devices.size() - 1; i >= 0; i--) {
+            final GBDevice device = devices.get(i);
+            if (device.getType() != DeviceType.OEPL_WEATHER_DISPLAY) {
+                continue;
+            }
+            final SharedPreferences prefs =
+                    GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+            if (prefs == null) {
+                continue;
+            }
+            if (!OEPLPrefs.weatherLocation(prefs).isEmpty()
+                    || !OEPLPrefs.rssUrl(prefs).isEmpty()
+                    || !OEPLPrefs.homeAssistantUrl(prefs).isEmpty()) {
+                return device;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The settings that belong to the household rather than to one panel, and are therefore
+     * worth handing to the next display that is paired.
+     */
+    private static final List<String> INHERITED_SETTINGS = Collections.unmodifiableList(
+            Arrays.asList(
+                    // where the weather is for, and how much of it is drawn
+                    OEPLPrefs.PREF_WEATHER_SOURCE,
+                    OEPLPrefs.PREF_WEATHER_LOCATION,
+                    OEPLPrefs.PREF_FORECAST_DAYS,
+                    OEPLPrefs.PREF_FORECAST_HOURS,
+                    OEPLPrefs.PREF_WIND_UNIT,
+                    OEPLPrefs.PREF_SHOW_SUN,
+                    // which calendars are read and how far ahead
+                    "sync_calendar",
+                    "calendar_blacklist",
+                    "calendar_lookahead_days",
+                    "sync_birthdays",
+                    OEPLPrefs.PREF_CALENDAR_EVENTS,
+                    OEPLPrefs.PREF_CALENDAR_DAYS,
+                    OEPLPrefs.PREF_CALENDAR_TITLE,
+                    // the news feed and the house
+                    OEPLPrefs.PREF_RSS_URL,
+                    OEPLPrefs.PREF_RSS_TITLE,
+                    OEPLPrefs.PREF_RSS_SUMMARY,
+                    OEPLPrefs.PREF_HA_URL,
+                    OEPLPrefs.PREF_HA_TOKEN,
+                    OEPLPrefs.PREF_HA_ENTITIES,
+                    OEPLPrefs.PREF_READING_GROUPS,
+                    OEPLPrefs.PREF_NOTIFICATION_COUNT,
+                    // how the cards are framed, which is taste rather than hardware
+                    OEPLPrefs.PREF_FRAME,
+                    OEPLPrefs.PREF_SHOW_FOOTER,
+                    // and how often a picture goes out at all
+                    OEPLPrefs.PREF_UPDATE_INTERVAL,
+                    OEPLPrefs.PREF_LIVE_UPDATES,
+                    OEPLPrefs.PREF_MIN_GAP,
+                    OEPLPrefs.PREF_CONNECT_WINDOW,
+                    OEPLPrefs.PREF_CONNECT_ATTEMPTS,
+                    OEPLPrefs.PREF_OPPORTUNISTIC,
+                    OEPLPrefs.PREF_REQUIRE_ADVERTISEMENT,
+                    OEPLPrefs.PREF_STAY_CONNECTED));
 
     /**
      * The plain ATC_BLE_OEPL coordinator matches the very same tags. Device type resolution

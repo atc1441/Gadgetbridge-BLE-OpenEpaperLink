@@ -220,7 +220,14 @@ the states itself. Nothing is installed on the Home Assistant side.
    can reach, e.g. `http://homeassistant.local:8123` or `http://192.168.1.4:8123`. A plain host
    name with a port is enough - `http://` is filled in when it is missing.
 3. Paste the token into **Access token**.
-4. List the **entities**, one per line, with an optional name after a vertical bar:
+4. Tap **Choose entities**. The display asks the instance what it has and lists it the way
+   Home Assistant groups it - by room, with each entity's current state beside its name, and a
+   search field above. Tick what the panel should show. (The rooms come from one template
+   query, because the area registry is not reachable over the plain REST interface; an
+   instance that does not answer it is simply grouped by domain instead.)
+
+   The list underneath stays editable for anything the picker cannot do - above all a name of
+   your own after a vertical bar. One entity per line:
 
    ```
    sensor.wohnzimmer_temperatur | Wohnzimmer
@@ -229,7 +236,8 @@ the states itself. Nothing is installed on the Home Assistant side.
    switch.waschmaschine
    ```
 
-   Without a name, the entity's own friendly name is used. Up to twelve entities are read; the
+   Without a name, the entity's own friendly name is used. A name typed here survives the
+   picker. Up to twelve entities are read; the
    card then shows as many of them as the panel can hold.
 5. Choose `panel_grid`, `panel_hero` or `panel_list`, and leave **House** switched on under
    *Dashboard values*.
@@ -249,6 +257,28 @@ says what went wrong, under *Home Assistant*.
 Two limits worth knowing: the phone has to be able to reach the instance when the update runs
 (the same network, a VPN, or Nabu Casa), and a self-signed certificate only works if its
 authority is installed on the phone. On a home network, plain `http://` is the simple answer.
+
+### The picture cards
+
+The picture a display shows is its own: every display keeps its own choice, its own colour
+reduction and its own framing, and the screen says whose picture is being chosen in its title.
+
+**Framing.** Drag on the preview to move the picture, pinch to zoom, double tap to go back to
+the whole of it. The preview is the card itself, so what is under the finger is what the panel
+gets. A fit that scales the whole picture into the panel is right for a poster and wrong for a
+photograph of a person, where the point is the face rather than the edges - and cropping it
+beforehand, in another app, for a panel whose proportions nobody remembers, is not a
+reasonable thing to ask.
+
+### A second display
+
+Pairing another display takes the settings of one that is already set up: the weather location,
+the calendars, the feed, the Home Assistant instance, the update schedule. None of that is
+about the panel - it is about the household - and typing it in again for every tag on the wall
+is work nobody should be asked to do twice. What is copied is an ordinary setting afterwards:
+the new display can be pointed somewhere else, and nothing remembers where its values came
+from. What it *shows* is deliberately not copied, nor its picture, rotation or colours, so a
+second display starts as ready to use as the first one but not as a copy of it.
 
 ### The quartered card
 

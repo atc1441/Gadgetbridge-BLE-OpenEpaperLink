@@ -79,7 +79,13 @@ public class OEPLImageActivity extends AbstractGBActivity {
             finish();
             return;
         }
-        setTitle(R.string.pref_oepl_weather_image_pick_title);
+        // Whose picture this is, in the title: every display keeps its own, and a screen
+        // that looks the same for all of them is a screen that invites picking a picture for
+        // the display in the other room.
+        setTitle(getString(R.string.oepl_image_for, device.getAliasOrName()));
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setSubtitle(R.string.pref_oepl_weather_image_pick_title);
+        }
 
         preview = findViewById(R.id.oepl_image_preview);
         note = findViewById(R.id.oepl_image_note);
@@ -95,6 +101,7 @@ public class OEPLImageActivity extends AbstractGBActivity {
             }
         });
         findViewById(R.id.oepl_image_use).setOnClickListener(v -> apply());
+        installGestures();
 
         restore();
         dither.setOnCheckedChangeListener((group, id) -> {
@@ -130,6 +137,142 @@ public class OEPLImageActivity extends AbstractGBActivity {
 
     private SharedPreferences prefs() {
         return GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+    }
+
+    // ------------------------------------------------------------------ framing the picture
+
+    /** True while a finger is on the preview, so a redraw does not fight the gesture. */
+    private boolean gesturing;
+    /** Set while a preview is being drawn, so the gestures do not queue up renders. */
+    private volatile boolean drawing;
+    private float lastX;
+    private float lastY;
+    private android.view.ScaleGestureDetector scaleDetector;
+
+    /**
+     * Dragging and pinching on the preview choose the part of the picture the panel shows.
+     * <p>
+     * The preview is the card itself, so this is direct: what is under the finger is what the
+     * display will show. A fit that scales the whole picture into the panel is right for a
+     * poster and wrong for a photograph of a person, where the point is the face rather than
+     * the edges - and cropping it beforehand in another app for a panel whose proportions
+     * nobody remembers is not a reasonable thing to ask.
+     */
+    private void installGestures() {
+        scaleDetector = new android.view.ScaleGestureDetector(this,
+                new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    @Override
+                    public boolean onScale(final android.view.ScaleGestureDetector detector) {
+                        final SharedPreferences prefs = prefs();
+                        final float zoom = clampZoom(OEPLPrefs.imageZoom(prefs)
+                                * detector.getScaleFactor());
+                        prefs.edit().putFloat(OEPLPrefs.PREF_IMAGE_ZOOM, zoom).apply();
+                        changed = true;
+                        redrawSoon();
+                        return true;
+                    }
+                });
+
+        final android.view.GestureDetector taps = new android.view.GestureDetector(this,
+                new android.view.GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDoubleTap(final android.view.MotionEvent event) {
+                        // back to the whole picture, which is where everybody starts over from
+                        prefs().edit()
+                                .putFloat(OEPLPrefs.PREF_IMAGE_ZOOM, 1f)
+                                .putFloat(OEPLPrefs.PREF_IMAGE_PAN_X, 0f)
+                                .putFloat(OEPLPrefs.PREF_IMAGE_PAN_Y, 0f)
+                                .apply();
+                        changed = true;
+                        refresh();
+                        return true;
+                    }
+                });
+
+        // The screen scrolls, and a finger dragged across a picture inside a scrolling
+        // screen scrolls it - the gesture never reaches the picture at all. So for as long as
+        // a finger is on the preview, the scrolling parents are asked to keep their hands off
+        // it, and asked again on every move because a parent may start intercepting mid
+        // gesture. Released again the moment the finger leaves, so the screen scrolls as
+        // usual everywhere else.
+        preview.setClickable(true);
+        preview.setOnTouchListener((view, event) -> {
+            scaleDetector.onTouchEvent(event);
+            taps.onTouchEvent(event);
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    holdTheScroll(view, true);
+                    gesturing = true;
+                    lastX = event.getX();
+                    lastY = event.getY();
+                    return true;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    holdTheScroll(view, true);
+                    if (event.getPointerCount() == 1 && !scaleDetector.isInProgress()) {
+                        pan(event.getX() - lastX, event.getY() - lastY, view.getWidth(),
+                                view.getHeight());
+                        lastX = event.getX();
+                        lastY = event.getY();
+                    }
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    holdTheScroll(view, false);
+                    gesturing = false;
+                    refresh();
+                    view.performClick();
+                    return true;
+                default:
+                    return true;
+            }
+        });
+    }
+
+    /** Keeps the scrolling parents out of a gesture that belongs to the picture. */
+    private void holdTheScroll(final View view, final boolean hold) {
+        android.view.ViewParent parent = view.getParent();
+        while (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(hold);
+            parent = parent.getParent();
+        }
+    }
+
+    /**
+     * Moves the cut-out by what the finger moved. Dragging to the right brings what is left of
+     * the frame into it, which is what every map and every photo viewer does.
+     */
+    private void pan(final float dx, final float dy, final int width, final int height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        final SharedPreferences prefs = prefs();
+        final float zoom = OEPLPrefs.imageZoom(prefs);
+        final float x = clampPan(OEPLPrefs.imagePanX(prefs) - 2f * dx / width / zoom);
+        final float y = clampPan(OEPLPrefs.imagePanY(prefs) - 2f * dy / height / zoom);
+        prefs.edit().putFloat(OEPLPrefs.PREF_IMAGE_PAN_X, x)
+                .putFloat(OEPLPrefs.PREF_IMAGE_PAN_Y, y).apply();
+        changed = true;
+        redrawSoon();
+    }
+
+    private float clampZoom(final float zoom) {
+        return Math.max(1f, Math.min(8f, zoom));
+    }
+
+    private float clampPan(final float pan) {
+        return Math.max(-1f, Math.min(1f, pan));
+    }
+
+    /**
+     * Redraws while a finger is still moving, but never more than one drawing at a time: the
+     * card goes through the dithering the panel will see, which costs enough that queueing
+     * them up would leave the preview lagging seconds behind the hand.
+     */
+    private void redrawSoon() {
+        if (drawing) {
+            return;
+        }
+        refresh();
     }
 
     /** Keeps the right to read the picture after the chooser is gone. */
@@ -210,6 +353,7 @@ public class OEPLImageActivity extends AbstractGBActivity {
                 ? CardContentFactory.IMAGE_URL : CardContentFactory.IMAGE;
         note.setText(R.string.oepl_image_drawing);
 
+        drawing = true;
         final Thread thread = new Thread(() -> {
             Bitmap card = null;
             try {
@@ -226,6 +370,7 @@ public class OEPLImageActivity extends AbstractGBActivity {
                 LOG.warn("could not draw the picture preview", e);
             }
             final Bitmap drawn = card;
+            drawing = false;
             handler.post(() -> show(drawn));
         }, "oepl-image-preview");
         thread.setDaemon(true);
@@ -246,8 +391,33 @@ public class OEPLImageActivity extends AbstractGBActivity {
         final String source = CardContentFactory.IMAGE_URL.equals(
                 OEPLPrefs.contentType(prefs()))
                 ? OEPLPrefs.imageUrl(prefs()) : OEPLPrefs.imageUri(prefs());
-        note.setText(source.isEmpty() ? getString(R.string.oepl_image_none)
-                : getString(R.string.oepl_image_note, card.getWidth() + "x" + card.getHeight()));
+        if (source.isEmpty()) {
+            // said plainly: the preview above is the card this display would draw, which looks
+            // the same on every display that has no picture of its own
+            note.setText(R.string.oepl_image_none_here);
+            return;
+        }
+        // ...and when there is one, which one: two displays showing a picture are told apart
+        // by its name, not by a thumbnail of the same size
+        final float zoom = OEPLPrefs.imageZoom(prefs());
+        final String framing = zoom > 1.001f
+                ? getString(R.string.oepl_image_zoom, zoom)
+                : getString(R.string.oepl_image_gesture);
+        note.setText(getString(R.string.oepl_image_file, name(source), framing));
+    }
+
+    /** The last part of a URI or URL, which is the part somebody recognises. */
+    private String name(final String source) {
+        final String withoutQuery = source.contains("?")
+                ? source.substring(0, source.indexOf('?')) : source;
+        final int slash = withoutQuery.lastIndexOf('/');
+        final String tail = slash >= 0 && slash < withoutQuery.length() - 1
+                ? withoutQuery.substring(slash + 1) : withoutQuery;
+        try {
+            return java.net.URLDecoder.decode(tail, "UTF-8");
+        } catch (final Exception ignored) {
+            return tail;
+        }
     }
 
     /** Makes the picture the thing this display shows, and sends it straight away. */

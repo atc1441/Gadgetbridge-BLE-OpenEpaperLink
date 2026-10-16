@@ -159,7 +159,9 @@ public final class CardContentFactory {
         final Bitmap picture = OEPLImageSource.load(context, prefs, id, device.getAddress(),
                 panel[0], panel[1]);
         return new ImageContent(picture, OEPLPrefs.imageDither(prefs),
-                OEPLPrefs.imageFit(prefs), palette(prefs, panel[2]));
+                OEPLPrefs.imageFit(prefs), palette(prefs, panel[2]),
+                OEPLPrefs.imageZoom(prefs), OEPLPrefs.imagePanX(prefs),
+                OEPLPrefs.imagePanY(prefs));
     }
 
     /**

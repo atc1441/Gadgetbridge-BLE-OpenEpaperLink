@@ -262,6 +262,10 @@
                 android:title="@string/pref_oepl_weather_ha_token_title"
                 android:summary="@string/pref_oepl_weather_ha_token_summary"
                 android:dialogTitle="@string/pref_oepl_weather_ha_token_title" />
+            <Preference
+                android:key="pref_oepl_weather_ha_pick"
+                android:title="@string/oepl_ha_pick_title"
+                android:summary="@string/oepl_ha_pick_summary" />
             <EditTextPreference
                 android:key="pref_oepl_weather_ha_entities"
                 android:title="@string/pref_oepl_weather_ha_entities_title"

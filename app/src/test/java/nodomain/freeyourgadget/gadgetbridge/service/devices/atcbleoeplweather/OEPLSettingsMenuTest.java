@@ -323,6 +323,7 @@ public class OEPLSettingsMenuTest {
         final Set<String> handledElsewhere = new HashSet<>(Arrays.asList(
                 // buttons: they notify when pressed, there is no value to watch
                 OEPLPrefs.PREF_IMAGE_PICK,
+                OEPLPrefs.PREF_HA_PICK,
                 OEPLPrefs.PREF_READ_CONFIG,
                 "pref_oepl_weather_pick_design",
                 "pref_oepl_weather_info",
