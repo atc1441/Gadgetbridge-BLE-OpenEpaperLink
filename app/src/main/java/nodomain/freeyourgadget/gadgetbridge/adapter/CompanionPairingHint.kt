@@ -30,6 +30,9 @@ object CompanionPairingHint {
         if (device.deviceCoordinator.connectionType == DeviceCoordinator.ConnectionType.USB) {
             return false
         }
+        if (!device.deviceCoordinator.suggestsCompanionPairing(device)) {
+            return false
+        }
         if (!BluetoothAdapter.checkBluetoothAddress(device.address)) {
             return false
         }

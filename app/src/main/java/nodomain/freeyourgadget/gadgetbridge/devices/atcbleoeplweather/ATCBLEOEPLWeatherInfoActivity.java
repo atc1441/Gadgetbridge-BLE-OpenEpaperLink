@@ -221,7 +221,7 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
         }
         final int battery = p.getInt(OEPLPrefs.LAST_BATTERY_MV, -1);
         if (battery > 0) {
-            row(getString(R.string.oepl_info_battery), String.format(Locale.getDefault(),
+            row(getString(R.string.oepl_info_battery), String.format(Locale.ROOT,
                     "%.2f V (%d %%)", battery / 1000f, OEPLPrefs.batteryPercent(battery)));
         }
         final int temperature = p.getInt(OEPLPrefs.LAST_PANEL_TEMPERATURE, -100);
@@ -337,7 +337,7 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
         final long duration = p.getLong(OEPLStatusStore.LAST_DURATION_MILLIS, 0L);
         if (duration > 0) {
             row(getString(R.string.oepl_info_duration),
-                    String.format(Locale.getDefault(), "%.1f s", duration / 1000f));
+                    String.format(Locale.ROOT, "%.1f s", duration / 1000f));
         }
         final long lastUpdate = p.getLong(OEPLPrefs.LAST_UPDATE_MILLIS, 0L);
         if (lastUpdate > 0) {
@@ -362,8 +362,8 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
         final int scans = p.getInt(OEPLStatusStore.COUNT_SCANS, 0);
         final int misses = p.getInt(OEPLStatusStore.COUNT_SCAN_MISSES, 0);
         row(getString(R.string.oepl_info_count_scans), scans + " / " + misses
-                + (scans > 0 ? String.format(Locale.getDefault(), " (%.0f %% erreicht)",
-                100f * (scans - misses) / scans) : ""));
+                + (scans > 0 ? " (" + getString(R.string.oepl_info_reached,
+                Math.round(100f * (scans - misses) / scans)) + ")" : ""));
     }
 
     private void contentSection(final SharedPreferences p) {
@@ -385,7 +385,7 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
             if (!error.isEmpty()) {
                 row(getString(R.string.oepl_info_weather_source_state), error);
             }
-            row(getString(R.string.oepl_info_weather_now), String.format(Locale.getDefault(),
+            row(getString(R.string.oepl_info_weather_now), String.format(Locale.ROOT,
                     "%.1f °C, %s", weather.current.temperature,
                     weather.days.isEmpty() ? ""
                             : Math.round(weather.days.get(0).minTemperature) + " / "

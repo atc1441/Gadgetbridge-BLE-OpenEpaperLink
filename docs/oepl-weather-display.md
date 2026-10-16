@@ -12,9 +12,15 @@ pushes it over Bluetooth LE. There is no access point and no server anywhere in 
    **OEPL Weather Display**. Pick the latter.
 3. If the wrong one was picked, long press the entry in the discovery list and force the type.
 
-The tag already tells you a lot before it is ever connected to: its hardware type, firmware
-version, battery voltage and panel temperature are in its advertisement, so the first card is
-drawn with a real battery reading and the right panel geometry.
+Each entry in the discovery list names the panel the tag carries, for example
+`M3 2.9" BWRY · 384×168 · 2.61 V`, together with its battery. Every one of these displays
+calls itself `ATC_` plus four characters of its MAC address, so a shelf of them is otherwise a
+list of identical entries - while the panel, which decides what can be shown on it, is in every
+advertisement they send. An unknown type still shows its code, as `Unknown (0x4F)`.
+
+That is also why the tag already tells you a lot before it is ever connected to: its hardware
+type, firmware version, battery voltage and panel temperature are in its advertisement, so the
+first card is drawn with a real battery reading and the right panel geometry.
 
 ## The cards
 
@@ -99,6 +105,10 @@ cannot drift apart.
 A tag is awake for a few seconds at a time and asleep in between, and Android is not keen on
 letting an app do anything in the background. The schedule is built around both:
 
+- **Every fifteen minutes by default**, settable from 5 minutes to 12 hours. An update whose
+  picture turns out to be the same as the one already on the panel never opens a connection at
+  all, so a short interval costs the cell nothing on a card that has not changed - and keeps a
+  clock, a reading or an appointment from standing there wrong for an hour.
 - **An exact alarm per display**, armed with `setAndAllowWhileIdle`, rather than WorkManager.
   Deferrable background work is how updates used to arrive hours late or not at all.
 - **The content is refreshed before the radio comes up**, never after. The tag hangs up by

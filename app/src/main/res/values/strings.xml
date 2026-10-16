@@ -5398,6 +5398,7 @@
     <string name="oepl_info_count_unchanged">Skipped as unchanged</string>
     <string name="oepl_info_count_failures">Failed</string>
     <string name="oepl_info_count_scans">Scans / missed</string>
+    <string name="oepl_info_reached">%1$d %% reached</string>
     <string name="oepl_info_card">Card</string>
     <string name="oepl_info_frame">Frame</string>
     <string name="oepl_info_weather_source">Weather from</string>

@@ -216,4 +216,17 @@ public final class OEPLTagTypes {
         final TagType t = TYPES.get(hardwareType);
         return t != null ? t.name : String.format("Unknown (0x%02X)", hardwareType);
     }
+
+    /**
+     * One line naming a tag the way a list has to name it: the model and the panel behind it.
+     * A type the catalogue does not know still gets its code, which is the only thing that can
+     * be looked up afterwards.
+     */
+    public static String describe(final int hardwareType) {
+        final TagType t = TYPES.get(hardwareType);
+        if (t == null) {
+            return nameOf(hardwareType);
+        }
+        return t.name + " · " + t.width + "×" + t.height;
+    }
 }

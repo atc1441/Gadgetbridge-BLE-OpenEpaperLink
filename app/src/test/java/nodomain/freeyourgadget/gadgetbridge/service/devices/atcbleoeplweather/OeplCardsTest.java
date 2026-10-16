@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.graphics.Bitmap;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 
 import org.junit.Before;
@@ -36,8 +37,10 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardContent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardStyle;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCalendarListCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCalendarWeekCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplClockCard;
@@ -395,5 +398,38 @@ public class OeplCardsTest {
 
         assertTrue("nonsense yields nothing rather than throwing",
                 OeplRssClient.parse("not xml at all").isEmpty());
+    }
+
+    /**
+     * A reading drawn onto a panel uses a decimal point, whatever the phone's language is. The
+     * figures on these cards sit next to dates written "16.10." and are read as measurements
+     * rather than as prose, and a comma also hangs below the digits it stands between, which on
+     * a panel without greys comes out as a smudge.
+     */
+    @Test
+    public void temperaturesAreDrawnWithADecimalPoint() {
+        final Locale previous = Locale.getDefault();
+        Locale.setDefault(Locale.GERMANY);
+        try {
+            for (final String id : new String[]{"oepl_4", "panel_big"}) {
+                final CardContent content = OeplDemo.card(id);
+                final Bitmap sheet = Bitmap.createBitmap(384, 184, Bitmap.Config.ARGB_8888);
+                final OeplInkRecorder recorder = new OeplInkRecorder(sheet);
+                final CardStyle style = new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE,
+                        OEPLImageCodec.RED, false);
+                content.draw(recorder, style, new RectF(0f, 0f, 384f, 184f));
+
+                boolean reading = false;
+                for (final OeplInkRecorder.Run run : recorder.textRuns()) {
+                    assertFalse(id + " drew a decimal comma: " + run.what,
+                            run.what.matches(".*\\d,\\d.*"));
+                    reading |= run.what.contains("13.4");
+                }
+                assertTrue(id + " did not draw the current reading at all", reading);
+                sheet.recycle();
+            }
+        } finally {
+            Locale.setDefault(previous);
+        }
     }
 }

@@ -76,7 +76,15 @@ public class DeviceCandidateAdapter extends ArrayAdapter<GBDeviceCandidate> {
 
         final String name = formatDeviceName(device);
         deviceNameLabel.setText(name);
-        deviceDetailsLabel.setText(getContext().getString(coordinator.getDeviceNameResource()) + "\n" + device.getMacAddress());
+        final List<String> detailLines = new ArrayList<>(3);
+        detailLines.add(getContext().getString(coordinator.getDeviceNameResource()));
+        // whatever the device broadcasts about itself, for telling two of a kind apart
+        final String advertised = coordinator.getCandidateDetails(getContext(), device);
+        if (!TextUtils.isEmpty(advertised)) {
+            detailLines.add(advertised);
+        }
+        detailLines.add(device.getMacAddress());
+        deviceDetailsLabel.setText(TextUtils.join("\n", detailLines));
         deviceImageView.setImageResource(coordinator.getDefaultIconResource());
 
         final List<String> statusLines = new ArrayList<>();

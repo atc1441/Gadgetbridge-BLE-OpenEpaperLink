@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -56,6 +57,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.AT
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLTagTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLUpdateScheduler;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
@@ -154,6 +156,19 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
     }
 
     /**
+     * No companion association, and no hint asking for one. It would be there to let
+     * Gadgetbridge reconnect by itself and watch for the device in the background - which for
+     * this display is not a missing feature but the thing it is built to avoid: the link is
+     * opened for a few seconds to hand over a picture and dropped again, because an idle
+     * connection is what empties the coin cell. The schedule here is an alarm, not a standing
+     * connection, so the association would buy nothing and the hint only asks to be dismissed.
+     */
+    @Override
+    public boolean suggestsCompanionPairing(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    /**
      * The tag broadcasts its hardware type, firmware, battery and temperature in the manufacturer
      * data, so all of that is known before a connection is ever opened. Picking it up here means
      * the very first rendered card already carries a real battery reading, and the panel geometry
@@ -162,17 +177,48 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
     @Override
     public GBDevice createDevice(final GBDeviceCandidate candidate, final DeviceType deviceType) {
         final GBDevice device = super.createDevice(candidate, deviceType);
+        final OEPLUpdateScheduler.Advertisement ad = advertisementOf(candidate);
+        if (ad != null) {
+            OEPLPrefs.storeFromAdvertisement(device.getAddress(), ad);
+        }
+        return device;
+    }
+
+    /** The tag's own broadcast, or null when this scan result carried none we understand. */
+    @Nullable
+    private OEPLUpdateScheduler.Advertisement advertisementOf(final GBDeviceCandidate candidate) {
         try {
             final SparseArray<byte[]> data = candidate.getManufacturerSpecificData();
             final byte[] raw = data != null ? data.get(OEPLProtocol.MANUFACTURER_ID) : null;
-            final OEPLUpdateScheduler.Advertisement ad = OEPLUpdateScheduler.Advertisement.parse(raw);
-            if (ad != null) {
-                OEPLPrefs.storeFromAdvertisement(device.getAddress(), ad);
-            }
+            return OEPLUpdateScheduler.Advertisement.parse(raw);
         } catch (final Exception e) {
             LOG.error("could not read the advertisement of {}", candidate.getMacAddress(), e);
+            return null;
         }
-        return device;
+    }
+
+    /**
+     * What kind of tag this is, in the discovery list, before anything has been paired. Every
+     * one of these displays calls itself ATC_ and the four characters after that are a piece of
+     * the MAC address, so a shelf full of them is a list of identical entries - while the panel
+     * they carry, which is the one thing that decides what can be put on them, is in every
+     * advertisement they send. The battery comes along because it costs nothing here and tells
+     * a dead tag from a live one while still searching.
+     */
+    @Nullable
+    @Override
+    public String getCandidateDetails(@NonNull final Context context,
+                                      @NonNull final GBDeviceCandidate candidate) {
+        final OEPLUpdateScheduler.Advertisement ad = advertisementOf(candidate);
+        if (ad == null || ad.hardwareType < 0) {
+            return null;
+        }
+        final StringBuilder details = new StringBuilder(OEPLTagTypes.describe(ad.hardwareType));
+        if (ad.batteryMillivolts > 0) {
+            details.append(String.format(Locale.ROOT, " · %.2f V",
+                    ad.batteryMillivolts / 1000f));
+        }
+        return details.toString();
     }
 
     @Override

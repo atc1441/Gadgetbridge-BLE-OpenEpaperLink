@@ -237,7 +237,7 @@ public final class OeplCardFactory {
         final int battery = prefs.getInt(OEPLPrefs.LAST_BATTERY_MV, -1);
         if (battery > 0) {
             rows.add(new OeplInfoCard.Row(context.getString(R.string.oepl_card_info_battery),
-                    String.format(Locale.getDefault(), "%.2f V (%d%%)",
+                    String.format(Locale.ROOT, "%.2f V (%d%%)",
                             battery / 1000f, OEPLPrefs.batteryPercent(battery))));
         }
         final int temperature = prefs.getInt(OEPLPrefs.LAST_PANEL_TEMPERATURE, -100);

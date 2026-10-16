@@ -1134,6 +1134,31 @@ public interface DeviceCoordinator {
     @StringRes
     int getDeviceNameResource();
 
+    /**
+     * What this particular device says about itself while it is only being scanned, for the
+     * discovery list: a model, a panel size, whatever the advertisement carries. Many devices
+     * broadcast enough to be told apart before anything is connected, and the list is where
+     * that matters - afterwards the device has a settings screen of its own to say it in.
+     *
+     * @return one short line, or null when the advertisement holds nothing worth showing
+     */
+    @Nullable
+    default String getCandidateDetails(@NonNull final Context context,
+                                       @NonNull final GBDeviceCandidate candidate) {
+        return null;
+    }
+
+    /**
+     * Whether associating this device as a companion device would do anything for it. The
+     * association exists so that Gadgetbridge may reconnect on its own and keep working in the
+     * background, and the device list offers it to anyone who has not set it up. A device that
+     * is deliberately connected for a moment at a time and left alone in between gains nothing
+     * from it, and the hint then only asks to be dismissed.
+     */
+    default boolean suggestsCompanionPairing(@NonNull final GBDevice device) {
+        return true;
+    }
+
     @DrawableRes
     int getDefaultIconResource();
 

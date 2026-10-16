@@ -78,10 +78,14 @@ public abstract class OeplCard implements CardContent {
         return String.valueOf(Math.round(value));
     }
 
-    /** A temperature with one decimal, the way the current reading is shown. */
+    /**
+     * A temperature with one decimal, the way the current reading is shown. The decimal point
+     * is a point in every locale: this is a figure drawn onto a panel, not a string in a user
+     * interface, and a comma would also sit lower than the digits around it.
+     */
     protected String tempFine(final float celsius) {
         final double value = fahrenheit ? celsius * 9.0 / 5.0 + 32.0 : celsius;
-        return String.format(java.util.Locale.getDefault(), "%.1f", value);
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
     /** The wind as the configured unit, with the Beaufort scale as the default. */

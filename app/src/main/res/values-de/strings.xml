@@ -4526,6 +4526,7 @@
     <string name="oepl_info_consecutive_failures">Fehlschläge in Folge</string>
     <string name="oepl_info_count_failures">Fehlgeschlagen</string>
     <string name="oepl_info_count_scans">Scans / ohne Antwort</string>
+    <string name="oepl_info_reached">%1$d %% erreicht</string>
     <string name="oepl_info_count_transfers">Gesendete Bilder</string>
     <string name="oepl_info_count_unchanged">Als unverändert übersprungen</string>
     <string name="oepl_info_duration">Funkzeit</string>

@@ -87,8 +87,14 @@ public final class OEPLPrefs {
     private OEPLPrefs() {
     }
 
+    /**
+     * How often a new picture is drawn and offered to the tag. Fifteen minutes by default: an
+     * update only costs a connection when the picture has actually changed and the display is
+     * in range, so a short interval mostly buys a clock and a current reading that are right,
+     * and a card that waits an hour for a changed appointment is of little use.
+     */
     public static int updateIntervalMinutes(final SharedPreferences prefs) {
-        return parseInt(prefs.getString(PREF_UPDATE_INTERVAL, "60"), 60);
+        return parseInt(prefs.getString(PREF_UPDATE_INTERVAL, "15"), 15);
     }
 
     /** Rotation in degrees, or -1 when it should be taken from the display type. */

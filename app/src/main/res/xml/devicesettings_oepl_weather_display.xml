@@ -247,7 +247,7 @@
             android:key="pref_oepl_weather_screen_updates"
             android:title="@string/pref_oepl_weather_screen_updates">
             <ListPreference
-                android:defaultValue="60"
+                android:defaultValue="15"
                 android:entries="@array/oepl_weather_update_interval"
                 android:entryValues="@array/oepl_weather_update_interval_values"
                 android:key="pref_oepl_weather_update_interval"

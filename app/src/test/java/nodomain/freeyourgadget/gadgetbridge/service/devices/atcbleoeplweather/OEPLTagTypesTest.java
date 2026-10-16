@@ -117,4 +117,16 @@ public class OEPLTagTypesTest {
         assertEquals("buffer rotation from the catalogue", 270, c.autoRotationDegrees());
         assertFalse("0x6D carries red, so the accent stays red", c.autoAccentIsYellow());
     }
+
+    /**
+     * What a scanned tag is called in the discovery list. The panel size belongs in that line:
+     * two tags of the same family differ by it, and it is what decides what can be shown.
+     */
+    @Test
+    public void describesATagByItsModelAndPanel() {
+        assertEquals("M3 2.9\" BWRY · 384×168", OEPLTagTypes.describe(0x2B));
+        assertEquals("M2 1.54\" · 152×152", OEPLTagTypes.describe(0x00));
+        // a type the catalogue has never heard of still has to say something useful
+        assertEquals("Unknown (0xF7)", OEPLTagTypes.describe(0xF7));
+    }
 }
