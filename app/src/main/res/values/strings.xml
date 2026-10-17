@@ -5409,6 +5409,8 @@
     <string name="oepl_info_duration">Air time</string>
     <string name="oepl_info_last_picture">Picture accepted</string>
     <string name="oepl_info_interval">Refresh every</string>
+    <string name="oepl_info_catch_up">Catch up every</string>
+    <string name="oepl_info_quiet">Quiet hours</string>
     <string name="oepl_info_next_attempt">Next attempt</string>
     <string name="oepl_info_count_transfers">Pictures sent</string>
     <string name="oepl_info_count_unchanged">Skipped as unchanged</string>
@@ -5608,6 +5610,13 @@
     <string name="oepl_screen_live_off">live updates off</string>
     <string name="pref_oepl_weather_update_interval_title">Update interval</string>
     <string name="pref_oepl_weather_update_interval_summary">The display is connected only when it is in range and the picture has actually changed</string>
+    <string name="pref_oepl_weather_catch_up_title">Catch up every</string>
+    <string name="pref_oepl_weather_catch_up_summary">While an update is owed - the display was out of range, the phone was elsewhere - it is tried again this often instead of waiting for the next interval</string>
+    <string name="pref_oepl_weather_category_quiet">Quiet hours</string>
+    <string name="pref_oepl_weather_quiet_title">Leave the display alone at night</string>
+    <string name="pref_oepl_weather_quiet_summary">No updates between these two times. What falls due in between is shown the moment the window ends, not the next day</string>
+    <string name="pref_oepl_weather_quiet_start_title">Quiet from</string>
+    <string name="pref_oepl_weather_quiet_end_title">Quiet until</string>
     <string name="pref_oepl_weather_forecast_days_title">Forecast days</string>
     <string name="pref_oepl_weather_accent_title">Accent colour</string>
     <string name="pref_oepl_weather_accent_summary">The second colour of the panel next to black and white</string>

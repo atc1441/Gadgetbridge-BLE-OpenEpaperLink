@@ -41,7 +41,17 @@
         <item>1 Stunde</item>
         <item>2 Stunden</item>
         <item>4 Stunden</item>
+        <item>8 Stunden</item>
         <item>12 Stunden</item>
+        <item>24 Stunden</item>
+    </string-array>
+    <string-array name="oepl_weather_catch_up">
+        <item>5 Minuten</item>
+        <item>10 Minuten</item>
+        <item>15 Minuten</item>
+        <item>30 Minuten</item>
+        <item>1 Stunde</item>
+        <item>2 Stunden</item>
     </string-array>
     <string-array name="oepl_weather_connect_window">
         <item>10 Sekunden</item>

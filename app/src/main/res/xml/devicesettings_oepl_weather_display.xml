@@ -353,13 +353,40 @@
             android:key="pref_oepl_weather_screen_updates"
             android:title="@string/pref_oepl_weather_screen_updates">
             <ListPreference
-                android:defaultValue="15"
+                android:defaultValue="60"
                 android:entries="@array/oepl_weather_update_interval"
                 android:entryValues="@array/oepl_weather_update_interval_values"
                 android:key="pref_oepl_weather_update_interval"
                 android:title="@string/pref_oepl_weather_update_interval_title"
                 android:summary="@string/pref_oepl_weather_update_interval_summary"
                 app:useSimpleSummaryProvider="true" />
+            <ListPreference
+                android:defaultValue="15"
+                android:entries="@array/oepl_weather_catch_up"
+                android:entryValues="@array/oepl_weather_catch_up_values"
+                android:key="pref_oepl_weather_catch_up"
+                android:title="@string/pref_oepl_weather_catch_up_title"
+                android:summary="@string/pref_oepl_weather_catch_up_summary"
+                app:useSimpleSummaryProvider="true" />
+
+            <PreferenceCategory android:title="@string/pref_oepl_weather_category_quiet">
+                <SwitchPreferenceCompat
+                    android:defaultValue="false"
+                    android:key="pref_oepl_weather_quiet"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_oepl_weather_quiet_title"
+                    android:summary="@string/pref_oepl_weather_quiet_summary" />
+                <nodomain.freeyourgadget.gadgetbridge.util.XTimePreference
+                    android:defaultValue="22:00"
+                    android:dependency="pref_oepl_weather_quiet"
+                    android:key="pref_oepl_weather_quiet_start"
+                    android:title="@string/pref_oepl_weather_quiet_start_title" />
+                <nodomain.freeyourgadget.gadgetbridge.util.XTimePreference
+                    android:defaultValue="07:00"
+                    android:dependency="pref_oepl_weather_quiet"
+                    android:key="pref_oepl_weather_quiet_end"
+                    android:title="@string/pref_oepl_weather_quiet_end_title" />
+            </PreferenceCategory>
 
             <PreferenceCategory android:title="@string/pref_oepl_weather_category_live">
                 <SwitchPreferenceCompat

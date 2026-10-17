@@ -45,6 +45,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.HomeAssistantClient;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLQuietHours;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLTagTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLUpdateScheduler;
@@ -251,6 +252,11 @@ public class ATCBLEOEPLWeatherInfoActivity extends AbstractGBActivity {
 
         final int interval = OEPLPrefs.updateIntervalMinutes(p);
         row(getString(R.string.oepl_info_interval), interval + " min");
+        row(getString(R.string.oepl_info_catch_up), OEPLPrefs.catchUpMinutes(p) + " min");
+        final String quiet = OEPLQuietHours.describe(p);
+        if (!quiet.isEmpty()) {
+            row(getString(R.string.oepl_info_quiet), quiet);
+        }
 
         final long due = p.getLong(OEPLStatusStore.NEXT_DUE_MILLIS, 0L);
         if (due > 0) {

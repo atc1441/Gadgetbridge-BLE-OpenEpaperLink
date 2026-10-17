@@ -195,7 +195,7 @@ cannot drift apart.
 | **Home Assistant** | address, access token, the entities to show |
 | **Four quarters** | which card goes into each of the four slots |
 | **Appearance** | frame, accent colour, rotation, status strip, invert |
-| **Updates** | interval, live updates and their minimum gap, connection attempts, reachability |
+| **Updates** | interval, catch-up gap, quiet hours, live updates and their minimum gap, connection attempts, reachability |
 | **Power and radio** | keep connection open, advertising interval, OEPL protocol flag |
 | **Hardware** | read the configuration from the display, display type, display commands, firmware |
 
@@ -394,6 +394,15 @@ reach. A transfer that breaks off halfway is the ordinary case rather than a fau
 keeps the firmware it has, and the firmware itself picks a transfer up where it stopped. Asking
 again gives a display another three goes.
 
+**The card comes back by itself afterwards.** A display that has just been written a firmware is
+showing whatever the new firmware drew on its panel, and nothing but another transfer will change
+that. So a minute after the firmware is confirmed — long enough for the tag to restart, bring its
+panel up and start advertising again — the display is fetched once more and its own card is drawn
+onto it. The cached checksum is dropped for it, because it still describes a picture the panel no
+longer has and would otherwise make the push decide there was nothing to send, and this redraw
+ignores both the interval and the quiet hours: a display set to refresh once a day would
+otherwise stand there showing the firmware's parting words until tomorrow.
+
 **Send to sleep.** The display writes `Sleeping` on its panel, stops its radio and goes quiet —
 what a display being stored away or shipped wants. It then cannot be reached at all. It comes
 back when its NFC coil picks up a field, so holding a phone against it is enough, or when the
@@ -475,10 +484,22 @@ is nothing in the diary.
 A tag is awake for a few seconds at a time and asleep in between, and Android is not keen on
 letting an app do anything in the background. The schedule is built around both:
 
-- **Every fifteen minutes by default**, settable from 5 minutes to 12 hours. An update whose
-  picture turns out to be the same as the one already on the panel never opens a connection at
-  all, so a short interval costs the cell nothing on a card that has not changed - and keeps a
-  clock, a reading or an appointment from standing there wrong for an hour.
+- **Every hour by default**, settable from 5 minutes to a whole day. An update whose picture
+  turns out to be the same as the one already on the panel never opens a connection at all, so
+  the interval costs the cell nothing on a card that has not changed. It is deliberately not a
+  short one: what makes a display look current is not the interval but the catch-up gap below.
+- **A catch-up gap, a quarter of an hour by default.** The interval says how often a picture is
+  owed; this says how often an owed picture is tried for. They are different questions, and
+  keeping them apart is what makes a daily interval usable: an afternoon in town does not cost
+  the picture until tomorrow, because from the moment it is owed the display is asked again
+  every quarter of an hour until it takes one. The retry ladder below is the first few of those
+  asks; this is the gap it settles on. A display that is simply up to date is not touched at
+  all until its interval comes round.
+- **Quiet hours**, off until they are switched on, 22:00 to 07:00 when they are. No updates
+  between the two times - and nothing is lost by it: what falls due in between is held, not
+  skipped, and goes out the moment the window ends. A command, a firmware and an update asked
+  for by hand all ignore the window, as does the redraw that follows a firmware; somebody
+  standing in front of the display at midnight means it.
 - **An exact alarm per display**, armed with `setAndAllowWhileIdle`, rather than WorkManager.
   Deferrable background work is how updates used to arrive hours late or not at all.
 - **The content is refreshed before the radio comes up**, never after. The tag hangs up by
@@ -489,8 +510,12 @@ letting an app do anything in the background. The schedule is built around both:
   makes three attempts before it gives up.
 - **A wake lock is held across the attempt and the transfer**, so the phone cannot fall asleep
   halfway through and strand the picture.
-- **A retry ladder** of 60 s, 2, 5, 10, 20, 30 minutes for runs that lead nowhere, never longer
-  than the configured interval.
+- **A retry ladder** of 60 s, 2, 5, 10, 20 minutes for runs that lead nowhere, settling on the
+  catch-up gap and never longer than the configured interval. A display that has been missing
+  for about twenty minutes is probed with one connection attempt instead of three: the several
+  attempts are there for a display that is present but was between two advertisements, while
+  one that is not in the flat at all answers the same way three times as expensively. The gap
+  between probes does not change, so nothing comes back any later.
 - **An opportunistic background scan**, registered with the Bluetooth controller so it is the
   chip and not the app that watches for the tag. An overdue picture goes out the moment the tag
   is heard. Only used where the controller can batch scans in hardware.

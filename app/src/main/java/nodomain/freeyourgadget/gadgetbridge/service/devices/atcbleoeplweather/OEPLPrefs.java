@@ -51,6 +51,12 @@ public final class OEPLPrefs {
     public static final String PREF_FRAME = "pref_oepl_weather_frame";
     public static final String PREF_LIVE_UPDATES = "pref_oepl_weather_live_updates";
     public static final String PREF_MIN_GAP = "pref_oepl_weather_min_gap";
+    /** How often an update that could not be delivered is tried again until it works. */
+    public static final String PREF_CATCH_UP = "pref_oepl_weather_catch_up";
+    /** The hours in which the display is left alone; see {@link OEPLQuietHours}. */
+    public static final String PREF_QUIET = "pref_oepl_weather_quiet";
+    public static final String PREF_QUIET_START = "pref_oepl_weather_quiet_start";
+    public static final String PREF_QUIET_END = "pref_oepl_weather_quiet_end";
     public static final String PREF_WEATHER_SOURCE = "pref_oepl_weather_source";
     public static final String PREF_WEATHER_LOCATION = "pref_oepl_weather_location";
     // how hard the app tries to reach the display on its own
@@ -152,6 +158,10 @@ public final class OEPLPrefs {
             PREF_ROTATION,
             PREF_INVERT,
             PREF_UPDATE_INTERVAL,
+            PREF_CATCH_UP,
+            PREF_QUIET,
+            PREF_QUIET_START,
+            PREF_QUIET_END,
             PREF_LIVE_UPDATES,
             PREF_MIN_GAP,
             PREF_CONNECT_WINDOW,
@@ -199,13 +209,39 @@ public final class OEPLPrefs {
     }
 
     /**
-     * How often a new picture is drawn and offered to the tag. Fifteen minutes by default: an
-     * update only costs a connection when the picture has actually changed and the display is
-     * in range, so a short interval mostly buys a clock and a current reading that are right,
-     * and a card that waits an hour for a changed appointment is of little use.
+     * How often a new picture is drawn and offered to the tag. An hour by default: a weather
+     * card, a forecast and an agenda are all things that change on the scale of hours, an
+     * update only costs a connection when the picture has actually changed, and what makes a
+     * display feel current is not a short interval but the catch-up gap below - a picture goes
+     * out the moment the display is within reach, whichever hour that happens to be.
      */
     public static int updateIntervalMinutes(final SharedPreferences prefs) {
-        return parseInt(prefs.getString(PREF_UPDATE_INTERVAL, "15"), 15);
+        return parseInt(prefs.getString(PREF_UPDATE_INTERVAL, "60"), 60);
+    }
+
+    /** The same figure as a duration, never zero, so it can be added to a point in time. */
+    public static long updateIntervalMillis(final SharedPreferences prefs) {
+        return Math.max(1, updateIntervalMinutes(prefs)) * 60_000L;
+    }
+
+    /**
+     * How long the scheduler waits between two attempts while an update is owed and has not
+     * got through - because the display was out of range, because the phone was elsewhere, or
+     * because the night was quiet and the morning has only just started.
+     * <p>
+     * This is what makes a long interval usable. A display set to once a day must not mean that
+     * a day in town costs the picture until tomorrow: the moment it is owed, the gap between
+     * attempts stops following the interval and follows this instead, which is why fifteen
+     * minutes is the default. The ladder in the scheduler still starts within the minute, so a
+     * tag that was merely asleep is caught at once; this is only the floor it settles on.
+     */
+    public static int catchUpMinutes(final SharedPreferences prefs) {
+        final int minutes = parseInt(prefs.getString(PREF_CATCH_UP, "15"), 15);
+        return Math.max(1, Math.min(240, minutes));
+    }
+
+    public static long catchUpMillis(final SharedPreferences prefs) {
+        return catchUpMinutes(prefs) * 60_000L;
     }
 
     /** Rotation in degrees, or -1 when it should be taken from the display type. */

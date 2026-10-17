@@ -88,6 +88,8 @@ public final class OEPLUpdateScheduler {
     public static final String REASON_BOOT = "boot";
     public static final String REASON_BLUETOOTH = "bluetooth";
     public static final String REASON_FOLLOW_UP = "follow-up";
+    /** Putting the card back on a display whose firmware has just been replaced. */
+    public static final String REASON_RESTORE = "restore";
 
     /**
      * How long a run may spend fetching content before the radio comes up. Everything happens
@@ -106,6 +108,19 @@ public final class OEPLUpdateScheduler {
      * not in range at all and there is nothing to be gained from asking every minute all day.
      */
     private static final int[] RETRY_SECONDS = {60, 120, 300, 600, 1200, 1800};
+    /**
+     * After this many fruitless attempts in a row, a probe is made with a single connection
+     * attempt rather than the configured number.
+     * <p>
+     * Several attempts in one run are there for a display that is present but was between two
+     * advertisements, and they are worth their cost for exactly that. A display that has been
+     * missing for twenty minutes is in all likelihood not in the flat at all, and since an
+     * attempt that finds nobody costs the full connection window, three of them cost three
+     * times as much battery for the same answer. The gap between probes does not change, so
+     * nothing comes back any later; the first one that gets through clears the counter and the
+     * full number of attempts is back.
+     */
+    private static final int LONE_ATTEMPT_AFTER = 4;
     /** Only used when the tag has to be heard before connecting, which is not the default. */
     private static final long SCAN_MILLIS = 20_000L;
     /** Lets the Bluetooth stack settle between two connection attempts. */
@@ -139,6 +154,16 @@ public final class OEPLUpdateScheduler {
         registerAdvertisementScan(context, device.getAddress());
     }
 
+    /** Which of the three questions an arming answers; see {@link #dueAt}. */
+    private enum When {
+        /** A cycle finished, so the next one is one interval after it. */
+        PLANNED,
+        /** An attempt led nowhere, so come back on the ladder. */
+        RETRY,
+        /** There was nothing to send at all, so do not keep asking. */
+        IDLE
+    }
+
     /**
      * Works out when the next picture is due and arms the alarm for it.
      *
@@ -146,20 +171,24 @@ public final class OEPLUpdateScheduler {
      */
     public static void armNext(final Context context, final String address,
                                final boolean afterFailure) {
+        armNext(context, address, afterFailure ? When.RETRY : When.PLANNED);
+    }
+
+    /**
+     * Comes back after a whole interval and no sooner, for a run that found nothing to send: a
+     * picture card without a picture is not a display that is failing, and asking it again every
+     * minute would cost the phone's battery for a display that is working perfectly.
+     */
+    public static void armIdle(final Context context, final String address) {
+        armNext(context, address, When.IDLE);
+    }
+
+    private static void armNext(final Context context, final String address, final When when) {
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
         final long now = System.currentTimeMillis();
-        final long interval = Math.max(1, OEPLPrefs.updateIntervalMinutes(prefs)) * 60_000L;
-
-        final long due;
-        if (afterFailure) {
-            final int failures = prefs.getInt(OEPLStatusStore.CONSECUTIVE_FAILURES, 1);
-            final int step = Math.min(failures, RETRY_SECONDS.length) - 1;
-            final long retry = Math.min(interval, RETRY_SECONDS[Math.max(0, step)] * 1000L);
-            due = now + retry;
-        } else {
-            final long lastRun = prefs.getLong(OEPLStatusStore.LAST_RUN_MILLIS, 0L);
-            due = Math.max(now + MIN_DELAY_MILLIS, lastRun + interval);
-        }
+        final long planned = dueAt(prefs, now, when);
+        // and never inside the quiet window: what fell due in the night waits for the morning
+        final long due = OEPLQuietHours.shift(prefs, planned);
 
         final AlarmManager alarms =
                 (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -170,11 +199,44 @@ public final class OEPLUpdateScheduler {
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due,
                     updateIntent(context, address, REASON_TIMER));
             prefs.edit().putLong(OEPLStatusStore.NEXT_DUE_MILLIS, due).apply();
-            LOG.info("{} is due again in {} s{}", address, (due - now) / 1000,
-                    afterFailure ? " (retry)" : "");
+            LOG.info("{} is due again in {} s ({}{})", address, (due - now) / 1000,
+                    when.name().toLowerCase(java.util.Locale.ROOT),
+                    due != planned ? ", after the quiet hours" : "");
         } catch (final Exception e) {
             LOG.error("could not arm the update alarm for {}", address, e);
         }
+    }
+
+    /**
+     * When the next attempt should happen, before the quiet window gets a say.
+     * <p>
+     * The retry ladder is the interesting part. It starts within the minute, because the usual
+     * reason an attempt leads nowhere is that the tag was between two advertisements, and climbs
+     * from there - but it stops climbing at the catch-up gap rather than at the interval. That
+     * is what lets the interval be a day: a display that owes a picture is asked again every
+     * quarter of an hour until it takes one, instead of being written off until tomorrow, while
+     * a display that is simply up to date is not touched at all for twenty-four hours. The
+     * interval still caps it as well, so a five minute display is never left waiting longer
+     * than its own interval.
+     */
+    private static long dueAt(final SharedPreferences prefs, final long now, final When when) {
+        final long interval = OEPLPrefs.updateIntervalMillis(prefs);
+        if (when == When.IDLE) {
+            return now + Math.max(MIN_DELAY_MILLIS, interval);
+        }
+        if (when == When.PLANNED) {
+            final long lastRun = prefs.getLong(OEPLStatusStore.LAST_RUN_MILLIS, 0L);
+            return Math.max(now + MIN_DELAY_MILLIS, lastRun + interval);
+        }
+        final long catchUp = OEPLPrefs.catchUpMillis(prefs);
+        final int failures = prefs.getInt(OEPLStatusStore.CONSECUTIVE_FAILURES, 1);
+        final int step = Math.min(Math.max(1, failures), RETRY_SECONDS.length) - 1;
+        // the top of the ladder is the catch-up gap itself, so that is what it settles on; the
+        // steps below it are the quick first looks, and none of them is ever slower than it
+        final long ladder = step >= RETRY_SECONDS.length - 1
+                ? catchUp
+                : Math.min(RETRY_SECONDS[step] * 1000L, catchUp);
+        return now + Math.max(MIN_DELAY_MILLIS, Math.min(ladder, interval));
     }
 
     /**
@@ -190,11 +252,18 @@ public final class OEPLUpdateScheduler {
         if (!OEPLPrefs.liveUpdates(prefs)) {
             return;
         }
+        if (OEPLQuietHours.covers(prefs, System.currentTimeMillis())) {
+            // a message arriving at two in the morning is not worth a panel flashing in a dark
+            // room; the alarm for the end of the window is already armed and will carry it
+            LOG.debug("{} is in its quiet hours, not pushing a live update",
+                    device.getAddress());
+            return;
+        }
         final long since = System.currentTimeMillis()
                 - prefs.getLong(OEPLPrefs.LAST_UPDATE_MILLIS, 0L);
         final long gap = OEPLPrefs.minGapMinutes(prefs) * 60_000L;
         final long delay = Math.max(LIVE_COALESCE_MILLIS, gap - since);
-        armIn(context, device.getAddress(), delay, REASON_LIVE);
+        armIn(context, device.getAddress(), delay, REASON_LIVE, true);
     }
 
     /** The user asked for it, so go now and do not wait for anything. */
@@ -212,20 +281,39 @@ public final class OEPLUpdateScheduler {
      */
     public static void requestFollowUp(final Context context, final String address,
                                        final long delayMillis) {
-        armIn(context, address, Math.max(MIN_DELAY_MILLIS, delayMillis), REASON_FOLLOW_UP);
+        armIn(context, address, Math.max(MIN_DELAY_MILLIS, delayMillis), REASON_FOLLOW_UP, true);
+    }
+
+    /**
+     * Comes back to put the card on a display that has just been written a firmware.
+     * <p>
+     * This one is not held by the quiet hours. Replacing a firmware is something somebody asked
+     * for, it leaves the panel showing whatever the new firmware drew on it, and a display left
+     * like that until seven in the morning would be a worse night than the one the quiet hours
+     * are meant to protect.
+     */
+    public static void requestRestore(final Context context, final String address,
+                                      final long delayMillis) {
+        armIn(context, address, Math.max(MIN_DELAY_MILLIS, delayMillis), REASON_RESTORE, false);
     }
 
     private static void armIn(final Context context, final String address, final long delayMillis,
-                              final String reason) {
+                              final String reason, final boolean quietMatters) {
         final AlarmManager alarms =
                 (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) {
             return;
         }
-        final long due = System.currentTimeMillis() + Math.max(1000L, delayMillis);
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+        final long asked = System.currentTimeMillis() + Math.max(1000L, delayMillis);
+        final long due = quietMatters ? OEPLQuietHours.shift(prefs, asked) : asked;
         try {
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, due,
                     updateIntent(context, address, reason));
+            // the same pending intent as the interval alarm, so this one has replaced it and is
+            // now when the display is next due - which is also what tells an advertisement
+            // heard in the meantime that it is worth pushing straight away
+            prefs.edit().putLong(OEPLStatusStore.NEXT_DUE_MILLIS, due).apply();
             LOG.debug("{} update for {} armed in {} ms", reason, address, delayMillis);
         } catch (final Exception e) {
             LOG.error("could not arm a {} update for {}", reason, address, e);
@@ -314,6 +402,20 @@ public final class OEPLUpdateScheduler {
 
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
 
+        if (onlyTheClockAsksForThis(reason, prefs)
+                && OEPLQuietHours.covers(prefs, System.currentTimeMillis())) {
+            // the window is normally kept by the arming itself, so this catches what arrives
+            // from the outside while it lasts: an advertisement heard across the flat, a
+            // notification, an alarm that was armed before the window was moved
+            final long until = OEPLQuietHours.endOfWindow(prefs, System.currentTimeMillis());
+            LOG.info("{} is in its quiet hours, {} min to go", address,
+                    (until - System.currentTimeMillis()) / 60_000);
+            OEPLStatusStore.recordWaiting(address, "quiet until "
+                    + OEPLQuietHours.asTime(OEPLQuietHours.endMinute(prefs)));
+            armNext(context, address, false);
+            return;
+        }
+
         final String waitingFor = CardContentFactory.waitingForSource(prefs);
         if (waitingFor != null && !OEPLActions.pending(prefs)
                 && !OEPLFirmware.pending(prefs)) {
@@ -322,7 +424,7 @@ public final class OEPLUpdateScheduler {
             // and the picture is not.
             LOG.info("{} for {}, skipping this update", waitingFor, address);
             OEPLStatusStore.recordWaiting(address, waitingFor);
-            armNext(context, address, false);
+            armIdle(context, address);
             return;
         }
 
@@ -365,6 +467,22 @@ public final class OEPLUpdateScheduler {
         connectAndPush(context, device, reason);
     }
 
+    /**
+     * Whether this run is one the quiet window may hold back.
+     * <p>
+     * Only the automatic ones are: the timer, an advertisement that was heard, a notification
+     * that arrived, the schedule being restored. An update asked for by hand, a command and a
+     * firmware are not - somebody who presses a button at midnight means it, and a display that
+     * has been promised a new firmware should not have to wait for the morning to get it.
+     */
+    private static boolean onlyTheClockAsksForThis(final String reason,
+                                                   final SharedPreferences prefs) {
+        return !REASON_MANUAL.equals(reason)
+                && !REASON_RESTORE.equals(reason)
+                && !OEPLActions.pending(prefs)
+                && !OEPLFirmware.pending(prefs);
+    }
+
     // ------------------------------------------------------------------ reaching the tag
 
     /**
@@ -388,7 +506,7 @@ public final class OEPLUpdateScheduler {
         }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
         final long window = OEPLPrefs.connectWindowMillis(prefs);
-        final int attempts = OEPLPrefs.connectAttempts(prefs);
+        final int attempts = probeAttempts(prefs);
         final long budget = attempts * (window + CONNECT_GRACE_MILLIS + ATTEMPT_PAUSE_MILLIS)
                 + TRANSFER_BUDGET_MILLIS + 10_000L;
 
@@ -407,6 +525,13 @@ public final class OEPLUpdateScheduler {
         }, "oepl-connect");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    /** How hard this particular run tries; see {@link #LONE_ATTEMPT_AFTER}. */
+    static int probeAttempts(final SharedPreferences prefs) {
+        final int attempts = OEPLPrefs.connectAttempts(prefs);
+        return prefs.getInt(OEPLStatusStore.CONSECUTIVE_FAILURES, 0) >= LONE_ATTEMPT_AFTER
+                ? 1 : attempts;
     }
 
     private static void attemptLoop(final Context context, final GBDevice device,
@@ -580,10 +705,14 @@ public final class OEPLUpdateScheduler {
             return;
         }
 
-        // A quarter of the update interval: often enough that a picture is never much later than
-        // it should be, rare enough that the phone is barely woken for it.
-        final long interval = Math.max(1, OEPLPrefs.updateIntervalMinutes(prefs)) * 60_000L;
-        final long reportDelay = Math.max(2 * 60_000L, Math.min(10 * 60_000L, interval / 4));
+        // A quarter of the update interval, but never slower than the catch-up gap: often enough
+        // that a picture is never much later than it should be, rare enough that the phone is
+        // barely woken for it. The catch-up gap is what matters on a display set to once a day -
+        // this listening is how an owed picture goes out minutes after the front door, rather
+        // than at whatever hour the interval happens to come round.
+        final long interval = OEPLPrefs.updateIntervalMillis(prefs);
+        final long base = Math.min(interval / 4, OEPLPrefs.catchUpMillis(prefs));
+        final long reportDelay = Math.max(2 * 60_000L, Math.min(10 * 60_000L, base));
 
         final ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)

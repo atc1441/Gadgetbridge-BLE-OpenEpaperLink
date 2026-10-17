@@ -330,8 +330,10 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
                 left++;
             }
         }
-        GB.toast(getString(left == 0 ? R.string.oepl_firmware_all_done
-                : R.string.oepl_firmware_left, left), 4000, GB.INFO);
+        final String done = left == 0
+                ? getString(R.string.oepl_firmware_all_done)
+                : getString(R.string.oepl_firmware_left, left);
+        GB.toast(done, 4000, GB.INFO);
         refresh();
     }
 }

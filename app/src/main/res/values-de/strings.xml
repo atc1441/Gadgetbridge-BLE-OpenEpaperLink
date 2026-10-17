@@ -4598,6 +4598,8 @@
     <string name="oepl_info_firmware">Firmware</string>
     <string name="oepl_info_frame">Rahmen</string>
     <string name="oepl_info_interval">Aktualisiert alle</string>
+    <string name="oepl_info_catch_up">Nachholen alle</string>
+    <string name="oepl_info_quiet">Ruhephase</string>
     <string name="oepl_info_last_connect">Letzte Verbindung</string>
     <string name="oepl_info_last_picture">Bild angenommen</string>
     <string name="oepl_info_last_scan">Letzter Scan</string>
@@ -4785,6 +4787,13 @@
     <string name="pref_oepl_weather_stay_connected_summary">Kostet viel Akku am Display. Nur zum Ausprobieren sinnvoll</string>
     <string name="pref_oepl_weather_stay_connected_title">Verbindung offen halten</string>
     <string name="pref_oepl_weather_update_interval_summary">Das Display wird nur verbunden, wenn es in Reichweite ist und sich das Bild wirklich geändert hat</string>
+    <string name="pref_oepl_weather_catch_up_title">Nachholen alle</string>
+    <string name="pref_oepl_weather_catch_up_summary">Solange ein Update aussteht - das Display war außer Reichweite, das Handy woanders - wird es so oft erneut versucht, statt auf das nächste Intervall zu warten</string>
+    <string name="pref_oepl_weather_category_quiet">Ruhephase</string>
+    <string name="pref_oepl_weather_quiet_title">Nachts nicht aktualisieren</string>
+    <string name="pref_oepl_weather_quiet_summary">Zwischen diesen beiden Zeiten keine Updates. Was dazwischen fällig wird, wird direkt nach dem Ende der Ruhephase gezeigt und nicht erst am nächsten Tag</string>
+    <string name="pref_oepl_weather_quiet_start_title">Ruhe ab</string>
+    <string name="pref_oepl_weather_quiet_end_title">Ruhe bis</string>
     <string name="pref_oepl_weather_update_interval_title">Aktualisierungsintervall</string>
     <string name="pref_oepl_weather_wind_unit_title">Windeinheit</string>
 

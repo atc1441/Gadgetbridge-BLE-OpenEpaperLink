@@ -934,6 +934,9 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         } else {
             OEPLUpdateScheduler.noteFailure(getContext(), getDevice().getAddress());
         }
+        if (transferIsFirmware && success) {
+            drawAgainAfterFirmware();
+        }
         payload = null;
         blockData = null;
         blockCount = -1;
@@ -973,6 +976,33 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             OEPLStatusStore.recordCommand(address, "firmware " + reason
                     + ", try " + OEPLFirmware.tries(prefs) + " of " + OEPLFirmware.MAX_TRIES);
         }
+    }
+
+    /**
+     * How long the display is left alone after a firmware has been written, before the card is
+     * put back on it. The tag restarts into the new firmware, brings its panel up and starts
+     * advertising again, none of which it can do while being talked to.
+     */
+    private static final long FIRMWARE_SETTLE_MILLIS = 60_000L;
+
+    /**
+     * Puts the display's own card back after a firmware update.
+     * <p>
+     * A tag that has just been written to shows whatever the new firmware put on its panel,
+     * which is not the card it is meant to show, and nothing but a new transfer will change
+     * that. Two things are needed for it: the cached checksum has to go, because it still
+     * describes a picture the panel no longer has and would make the next push decide there was
+     * nothing to send, and the schedule has to come back in a minute rather than at the end of
+     * the interval - a display set to refresh once a day would otherwise sit there showing the
+     * firmware's parting words until tomorrow.
+     */
+    private void drawAgainAfterFirmware() {
+        final String address = getDevice().getAddress();
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .putLong(OEPLPrefs.LAST_IMAGE_CRC, 0L).apply();
+        LOG.info("{} has the new firmware, putting its card back in {} s", address,
+                FIRMWARE_SETTLE_MILLIS / 1000);
+        OEPLUpdateScheduler.requestRestore(getContext(), address, FIRMWARE_SETTLE_MILLIS);
     }
 
     /**
@@ -1101,6 +1131,12 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             if (!content.contains(relevantContent)) {
                 return;
             }
+            if (OEPLQuietHours.covers(prefs, System.currentTimeMillis())) {
+                // the quiet hours are kept here as well, because a display that is being held
+                // open would otherwise redraw all night on whatever arrives on the phone
+                LOG.debug("quiet hours, leaving the panel as it is");
+                return;
+            }
             if (getDevice().isInitialized()) {
                 pushUpdateIfNeeded();
             } else {
@@ -1113,8 +1149,14 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
 
     @Override
     public void onSendWeather() {
-        // fresh weather is the whole point of this device, so go and show it
+        // fresh weather is the whole point of this device, so go and show it - unless the
+        // display is in its quiet hours, where a forecast nobody is awake to read can wait
         forced = false;
+        if (OEPLQuietHours.covers(
+                GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()),
+                System.currentTimeMillis())) {
+            return;
+        }
         if (getDevice().isInitialized()) {
             pushUpdateIfNeeded();
         } else {
@@ -1168,10 +1210,15 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
 
         if (OEPLPrefs.PREF_UPDATE_INTERVAL.equals(config)
+                || OEPLPrefs.PREF_CATCH_UP.equals(config)
+                || OEPLPrefs.PREF_QUIET.equals(config)
+                || OEPLPrefs.PREF_QUIET_START.equals(config)
+                || OEPLPrefs.PREF_QUIET_END.equals(config)
                 || OEPLPrefs.PREF_OPPORTUNISTIC.equals(config)
                 || OEPLPrefs.PREF_REQUIRE_ADVERTISEMENT.equals(config)) {
             // the interval decides how often the controller reports what it heard, so the
-            // background listening has to be registered again with the new figure
+            // background listening has to be registered again with the new figure, and a
+            // changed quiet window has to move the alarm that is already armed
             OEPLUpdateScheduler.reschedule(getContext(), getDevice());
             return;
         }
