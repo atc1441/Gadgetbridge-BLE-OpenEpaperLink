@@ -96,16 +96,92 @@ public class OeplFirmwareRolloutTest {
 
     /** Arming again starts the attempts over: the user asking a second time means try again. */
     @Test
-    public void askingAgainGivesItAnotherThreeGoes() {
+    public void askingAgainGivesItAnotherFullSetOfGoes() {
         OEPLFirmware.arm(HALL, FILE);
-        OEPLFirmware.noteAttempt(HALL);
-        OEPLFirmware.noteAttempt(HALL);
-        OEPLFirmware.noteAttempt(HALL);
+        for (int attempt = 0; attempt < OEPLFirmware.MAX_TRIES; attempt++) {
+            OEPLFirmware.noteAttempt(HALL);
+        }
         assertTrue(OEPLFirmware.exhausted(display(HALL)));
 
         OEPLFirmware.arm(HALL, FILE);
         assertFalse(OEPLFirmware.exhausted(display(HALL)));
         assertEquals(0, OEPLFirmware.tries(display(HALL)));
+    }
+
+    /**
+     * Recovery, which is the other half of picking a transfer up where it stopped.
+     * <p>
+     * A display writes an update in blocks and keeps its own place in that sequence. If one
+     * block arrives wrong it can be left asking for parts that no longer line up with the file,
+     * and then the transfer neither finishes nor fails: it goes on asking on every connection.
+     * A note that only ever gives up at the end of a transfer would stand in front of
+     * everything else that display is asked to do for ever, so the attempts are read before a
+     * connection is spent on them, and five of them are the end of it.
+     */
+    @Test
+    public void aFirmwareThatNeverFinishesIsLetGoOfRatherThanBlockingTheDisplay() {
+        assertEquals("five goes, as asked for", 5, OEPLFirmware.MAX_TRIES);
+        OEPLFirmware.arm(HALL, FILE);
+        display(HALL).edit().putLong(OEPLPrefs.LAST_IMAGE_CRC, 0x1234L).apply();
+
+        for (int attempt = 1; attempt < OEPLFirmware.MAX_TRIES; attempt++) {
+            OEPLFirmware.noteAttempt(HALL);
+            assertTrue("given up on after " + attempt + " hangs",
+                    OEPLFirmware.worthTrying(display(HALL)));
+        }
+        OEPLFirmware.noteAttempt(HALL);
+
+        assertTrue("the note is still there to be reported on",
+                OEPLFirmware.pending(display(HALL)));
+        assertFalse("but nothing may be spent on it any more",
+                OEPLFirmware.worthTrying(display(HALL)));
+    }
+
+    /**
+     * Letting go of it has to put the display back to work, and that takes more than removing
+     * the note: a transfer that broke off halfway may have left something else on the panel, so
+     * the checksum that claims the panel shows the last card has to go too, or the next push
+     * decides there is nothing to send and the display keeps showing the wreckage.
+     */
+    @Test
+    public void droppingTheNoteAlsoBringsTheCardBack() {
+        OEPLFirmware.arm(HALL, FILE);
+        display(HALL).edit().putLong(OEPLPrefs.LAST_IMAGE_CRC, 0x1234L).apply();
+
+        OEPLFirmware.giveUp(HALL);
+
+        assertFalse(OEPLFirmware.pending(display(HALL)));
+        assertEquals("the panel is not known to show anything any more",
+                0L, display(HALL).getLong(OEPLPrefs.LAST_IMAGE_CRC, -1L));
+        assertEquals(0, OEPLFirmware.tries(display(HALL)));
+    }
+
+    /**
+     * What actually cures the stuck display, found the hard way on a 4.2": a restart. So from
+     * the second attempt on, the connection before each firmware attempt is spent on one -
+     * once per attempt, never twice for the same one, and never before the first attempt.
+     */
+    @Test
+    public void theDisplayIsRestartedBeforeItIsOfferedTheSameFirmwareAgain() {
+        OEPLFirmware.arm(HALL, FILE);
+        assertFalse("the first attempt has no reason to be anything but clean",
+                OEPLFirmware.wantsRestartFirst(display(HALL)));
+
+        OEPLFirmware.noteAttempt(HALL);
+        assertTrue("the second attempt gets a clear head first",
+                OEPLFirmware.wantsRestartFirst(display(HALL)));
+
+        OEPLFirmware.notedRestart(HALL);
+        assertFalse("and only one restart per attempt, not a loop of them",
+                OEPLFirmware.wantsRestartFirst(display(HALL)));
+
+        OEPLFirmware.noteAttempt(HALL);
+        assertTrue("the attempt after that one gets its own restart",
+                OEPLFirmware.wantsRestartFirst(display(HALL)));
+
+        // asking for the file again starts the whole arrangement over
+        OEPLFirmware.arm(HALL, FILE);
+        assertFalse(OEPLFirmware.wantsRestartFirst(display(HALL)));
     }
 
     /**
@@ -135,6 +211,6 @@ public class OeplFirmwareRolloutTest {
 
         OEPLFirmware.arm(HALL, FILE);
         assertTrue("the connection is the point, not the picture",
-                OEPLFirmware.pending(display(HALL)));
+                OEPLFirmware.worthTrying(display(HALL)));
     }
 }

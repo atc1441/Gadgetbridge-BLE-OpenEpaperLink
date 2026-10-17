@@ -418,7 +418,7 @@ public final class OEPLUpdateScheduler {
 
         final String waitingFor = CardContentFactory.waitingForSource(prefs);
         if (waitingFor != null && !OEPLActions.pending(prefs)
-                && !OEPLFirmware.pending(prefs)) {
+                && !OEPLFirmware.worthTrying(prefs)) {
             // not even worth waking the display for: there is nothing to put on it yet. Unless
             // it has been asked to blink or to go to sleep - then the connection is the point
             // and the picture is not.
@@ -432,7 +432,7 @@ public final class OEPLUpdateScheduler {
         // seconds of silence, so a picture must be ready to send the moment it answers. A run
         // that only carries a command sends no picture, so it skips all of this and gets on
         // with it - somebody is standing in front of the display waiting for it to blink.
-        if (!OEPLActions.pending(prefs) && !OEPLFirmware.pending(prefs)) {
+        if (!OEPLActions.pending(prefs) && !OEPLFirmware.worthTrying(prefs)) {
             try {
                 OEPLContentSync.freshen(prefs, WARMUP_BUDGET_MILLIS, address);
             } catch (final Exception e) {
@@ -480,7 +480,7 @@ public final class OEPLUpdateScheduler {
         return !REASON_MANUAL.equals(reason)
                 && !REASON_RESTORE.equals(reason)
                 && !OEPLActions.pending(prefs)
-                && !OEPLFirmware.pending(prefs);
+                && !OEPLFirmware.worthTrying(prefs);
     }
 
     // ------------------------------------------------------------------ reaching the tag

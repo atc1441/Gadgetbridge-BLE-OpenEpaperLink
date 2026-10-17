@@ -4689,6 +4689,12 @@
     <string name="oepl_firmware_all_done">Alle Displays haben die Firmware übernommen</string>
     <string name="oepl_firmware_left">%1$d Displays fehlen noch, sie werden beschrieben, sobald sie antworten</string>
     <string name="oepl_firmware_no_displays">Noch keine Wetterdisplays gekoppelt</string>
+    <string name="oepl_firmware_given_up">%1$s hat die Firmware in %2$d Versuchen nicht übernommen. Die eigene Firmware ist unberührt, der Inhalt kommt jetzt zurück.</string>
+    <string name="oepl_firmware_forget">Firmware-Vormerkung verwerfen</string>
+    <string name="oepl_firmware_forget_hint">Ein Display, das eine Firmware nicht übernimmt, wird nach fünf Versuchen von selbst aufgegeben. Das hier ist der Weg vorher: die Vormerkung verschwindet, das Display behält seine bisherige Firmware, und sein Inhalt kommt wieder aufs Panel.</string>
+    <string name="oepl_firmware_forget_confirm">Dem Display wird diese Firmware nicht mehr angeboten, es zeigt wieder seinen Inhalt. Die laufende Firmware behält es - eine Übertragung, die nicht komplett durchlief, hat daran nichts geändert. Weiter?</string>
+    <string name="oepl_firmware_forget_go">Verwerfen</string>
+    <string name="oepl_firmware_forgotten">Die Vormerkung ist weg. Der Inhalt kommt bei der nächsten Verbindung zurück.</string>
     <string name="oepl_firmware_note">Du kannst diesen Bildschirm verlassen. Ein Display, dem eine Firmware übergeben wurde, behält sie vorgemerkt und wird beim nächsten Kontakt beschrieben, bis zu drei Versuche; seine eigene Firmware bleibt stehen, bis eine Übertragung komplett durchgelaufen ist.</string>
     <string name="oepl_weather_accent_auto">Automatisch (aus dem Displaytyp)</string>
     <string name="oepl_weather_config_read">Konfiguration gelesen: %1$s, %2$dx%3$d, %4$d Farben</string>

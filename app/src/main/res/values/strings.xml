@@ -5472,6 +5472,12 @@
     <string name="oepl_firmware_all_done">Every display took the firmware</string>
     <string name="oepl_firmware_left">%1$d displays still to go, they are flashed as they answer</string>
     <string name="oepl_firmware_no_displays">No weather displays paired yet</string>
+    <string name="oepl_firmware_given_up">%1$s did not take the firmware in %2$d attempts. Its own firmware is untouched and its card comes back now.</string>
+    <string name="oepl_firmware_forget">Drop the firmware note</string>
+    <string name="oepl_firmware_forget_hint">A display that keeps failing to take a firmware is let go of by itself after five attempts. This is the way out before that: the note goes, the display keeps the firmware it has, and its card goes back on the panel.</string>
+    <string name="oepl_firmware_forget_confirm">The display stops being offered this firmware and goes back to showing its card. It keeps the firmware it is running - an update that did not get all the way through changed nothing on it. Carry on?</string>
+    <string name="oepl_firmware_forget_go">Drop it</string>
+    <string name="oepl_firmware_forgotten">The note is gone. The card goes back on at the next connection.</string>
     <string name="oepl_firmware_note">You can leave this screen. A display that has been handed a firmware keeps it noted down and is written the next time it is reachable, up to three attempts; its own firmware stays in place until a transfer gets all the way through.</string>
     <!-- the cards that follow the OpenEPaperLink layouts -->
     <string name="oepl_content_oepl_weather">OEPL: current weather</string>

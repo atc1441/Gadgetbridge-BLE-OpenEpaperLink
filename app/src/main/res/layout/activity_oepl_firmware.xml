@@ -72,6 +72,15 @@
             android:enabled="false"
             android:text="@string/oepl_firmware_title" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/oepl_firmware_forget"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/oepl_firmware_forget"
+            android:visibility="gone" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

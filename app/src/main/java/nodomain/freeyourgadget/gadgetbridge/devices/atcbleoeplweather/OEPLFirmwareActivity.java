@@ -83,6 +83,7 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
     private LinearLayout list;
     private TextView chosen;
     private Button distribute;
+    private Button forget;
 
     /** The displays on screen, by address, in the order they are listed. */
     private final Map<String, GBDevice> displays = new LinkedHashMap<>();
@@ -109,6 +110,13 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
         list = findViewById(R.id.oepl_firmware_list);
         chosen = findViewById(R.id.oepl_firmware_chosen);
         distribute = findViewById(R.id.oepl_firmware_distribute);
+        forget = findViewById(R.id.oepl_firmware_forget);
+        forget.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(R.string.oepl_firmware_forget)
+                .setMessage(R.string.oepl_firmware_forget_confirm)
+                .setPositiveButton(R.string.oepl_firmware_forget_go, (d, w) -> forgetAll())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show());
 
         findViewById(R.id.oepl_firmware_pick).setOnClickListener(v -> {
             try {
@@ -193,7 +201,46 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
         for (final Map.Entry<String, TextView> entry : details.entrySet()) {
             entry.getValue().setText(describe(entry.getKey()));
         }
+        forget.setVisibility(waiting().isEmpty() ? View.GONE : View.VISIBLE);
         updateButton();
+    }
+
+    /** The displays that are still owed a firmware, whether or not this screen handed it out. */
+    private List<String> waiting() {
+        final List<String> left = new ArrayList<>();
+        for (final String address : displays.keySet()) {
+            if (OEPLFirmware.pending(GBApplication.getDeviceSpecificSharedPrefs(address))) {
+                left.add(address);
+            }
+        }
+        return left;
+    }
+
+    /**
+     * Takes the note off every display that is still carrying one, and stops the rollout.
+     * <p>
+     * The counterpart to handing the file out: a file that turns out to be the wrong one for
+     * these displays would otherwise be offered to each of them for five more connections, with
+     * their cards standing still in the meantime.
+     */
+    private void forgetAll() {
+        handler.removeCallbacksAndMessages(null);
+        at = -1;
+        startedAt = 0L;
+        final List<String> waiting = waiting();
+        for (final String address : waiting) {
+            OEPLFirmware.giveUp(address);
+            final GBDevice display = displays.get(address);
+            if (display != null) {
+                OEPLUpdateScheduler.armNext(this, address, false);
+            }
+        }
+        for (final CheckBox box : boxes.values()) {
+            box.setEnabled(true);
+        }
+        LOG.info("dropped the firmware note of {} displays", waiting.size());
+        GB.toast(getString(R.string.oepl_firmware_forgotten), 4000, GB.INFO);
+        refresh();
     }
 
     private boolean anyUnticked() {

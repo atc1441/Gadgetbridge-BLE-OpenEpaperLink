@@ -43,8 +43,10 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLActions;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLFirmware;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLUpdateScheduler;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
@@ -126,6 +128,41 @@ public class OEPLToolsActivity extends AbstractGBActivity {
                 GB.toast(getString(R.string.oepl_image_no_picker), 3000, GB.ERROR);
             }
         });
+        findViewById(R.id.oepl_tools_firmware_forget).setOnClickListener(v ->
+                new AlertDialog.Builder(this)
+                        .setTitle(R.string.oepl_firmware_forget)
+                        .setMessage(R.string.oepl_firmware_forget_confirm)
+                        .setPositiveButton(R.string.oepl_firmware_forget_go,
+                                (d, w) -> forgetFirmware())
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show());
+        showFirmwareNote();
+    }
+
+    /**
+     * The way out of a firmware that will not go through.
+     * <p>
+     * A noted firmware takes precedence over a picture, because a transfer that was broken off
+     * is meant to be picked up again rather than abandoned - which is right until the display
+     * is one that will not take this file at all. Then the note is in the way of everything
+     * else, and this is the button that removes it. Five failed attempts remove it as well, but
+     * a display that is only reachable now and then can take days to get through five, and
+     * nobody should have to wait that out.
+     */
+    private void forgetFirmware() {
+        OEPLFirmware.giveUp(device.getAddress());
+        showFirmwareNote();
+        GB.toast(getString(R.string.oepl_firmware_forgotten), 4000, GB.INFO);
+        // and the card goes back on the panel rather than at the end of the interval
+        OEPLUpdateScheduler.requestUpdateNow(this, device);
+    }
+
+    /** The button only exists while there is a note to drop. */
+    private void showFirmwareNote() {
+        final boolean pending = OEPLFirmware.pending(prefs());
+        final int visibility = pending ? android.view.View.VISIBLE : android.view.View.GONE;
+        findViewById(R.id.oepl_tools_firmware_forget).setVisibility(visibility);
+        findViewById(R.id.oepl_tools_firmware_forget_hint).setVisibility(visibility);
     }
 
     @Override
@@ -133,6 +170,7 @@ public class OEPLToolsActivity extends AbstractGBActivity {
         super.onResume();
         LocalBroadcastManager.getInstance(this).registerReceiver(deviceChanged,
                 new IntentFilter(GBDevice.ACTION_DEVICE_CHANGED));
+        showFirmwareNote();
     }
 
     @Override

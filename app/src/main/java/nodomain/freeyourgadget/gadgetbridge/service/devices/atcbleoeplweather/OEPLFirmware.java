@@ -41,13 +41,16 @@ public final class OEPLFirmware {
     static final String PENDING_URI = "oepl_weather_firmware_uri";
     /** How often it has been tried, so a file this display will not take is given up on. */
     static final String PENDING_TRIES = "oepl_weather_firmware_tries";
+    /** The attempt number the display was last restarted at; see {@link #wantsRestartFirst}. */
+    static final String RESTARTED_AT = "oepl_weather_firmware_restarted_at";
 
     /**
-     * Three goes. A display out of range or short of battery deserves another attempt; a file
-     * its loader keeps refusing deserves to stop, rather than every connection for the rest of
-     * the week being spent on the same two hundred kilobytes.
+     * Five goes. A display out of range or short of battery deserves another attempt; a file
+     * its loader keeps refusing deserves to stop - rather than every connection for the rest of
+     * the week being spent on the same two hundred kilobytes, and rather than the note standing
+     * in front of everything else this display is asked to do.
      */
-    public static final int MAX_TRIES = 3;
+    public static final int MAX_TRIES = 5;
 
     private OEPLFirmware() {
     }
@@ -57,7 +60,35 @@ public final class OEPLFirmware {
         GBApplication.getDeviceSpecificSharedPrefs(address).edit()
                 .putString(PENDING_URI, uri)
                 .putInt(PENDING_TRIES, 0)
+                .remove(RESTARTED_AT)
                 .apply();
+    }
+
+    /**
+     * Whether the display should be restarted before it is offered the firmware again.
+     * <p>
+     * An update is written in blocks, and the display keeps its own place in that sequence so a
+     * transfer that breaks off can be picked up where it stopped. That is the right design and
+     * it is also where this gets stuck: if one block arrives wrong, the display can be left
+     * asking for parts that no longer line up with the file, and it will go on asking for them
+     * on every connection from then on. The transfer never finishes and never quite fails
+     * either, which is the state a display has to be restarted out of - taking the battery out
+     * cures it, and so does the restart command, which is the one thing that costs nothing to
+     * try.
+     * <p>
+     * So from the second attempt on, the connection before each firmware attempt is spent on a
+     * restart instead. Once per attempt, never twice for the same one, and never before the
+     * first attempt, which has no reason to be anything but clean.
+     */
+    public static boolean wantsRestartFirst(final SharedPreferences prefs) {
+        final int tries = tries(prefs);
+        return tries >= 1 && prefs.getInt(RESTARTED_AT, 0) < tries;
+    }
+
+    /** Remembers that the display was restarted for the attempt it has behind it. */
+    public static void notedRestart(final String address) {
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+        prefs.edit().putInt(RESTARTED_AT, tries(prefs)).apply();
     }
 
     @Nullable
@@ -92,6 +123,34 @@ public final class OEPLFirmware {
 
     public static boolean exhausted(final SharedPreferences prefs) {
         return tries(prefs) >= MAX_TRIES;
+    }
+
+    /**
+     * Whether this display is still owed a firmware that is worth trying. A note whose attempts
+     * are used up is not: it is on its way out, and until it is gone it must not be allowed to
+     * decide what a connection is for.
+     */
+    public static boolean worthTrying(final SharedPreferences prefs) {
+        return pending(prefs) && !exhausted(prefs);
+    }
+
+    /**
+     * Stops trying, and lets the display go back to being a display.
+     * <p>
+     * Two things have to happen for that, and the second is easy to miss. The note goes, so the
+     * next connection is an ordinary one again - and the cached checksum goes with it, because
+     * a transfer that broke off halfway may have left something else on the panel entirely. The
+     * checksum would still claim the panel shows the last card, the next push would decide
+     * there was nothing to send, and the display would sit there showing the wreckage of an
+     * update that never finished.
+     */
+    public static void giveUp(final String address) {
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .remove(PENDING_URI)
+                .remove(PENDING_TRIES)
+                .remove(RESTARTED_AT)
+                .putLong(OEPLPrefs.LAST_IMAGE_CRC, 0L)
+                .apply();
     }
 
     /**

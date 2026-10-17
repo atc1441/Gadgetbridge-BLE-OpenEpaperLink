@@ -175,19 +175,40 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         // what came back was a failed update rather than a restart that worked.
         final SharedPreferences own =
                 GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-        if (OEPLFirmware.pending(own)) {
+        // The commands come first, and that order is the way out of a firmware that will not
+        // go through. A firmware takes the whole link for minutes, so while one is noted down
+        // nothing else happens on a connection - which meant that a display stuck on a firmware
+        // could not be restarted, blinked at or drawn on, and the one thing that might clear
+        // the jam was the one thing that could not be asked for. A restart is three bytes and
+        // the connection is over with; the firmware gets the next one.
+        if (OEPLActions.pending(own)) {
+            commandSession = true;
+            commandSessionOver = false;
+            performPendingActions(builder);
+            return builder;
+        }
+        if (firmwareWorthTrying(own) && OEPLFirmware.wantsRestartFirst(own)) {
+            // The display is restarted before it is offered the same firmware again, because a
+            // transfer that went wrong once leaves it asking for parts that no longer line up
+            // with the file, and it will go on asking for them for ever. A restart clears that;
+            // the firmware itself is untouched by it, and the file is offered again a minute
+            // later. See OEPLFirmware.wantsRestartFirst.
+            OEPLFirmware.notedRestart(getDevice().getAddress());
+            OEPLActions.arm(own, OEPLActions.REBOOT);
+            commandSession = true;
+            commandSessionOver = false;
+            performPendingActions(builder);
+            OEPLUpdateScheduler.requestRestore(getContext(), getDevice().getAddress(),
+                    FIRMWARE_SETTLE_MILLIS);
+            return builder;
+        }
+        if (firmwareWorthTrying(own)) {
             // A firmware takes minutes and the whole link; everything else on this connection
             // would be in its way. Started from inside the queue so that the notifications are
             // already switched on when the first block is asked for.
             commandSession = true;
             commandSessionOver = true; // the transfer itself ends this connection
             builder.run(this::startArmedFirmware);
-            return builder;
-        }
-        if (OEPLActions.pending(own)) {
-            commandSession = true;
-            commandSessionOver = false;
-            performPendingActions(builder);
             return builder;
         }
 
@@ -265,6 +286,36 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
         builder.run(() -> commandSessionOver(what));
         renderExecutor.schedule(() -> commandSessionOver(what), 6, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Whether this connection should be spent on the firmware this display was handed - and the
+     * place where a firmware that keeps failing is finally let go of.
+     * <p>
+     * The attempts are counted when a transfer starts rather than when it ends, which is what
+     * makes this the right place to read them. A transfer that simply stops - the display
+     * carried off, a block that is never answered, the half-written state a display can get
+     * itself into after an error - never reaches the end where a failure would be noticed, so a
+     * note that is only ever examined on the way out would stand in front of every connection
+     * for ever. Here it is examined on the way in, and that is what makes it recoverable.
+     */
+    private boolean firmwareWorthTrying(final SharedPreferences prefs) {
+        if (!OEPLFirmware.pending(prefs)) {
+            return false;
+        }
+        if (!OEPLFirmware.exhausted(prefs)) {
+            return true;
+        }
+        final String address = getDevice().getAddress();
+        LOG.warn("{} did not take the firmware in {} attempts, dropping the note", address,
+                OEPLFirmware.MAX_TRIES);
+        OEPLFirmware.giveUp(address);
+        OEPLStatusStore.recordCommand(address,
+                "firmware gave up after " + OEPLFirmware.MAX_TRIES + " tries");
+        GB.toast(getContext().getString(R.string.oepl_firmware_given_up,
+                getDevice().getAliasOrName(), OEPLFirmware.MAX_TRIES), 5000, GB.WARN);
+        // and this connection carries on as an ordinary one, so the card goes back on the panel
+        return false;
     }
 
     /**
@@ -1023,6 +1074,11 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                     : String.format(Locale.ROOT, "no answer at block %d/%d part %d",
                             currentBlock + 1, blockCount, currentChunk);
             OEPLStatusStore.recordFailure(address, where);
+            if (transferIsFirmware) {
+                // on the record even though nothing ever came back, which is how a firmware
+                // that hangs rather than fails gets used up and eventually let go of
+                noteFirmwareOutcome(false, where);
+            }
             synchronized (ATCBLEOEPLWeatherDeviceSupport.this) {
                 payload = null;
                 blockData = null;

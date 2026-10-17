@@ -377,7 +377,8 @@ handed — so the file is checked here first: the mark the Telink toolchain leav
 and the length the image states about itself a little further on. A file that is not one of the
 shapes a firmware for these displays has is refused rather than tried. The transfer takes a few
 minutes and the display has to stay in reach for all of it; this is the one command that opens
-the connection itself and waits for it.
+the connection itself and waits for it. What to do when one will not go through is under
+*Distribute firmware* below, and applies to a single display just the same.
 
 **Distribute firmware.** The same thing for a whole shelf at once, on its own screen. A shelf of
 these displays is not one kind of display — they are built around more than one radio and bought
@@ -388,11 +389,34 @@ last happened to it, and which of them get the file is your choice. They are wri
 another, because a firmware takes the whole link for minutes.
 
 A display that is out of reach when its turn comes is not skipped. Each ticked display is handed
-a note, and the note stays until the display confirms the new firmware or three attempts are
-used up — so the screen can be left, and the remaining displays are written as they come within
+a note, and the note stays until the display confirms the new firmware or five attempts are used
+up — so the screen can be left, and the remaining displays are written as they come within
 reach. A transfer that breaks off halfway is the ordinary case rather than a fault: the display
 keeps the firmware it has, and the firmware itself picks a transfer up where it stopped. Asking
-again gives a display another three goes.
+again gives a display another five goes.
+
+**Getting a display unstuck.** Picking a transfer up where it stopped is the right design and it
+is also where this can jam: the display keeps its own place in the sequence of blocks, and if one
+block arrives wrong it can be left asking for parts that no longer line up with the file. Then
+the transfer neither finishes nor fails — it goes on asking on every connection. Three things
+are arranged around that:
+
+- **The commands come first.** While a firmware is noted down, nothing else happens on a
+  connection, which used to mean a display stuck on one could not be restarted, blinked at or
+  drawn on — the one thing that might clear the jam was the one thing that could not be asked
+  for. Now a blink, a restart or a sleep takes the connection it is asked on, and the firmware
+  gets the next one.
+- **A restart before each retry.** From the second attempt on, the connection before the
+  firmware attempt is spent on the restart command, once per attempt, and the file is offered
+  again a minute later. That is what cures the state: a restart leaves the firmware itself
+  untouched and resets where the display thinks it is in the transfer. Taking the battery out
+  does the same thing by hand.
+- **The attempts are read on the way in, not on the way out.** A transfer that simply stops
+  never reaches the end where a failure would be noticed, so the count is taken when an attempt
+  starts. After five the note is dropped by itself, the display is told so, and the same
+  connection goes on to put its card back. *Firmware-Vormerkung verwerfen* on the commands
+  screen does it immediately for one display, and the distributor has the same button for every
+  display still carrying a note.
 
 **The card comes back by itself afterwards.** A display that has just been written a firmware is
 showing whatever the new firmware drew on its panel, and nothing but another transfer will change
