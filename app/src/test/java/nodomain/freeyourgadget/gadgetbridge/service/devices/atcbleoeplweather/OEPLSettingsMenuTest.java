@@ -405,6 +405,7 @@ public class OEPLSettingsMenuTest {
                 OEPLPrefs.PREF_IMAGE_PICK,
                 OEPLPrefs.PREF_HA_PICK,
                 OEPLPrefs.PREF_READ_CONFIG,
+                OEPLPrefs.PREF_TOOLS,
                 "pref_oepl_weather_pick_design",
                 "pref_oepl_weather_info",
                 // the shared calendar settings, registered by the fragment for every device

@@ -315,8 +315,11 @@ public final class OEPLUpdateScheduler {
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
 
         final String waitingFor = CardContentFactory.waitingForSource(prefs);
-        if (waitingFor != null) {
-            // not even worth waking the display for: there is nothing to put on it yet
+        if (waitingFor != null && !OEPLActions.pending(prefs)
+                && !OEPLFirmware.pending(prefs)) {
+            // not even worth waking the display for: there is nothing to put on it yet. Unless
+            // it has been asked to blink or to go to sleep - then the connection is the point
+            // and the picture is not.
             LOG.info("{} for {}, skipping this update", waitingFor, address);
             OEPLStatusStore.recordWaiting(address, waitingFor);
             armNext(context, address, false);
@@ -324,11 +327,15 @@ public final class OEPLUpdateScheduler {
         }
 
         // Fetched before the link comes up, never after: the tag hangs up by itself after a few
-        // seconds of silence, so a picture must be ready to send the moment it answers.
-        try {
-            OEPLContentSync.freshen(prefs, WARMUP_BUDGET_MILLIS, address);
-        } catch (final Exception e) {
-            LOG.warn("content refresh failed, showing what we have", e);
+        // seconds of silence, so a picture must be ready to send the moment it answers. A run
+        // that only carries a command sends no picture, so it skips all of this and gets on
+        // with it - somebody is standing in front of the display waiting for it to blink.
+        if (!OEPLActions.pending(prefs) && !OEPLFirmware.pending(prefs)) {
+            try {
+                OEPLContentSync.freshen(prefs, WARMUP_BUDGET_MILLIS, address);
+            } catch (final Exception e) {
+                LOG.warn("content refresh failed, showing what we have", e);
+            }
         }
 
         // Listening first costs a few seconds and tells us whether the tag is there at all, but

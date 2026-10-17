@@ -17,14 +17,17 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.atcbleoeplweather;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Parcel;
 
+import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 
 import java.util.Collections;
 import java.util.Set;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
@@ -69,10 +72,42 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
     @Override
     public void onPreferenceChange(final Preference preference,
                                    final DeviceSpecificSettingsHandler handler) {
-        if (preference != null && OEPLPrefs.PREF_CONTENT.equals(preference.getKey())
-                && preference.getSharedPreferences() != null) {
+        if (preference == null || preference.getSharedPreferences() == null) {
+            return;
+        }
+        if (OEPLPrefs.PREF_CONTENT.equals(preference.getKey())) {
             apply(handler, preference.getSharedPreferences()
                     .getString(OEPLPrefs.PREF_CONTENT, DEFAULT_CONTENT));
+        }
+        if (OEPLPrefs.PREF_HA_URL.equals(preference.getKey())
+                || OEPLPrefs.PREF_HA_TOKEN.equals(preference.getKey())) {
+            OEPLPrefs.rememberHomeAssistant(preference.getSharedPreferences());
+        }
+    }
+
+    /**
+     * Fills in the Home Assistant address and token of a display that has never been told
+     * either, from the last display that was.
+     * <p>
+     * The values are written into this display's own settings rather than only being shown,
+     * because that is what they are: its settings, which happen to have been guessed well.
+     * Changing one of them afterwards changes this display and nothing else, and clearing one
+     * stays cleared. The fields are set on the screen as well, since the preferences read
+     * their stored value while the screen is being built, which is before this runs.
+     */
+    private void fillInHomeAssistant(final DeviceSpecificSettingsHandler handler) {
+        final EditTextPreference url = handler.findPreference(OEPLPrefs.PREF_HA_URL);
+        final EditTextPreference token = handler.findPreference(OEPLPrefs.PREF_HA_TOKEN);
+        final SharedPreferences prefs = url != null ? url.getSharedPreferences()
+                : GBApplication.getDeviceSpecificSharedPrefs(handler.getDevice().getAddress());
+        if (!OEPLPrefs.seedHomeAssistant(prefs)) {
+            return;
+        }
+        if (url != null) {
+            url.setText(OEPLPrefs.homeAssistantUrl(prefs));
+        }
+        if (token != null) {
+            token.setText(OEPLPrefs.homeAssistantToken(prefs));
         }
     }
 
@@ -155,6 +190,7 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
                     OEPLPrefs.liveUpdates(live.getSharedPreferences()));
         }
 
+        fillInHomeAssistant(handler);
         summaries(handler, content);
     }
 

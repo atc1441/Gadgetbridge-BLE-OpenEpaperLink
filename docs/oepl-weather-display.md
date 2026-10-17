@@ -197,7 +197,7 @@ cannot drift apart.
 | **Appearance** | frame, accent colour, rotation, status strip, invert |
 | **Updates** | interval, live updates and their minimum gap, connection attempts, reachability |
 | **Power and radio** | keep connection open, advertising interval, OEPL protocol flag |
-| **Hardware** | read the configuration from the display, display type |
+| **Hardware** | read the configuration from the display, display type, display commands, firmware |
 
 ### The month sheet
 
@@ -286,6 +286,18 @@ Two limits worth knowing: the phone has to be able to reach the instance when th
 (the same network, a VPN, or Nabu Casa), and a self-signed certificate only works if its
 authority is installed on the phone. On a home network, plain `http://` is the simple answer.
 
+**The token is typed once.** Steps 2 and 3 are per display, because two instances or a display
+that should read nothing at all have to stay possible - but there is normally one Home
+Assistant in a flat, and the token is a long piece of random text. So the address and the token
+last entered are remembered and written into the next display as its own starting values, at
+the moment it is paired, and they are there to be seen and changed under *Content → Home
+Assistant* like anything else that was typed by hand.
+
+It is a guess at what has not been decided yet, never a correction of what has: a display that
+was given its own address keeps it, and an address cleared on purpose stays cleared. Clearing
+one display also does not make the next one start out blank - the remembered pair only changes
+when something is actually entered.
+
 ### The picture cards
 
 The picture a display shows is its own: every display keeps its own choice, its own colour
@@ -339,6 +351,83 @@ so the boxes appear - and disappear again - without waiting for the next schedul
 display that is out of range gets its box the next time it is reached. The name is written
 before the card is turned into the panel buffer, so the corner is the one you are looking at,
 and the design picker shows the box too, which is the quickest way to see that the mode is on.
+
+### Display commands
+
+*Hardware → Display commands* holds the four things a display is told to do once, as opposed to
+the settings it is given. They are kept off the settings list on purpose: a settings screen is a
+place where every line can be tried out and undone, and two of these cannot.
+
+**Blink the LED.** Three flashes, five times over, in a colour you pick per display — the
+quickest way to point at one panel out of a shelf full of them, and the companion to the name
+tags above. The display runs the pattern itself and switches the light off again afterwards,
+which is the only way to make the LED do something that outlives the connection: switching it
+on plainly would be undone a second later, because the tag turns the LED off every time it goes
+back to sleep. For the same reason no pattern offered here runs forever — that would be a tag
+that never sleeps again and a coin cell gone by the morning. Not every one of these tags has an
+LED fitted; on one that has none, nothing happens.
+
+**Restart.** Reads the settings again and redraws the panel. This is also how a display that
+was sent to sleep is brought back.
+
+**Update the firmware.** Pick an `ATC_BLE_OEPL.bin` and it goes over the same block transfer a
+picture does, only marked as firmware, which is what makes the display write it into its own
+program memory and reboot into it. The display checks nothing itself — it runs what it is
+handed — so the file is checked here first: the mark the Telink toolchain leaves eight bytes in,
+and the length the image states about itself a little further on. A file that is not one of the
+shapes a firmware for these displays has is refused rather than tried. The transfer takes a few
+minutes and the display has to stay in reach for all of it; this is the one command that opens
+the connection itself and waits for it.
+
+**Distribute firmware.** The same thing for a whole shelf at once, on its own screen. A shelf of
+these displays is not one kind of display — they are built around more than one radio and bought
+at different times, so a file that belongs on one of them can be wrong for the next. Hence a list
+with boxes rather than a button: every paired display is listed with what it is, which firmware
+it reports (`FW v124`, read out of its advertisement, so no connection is needed for it) and what
+last happened to it, and which of them get the file is your choice. They are written one after
+another, because a firmware takes the whole link for minutes.
+
+A display that is out of reach when its turn comes is not skipped. Each ticked display is handed
+a note, and the note stays until the display confirms the new firmware or three attempts are
+used up — so the screen can be left, and the remaining displays are written as they come within
+reach. A transfer that breaks off halfway is the ordinary case rather than a fault: the display
+keeps the firmware it has, and the firmware itself picks a transfer up where it stopped. Asking
+again gives a display another three goes.
+
+**Send to sleep.** The display writes `Sleeping` on its panel, stops its radio and goes quiet —
+what a display being stored away or shipped wants. It then cannot be reached at all. It comes
+back when its NFC coil picks up a field, so holding a phone against it is enough, or when the
+battery is taken out and put back in.
+
+The first three are written into the display's own settings and carried out the next time it
+answers, which is normally a few seconds: asking for one also sends the scheduler to fetch the
+display. That is also why they are written down rather than remembered — the service is started
+and stopped around every connection, and a note in a field would be lost between the button and
+the display answering. Asking twice before it answers once is one blink, not two, and the two
+commands that end the connection are always sent last, so a display is never put to sleep before
+it has shown which one it is.
+
+**Whether the display took it is reported back.** Each of these commands is answered — the
+display either acknowledges it or says it has no such command, and both end up in the *Result*
+line of the info screen (`reboot ok`, `reboot not supported`, `reboot unanswered`) and as a
+short message on the phone. It is worth having because a restart is nearly invisible from the
+outside: the panel keeps the picture it had, so a working restart and a command that never
+arrived look identical. The commands were also added to the firmware over time, the restart last
+of all, so a display still running an older build simply has no such command — which is what the
+*not supported* answer is, and the firmware update on the same screen is the way out of it. On a
+display with an LED a real restart also shows itself: the boot sequence flicks the light red,
+green and blue for a tenth of a second each.
+
+**A connection opened for a command belongs to that command.** No hardware read, no picture, and
+the link is dropped as soon as the command has gone out; the forecast is not even fetched first,
+because nobody standing in front of a display waiting for it to blink is waiting for the
+weather. The restart is the case that made this necessary: the display reboots the moment it has
+the command, so a picture queued behind it was a transfer into a display that was no longer
+there — what came back was a failed update rather than a restart that worked. A command asked
+for while the display happens to be connected for a picture gives up that transfer rather than
+letting it time out, and the scheduler sends the picture again on its own. Either way the
+connection counts as a display that was reached, so the retry ladder does not climb and the
+transfer and failure tallies — which are about pictures — are left alone.
 
 ### The quartered card
 

@@ -205,6 +205,22 @@ public final class OEPLStatusStore {
                 .apply();
     }
 
+    /**
+     * A connection that existed to carry out a command rather than a picture.
+     * <p>
+     * It counts as a finished run even though nothing was drawn: the display was reached, which
+     * is what the retry ladder is about, and the scheduler is waiting for exactly this to stop
+     * holding its wake lock. It is kept out of the transfer and failure tallies, which are
+     * about pictures.
+     */
+    public static void recordCommand(final String address, final String what) {
+        prefs(address).edit().putString(LAST_RESULT, what)
+                .putLong(LAST_RESULT_MILLIS, System.currentTimeMillis())
+                .putLong(LAST_RUN_MILLIS, System.currentTimeMillis())
+                .putInt(CONSECUTIVE_FAILURES, 0)
+                .apply();
+    }
+
     /** The display already had this picture, so nothing was sent. */
     public static void recordUnchanged(final String address) {
         final SharedPreferences p = prefs(address);

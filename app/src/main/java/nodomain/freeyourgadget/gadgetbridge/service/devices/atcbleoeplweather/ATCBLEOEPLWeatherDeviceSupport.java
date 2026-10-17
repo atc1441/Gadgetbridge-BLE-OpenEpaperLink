@@ -99,6 +99,19 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
     private boolean firstConnection;
     /** True while a configuration read the user asked for is outstanding. */
     private boolean configReadRequested;
+    /** Set once this display has been told to go quiet, so nothing else is offered to it. */
+    private boolean goingToSleep;
+    /** Set while this connection exists to carry a command rather than a picture. */
+    private boolean commandSession;
+    /** Whether the hang-up after a command has already happened. */
+    private boolean commandSessionOver;
+    /** What this connection was asked to carry, while an answer to it is still outstanding. */
+    @Nullable
+    private String awaitedCommand;
+    /** Set once the display has answered that it took the command. */
+    private boolean commandAcknowledged;
+    /** Set when the command makes the display leave by itself, so we must not pull the link. */
+    private boolean commandEndsConnection;
     /**
      * Fires if a connection produces no finished transfer. A tag that answers the handshake and
      * then goes quiet used to leave the link half open and the schedule waiting for a completion
@@ -138,6 +151,12 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
         armWatchdog();
+        // the support object outlives a single connection, so what the last one was doing may
+        // not decide what this one is for
+        commandSession = false;
+        goingToSleep = false;
+        commandEndsConnection = false;
+        awaitedCommand = null;
         builder.setDeviceState(GBDevice.State.INITIALIZING);
         builder.requestMtu(512);
         builder.notify(OEPLProtocol.UUID_CHARACTERISTIC, true);
@@ -148,6 +167,30 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         builder.setDeviceState(GBDevice.State.INITIALIZED);
 
         builder.sleep(200);
+
+        // A connection opened for a command belongs to that command and nothing else: no
+        // hardware read, no picture, and the link is dropped as soon as it has been sent. A
+        // restart is the clearest case - the display reboots the moment it has the command, so
+        // a picture queued behind it is a transfer into a display that is no longer there, and
+        // what came back was a failed update rather than a restart that worked.
+        final SharedPreferences own =
+                GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        if (OEPLFirmware.pending(own)) {
+            // A firmware takes minutes and the whole link; everything else on this connection
+            // would be in its way. Started from inside the queue so that the notifications are
+            // already switched on when the first block is asked for.
+            commandSession = true;
+            commandSessionOver = true; // the transfer itself ends this connection
+            builder.run(this::startArmedFirmware);
+            return builder;
+        }
+        if (OEPLActions.pending(own)) {
+            commandSession = true;
+            commandSessionOver = false;
+            performPendingActions(builder);
+            return builder;
+        }
+
         builder.write(OEPLProtocol.UUID_CHARACTERISTIC, OEPLProtocol.command(OEPLProtocol.CMD_GET_INFOS));
         builder.sleep(150);
         // the hardware description is the authoritative source for geometry and colour count
@@ -160,6 +203,206 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         // never sent anything is the worst of both worlds.
         renderExecutor.schedule(this::drawFromCatalogueIfSilent, 4, TimeUnit.SECONDS);
         return builder;
+    }
+
+    /**
+     * Carries out whatever the display was asked to do while it was out of reach, and then ends
+     * the connection.
+     * <p>
+     * Nothing else happens on this connection; see {@link #initializeDevice}. The hang-up is
+     * asked for twice over, once at the end of the queue and once on a timer, because the two
+     * commands that make the display leave can take the rest of the queue with them - and a
+     * connection nobody ends is a tag held awake and a watchdog that later reports a failure
+     * for a command that worked.
+     */
+    private void performPendingActions(final TransactionBuilder builder) {
+        final List<String> actions = OEPLActions.drain(getDevice().getAddress());
+        if (actions.isEmpty()) {
+            return;
+        }
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        for (final String action : actions) {
+            LOG.info("carrying out {} on {}", action, getDevice().getAddress());
+            switch (action) {
+                case OEPLActions.BLINK:
+                    builder.write(OEPLProtocol.UUID_CHARACTERISTIC, OEPLProtocol.command(
+                            OEPLProtocol.CMD_SET_LED,
+                            OEPLProtocol.ledPatternArgument(OEPLPrefs.ledColor(prefs), 3, 5)));
+                    break;
+                case OEPLActions.REBOOT:
+                    builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
+                            OEPLProtocol.command(OEPLProtocol.CMD_REBOOT));
+                    commandEndsConnection = true;
+                    break;
+                case OEPLActions.SLEEP:
+                    // the display stops answering after this, so nothing may follow it
+                    builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
+                            OEPLProtocol.command(OEPLProtocol.CMD_DEEPSLEEP));
+                    goingToSleep = true;
+                    commandEndsConnection = true;
+                    break;
+                default:
+                    break;
+            }
+            builder.sleep(200);
+        }
+        final String what = actions.size() == 1 ? actions.get(0)
+                : android.text.TextUtils.join(", ", actions);
+        awaitedCommand = what;
+        commandAcknowledged = false;
+
+        if (commandEndsConnection) {
+            // A restart and a sleep are the display's own to carry out, and it leaves the
+            // connection by doing so. Dropping the link ourselves first is what can hold them
+            // up: as long as the connection is up the display's loop runs through without
+            // sleeping and acts on the command at once, while a display back on its own goes
+            // into the sleep it keeps between two advertisements and only gets round to the
+            // command when it next wakes. So the link is left to the display, with a long stop
+            // behind it for the case where nothing happens at all.
+            renderExecutor.schedule(() -> commandSessionOver(what), 10, TimeUnit.SECONDS);
+            return;
+        }
+        builder.run(() -> commandSessionOver(what));
+        renderExecutor.schedule(() -> commandSessionOver(what), 6, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Writes the firmware this display was handed, if it is still there to be written.
+     * <p>
+     * The attempt is counted before anything is sent. A display that takes the file and dies
+     * halfway through it would otherwise be handed the same two hundred kilobytes on every
+     * connection for the rest of the week; after a few goes the note is dropped and the display
+     * keeps the firmware it has, which is what it does anyway until a transfer completes.
+     */
+    private void startArmedFirmware() {
+        final String address = getDevice().getAddress();
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+        final String uri = OEPLFirmware.armed(prefs);
+        if (uri == null) {
+            return;
+        }
+        final int attempt = OEPLFirmware.noteAttempt(address);
+        byte[] firmware = null;
+        try (InputStream in = new BufferedInputStream(getContext().getContentResolver()
+                .openInputStream(Uri.parse(uri)))) {
+            firmware = FileUtils.readAll(in, 262144);
+        } catch (final Exception e) {
+            LOG.error("could not read the firmware {} for {}", uri, address, e);
+        }
+        if (firmware == null || !OEPLProtocol.looksLikeFirmware(firmware)) {
+            // nothing about this gets better by trying again
+            OEPLFirmware.done(address);
+            OEPLStatusStore.recordFailure(address, "firmware file unusable");
+            disconnectIfTransient();
+            return;
+        }
+        LOG.info("writing {} bytes of firmware to {}, attempt {} of {}",
+                firmware.length, address, attempt, OEPLFirmware.MAX_TRIES);
+        transferIsFirmware = true;
+        pendingCrc = 123; // the display does not check this for firmware
+        forced = true;
+        send(firmware, OEPLProtocol.DATATYPE_FIRMWARE, R.string.updating_firmware);
+    }
+
+    /**
+     * The display answering that it has no such command.
+     * <p>
+     * Which is a fact about that display and not a fault: every one of these commands was added
+     * to the firmware at some point, and the restart is the newest of them. A display still
+     * running an older build answers this to it, and the way out is the firmware update on the
+     * same screen.
+     */
+    private synchronized boolean refuseCommand() {
+        if (awaitedCommand == null) {
+            LOG.info("{} refused something we sent", getDevice().getAddress());
+            return false;
+        }
+        LOG.warn("{} does not know the command {}", getDevice().getAddress(), awaitedCommand);
+        GB.toast(getContext().getString(R.string.oepl_tools_unknown_command),
+                Toast.LENGTH_LONG, GB.WARN);
+        final String what = awaitedCommand;
+        commandAcknowledged = false;
+        commandEndsConnection = false; // it is not going anywhere after all
+        commandSessionOver = true;
+        cancelWatchdog();
+        OEPLStatusStore.recordCommand(getDevice().getAddress(), what + " not supported");
+        awaitedCommand = null;
+        disconnectIfTransient();
+        return true;
+    }
+
+    /**
+     * The display answering that it took the command.
+     * <p>
+     * Worth its own handling because it is the only way to tell a command that never arrived
+     * from one that arrived and did nothing. A restart in particular is close to invisible from
+     * the outside - the panel keeps the picture it had - so without this there is nothing to go
+     * on but pressing the button again.
+     */
+    private synchronized boolean acknowledgeCommand() {
+        if (awaitedCommand == null) {
+            return false; // an answer to a setting rather than to one of the commands
+        }
+        commandAcknowledged = true;
+        LOG.info("{} took the command: {}", getDevice().getAddress(), awaitedCommand);
+        GB.toast(getContext().getString(R.string.oepl_tools_acknowledged),
+                Toast.LENGTH_SHORT, GB.INFO);
+        if (!commandEndsConnection) {
+            commandSessionOver(awaitedCommand);
+        }
+        return true;
+    }
+
+    /**
+     * The command has been handed over, so the display is left alone again.
+     * <p>
+     * Asked for from two places and therefore written to happen once. Counting it as a finished
+     * run matters: the scheduler is holding a wake lock waiting for one, and the display *was*
+     * reached, so the retry ladder has no business climbing.
+     */
+    private synchronized void commandSessionOver(final String what) {
+        if (commandSessionOver) {
+            return;
+        }
+        commandSessionOver = true;
+        cancelWatchdog();
+        OEPLStatusStore.recordCommand(getDevice().getAddress(),
+                commandAcknowledged ? what + " ok" : what + " unanswered");
+        if (!commandAcknowledged) {
+            LOG.warn("{} never answered the command {}", getDevice().getAddress(), what);
+            GB.toast(getContext().getString(R.string.oepl_tools_no_answer),
+                    Toast.LENGTH_LONG, GB.WARN);
+        }
+        awaitedCommand = null;
+        disconnectIfTransient();
+    }
+
+    /**
+     * The same on a display that is connected already - which is the only case where a command
+     * has to push its way past something else. A restart or a sleep ends the connection under a
+     * running transfer, so that transfer is given up on here rather than left to time out and be
+     * counted as a display that went quiet.
+     */
+    private void performPendingActionsNow() {
+        try {
+            if (payload != null) {
+                LOG.info("giving up the running transfer to {} for a command",
+                        getDevice().getAddress());
+                payload = null;
+                blockData = null;
+                blockCount = -1;
+                clearProgress();
+            }
+            commandSession = true;
+            commandSessionOver = false;
+            commandEndsConnection = false;
+            final TransactionBuilder builder = performInitialized("display command");
+            performPendingActions(builder);
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("could not reach the display for what it was asked to do", e);
+        }
     }
 
     /**
@@ -206,7 +449,18 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                                            final byte[] value) {
         super.onCharacteristicChanged(gatt, characteristic, value);
         if (!OEPLProtocol.UUID_CHARACTERISTIC.equals(characteristic.getUuid())
-                || value.length < 2 || value[0] != 0x00) {
+                || value.length < 2) {
+            return false;
+        }
+        // The one answer that is not a zero byte followed by an opcode: the display saying it
+        // has no idea what it was just sent. Worth catching rather than dropping, because the
+        // commands were added to the firmware over time and the newest of them simply do not
+        // exist on a display that has not been updated - which looks exactly like a button
+        // that does nothing.
+        if ((value[0] & 0xff) == 0xff && (value[1] & 0xff) == 0xff) {
+            return refuseCommand();
+        }
+        if (value[0] != 0x00) {
             return false;
         }
         final int opcode = value[1] & 0xff;
@@ -222,6 +476,8 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             case OEPLProtocol.ACK_DEBUG_INFO:
                 handleDebugInfo(value);
                 return true;
+            case OEPLProtocol.ACK_COMMAND:
+                return acknowledgeCommand();
             case OEPLProtocol.REQUEST_BLOCK:
                 startBlock(value);
                 return true;
@@ -320,6 +576,14 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
      * Rendering and compression happen off the Bluetooth queue thread.
      */
     private synchronized void pushUpdateIfNeeded() {
+        if (goingToSleep || commandSession) {
+            // this connection was opened for a command, and a picture behind it would be a
+            // transfer into a display that is rebooting, sleeping or about to be let go - a
+            // failure counted against a display that is doing exactly what was asked
+            LOG.info("{} is busy with a command, not sending a picture",
+                    getDevice().getAddress());
+            return;
+        }
         if (config == null || !config.valid) {
             LOG.warn("no usable panel configuration, nothing to send");
             disconnectIfTransient();
@@ -660,6 +924,9 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         } else if (!success) {
             OEPLStatusStore.recordFailure(getDevice().getAddress(), reason);
         }
+        if (transferIsFirmware) {
+            noteFirmwareOutcome(success, reason);
+        }
         cancelWatchdog();
         clearProgress();
         if (success) {
@@ -679,6 +946,33 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             getDevice().sendDeviceUpdateIntent(getContext());
         }
         disconnectIfTransient();
+    }
+
+    /**
+     * What became of a firmware transfer.
+     * <p>
+     * A success is the end of it. A failure is not: a display carried out of range mid transfer
+     * is the ordinary case, the display keeps what it had, and the firmware picks the transfer
+     * up where it stopped the next time round - so the note stays until the attempts are used
+     * up. Either way this is kept out of the picture tallies.
+     */
+    private void noteFirmwareOutcome(final boolean success, final String reason) {
+        final String address = getDevice().getAddress();
+        if (success) {
+            OEPLFirmware.done(address);
+            OEPLStatusStore.recordCommand(address, "firmware written");
+            LOG.info("{} is running the new firmware", address);
+            return;
+        }
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+        if (OEPLFirmware.exhausted(prefs)) {
+            OEPLFirmware.done(address);
+            OEPLStatusStore.recordCommand(address,
+                    "firmware gave up after " + OEPLFirmware.MAX_TRIES + " tries: " + reason);
+        } else {
+            OEPLStatusStore.recordCommand(address, "firmware " + reason
+                    + ", try " + OEPLFirmware.tries(prefs) + " of " + OEPLFirmware.MAX_TRIES);
+        }
     }
 
     /**
@@ -868,6 +1162,11 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             return;
         }
 
+        if (OEPLPrefs.PREF_ACTION.equals(config)) {
+            performPendingActionsNow();
+            return;
+        }
+
         if (OEPLPrefs.PREF_UPDATE_INTERVAL.equals(config)
                 || OEPLPrefs.PREF_OPPORTUNISTIC.equals(config)
                 || OEPLPrefs.PREF_REQUIRE_ADVERTISEMENT.equals(config)) {
@@ -1005,9 +1304,11 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             if (uriHelper.getFileName().endsWith(".bin")) {
                 try (InputStream in = new BufferedInputStream(uriHelper.openInputStream())) {
                     final byte[] firmware = FileUtils.readAll(in, 262144);
-                    if (firmware.length < 12 || firmware[8] != 0x4b || firmware[9] != 0x4e
-                            || firmware[10] != 0x4c || firmware[11] != 0x54) {
-                        LOG.error("that .bin does not carry the firmware magic");
+                    if (!OEPLProtocol.looksLikeFirmware(firmware)) {
+                        LOG.error("that .bin does not look like firmware for this display");
+                        GB.toast(getContext().getString(
+                                        R.string.oepl_tools_firmware_not_firmware),
+                                Toast.LENGTH_LONG, GB.ERROR);
                         return;
                     }
                     transferIsFirmware = true;

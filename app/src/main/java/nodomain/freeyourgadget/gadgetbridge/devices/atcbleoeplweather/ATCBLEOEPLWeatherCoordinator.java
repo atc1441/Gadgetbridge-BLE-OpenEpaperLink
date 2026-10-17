@@ -490,6 +490,9 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         if (ad != null) {
             OEPLPrefs.storeFromAdvertisement(device.getAddress(), ad);
         }
+        // and whatever Home Assistant was last reached at, so that the second display of a
+        // shelf full of them does not have to be told the address and the token again
+        OEPLPrefs.seedHomeAssistant(device.getAddress());
         return device;
     }
 

@@ -5671,6 +5671,20 @@
         <item>Red</item>
         <item>Yellow</item>
     </string-array>
+    <string-array name="oepl_weather_led_colors">
+        <item>@string/red</item>
+        <item>@string/green</item>
+        <item>@string/blue</item>
+        <item>@string/yellow</item>
+        <item>@string/white</item>
+    </string-array>
+    <string-array name="oepl_weather_led_colors_values" translatable="false">
+        <item>red</item>
+        <item>green</item>
+        <item>blue</item>
+        <item>yellow</item>
+        <item>white</item>
+    </string-array>
     <string-array name="oepl_weather_accent_values" translatable="false">
         <item>auto</item>
         <item>red</item>

@@ -195,11 +195,19 @@ public class OeplForecastCard extends OeplCard {
 
             final boolean withRain = day.precipitation > 0.05f && row > textSize * 1.9f;
             final float firstLine = middle - textSize * (withRain ? 0.95f : 0.55f);
-            c.textFitted(dayLabel(c, weather, day, weekday, textSize, w * 0.25f), pad,
+            // The room left of the pictogram, measured rather than assumed. An icon glyph is
+            // nowhere near square - the same reason the wind arrow above is placed from its
+            // measured width - so a wide sky symbol reaches further left than its height
+            // suggests, and a quarter of the panel for the weekday had the two touching.
+            final String sky = OeplIcons.weather(day.wmoCode, false);
+            final float skyHeight = Math.min(row * 0.70f, w * 0.24f);
+            final float skyWidth = c.iconWidth(sky, skyHeight);
+            final float labelRoom = Math.max(w * 0.12f,
+                    w * 0.45f - skyWidth / 2f - pad * 1.5f);
+            c.textFitted(dayLabel(c, weather, day, weekday, textSize, labelRoom), pad,
                     firstLine, textSize, OeplCanvas.LEFT,
-                    weather.isToday(day) ? c.accent : c.ink, w * 0.25f);
-            c.iconCentered(OeplIcons.weather(day.wmoCode, false), w * 0.45f, middle,
-                    Math.min(row * 0.70f, w * 0.24f),
+                    weather.isToday(day) ? c.accent : c.ink, labelRoom);
+            c.iconCentered(sky, w * 0.45f, middle, skyHeight,
                     inkOrAccent(c, OeplIcons.isSevere(day.wmoCode)));
 
             final String range = temp(day.minTemperature) + " " + temp(day.maxTemperature);
@@ -209,7 +217,7 @@ public class OeplForecastCard extends OeplCard {
             if (withRain) {
                 c.textFitted(Math.round(day.precipitation) + "mm", pad,
                         middle + textSize * 0.2f, textSize * 0.62f, OeplCanvas.LEFT,
-                        inkOrAccent(c, day.precipitation > 10f), w * 0.25f);
+                        inkOrAccent(c, day.precipitation > 10f), labelRoom);
             }
             if (i > 0) {
                 for (float x = 0; x < w; x += 3f) {

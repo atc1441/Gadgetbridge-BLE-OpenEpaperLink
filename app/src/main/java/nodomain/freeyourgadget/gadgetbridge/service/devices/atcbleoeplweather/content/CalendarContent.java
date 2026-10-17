@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.c
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 
 import androidx.annotation.Nullable;
@@ -79,16 +80,16 @@ public class CalendarContent implements CardContent {
         final Paint bullet = new Paint(Paint.ANTI_ALIAS_FLAG);
         bullet.setColor(style.ink);
 
-        // the column has to fit the widest label actually drawn, not a placeholder: with a
-        // weekday prefix the stamps are far wider and would run into the titles
-        float timeColumn = 0f;
-        for (int i = 0; i < count; i++) {
-            timeColumn = Math.max(timeColumn, when.measureText(label(events.get(i))));
-        }
+        // The column has to fit the widest label actually drawn, not a placeholder: with a
+        // weekday prefix the stamps are far wider and would run into the titles. And it is
+        // measured by the ink rather than by the advance the stamp is laid out with - those
+        // differ by a few pixels, which is exactly the margin by which "Sun 10:00" used to
+        // touch the appointment next to it.
         final float maxColumn = (area.width() - pad * 5) * 0.45f;
+        float timeColumn = widest(when, events, count);
         while (timeColumn > maxColumn && when.getTextSize() > 6f) {
-            when.setTextSize(when.getTextSize() * 0.94f);
-            timeColumn *= 0.94f;
+            when.setTextSize(Math.max(6f, when.getTextSize() * 0.94f));
+            timeColumn = widest(when, events, count);
         }
 
         for (int i = 0; i < count; i++) {
@@ -106,6 +107,18 @@ public class CalendarContent implements CardContent {
             style.drawEllipsised(canvas, event.getTitle(), textLeft, base,
                     area.right - textLeft - pad, what);
         }
+    }
+
+    /** The widest stamp of the rows that are drawn, by the room its ink actually takes. */
+    private float widest(final Paint paint, final List<CalendarEvent> events, final int count) {
+        final Rect ink = new Rect();
+        float widest = 0f;
+        for (int i = 0; i < count; i++) {
+            final String stamp = label(events.get(i));
+            paint.getTextBounds(stamp, 0, stamp.length(), ink);
+            widest = Math.max(widest, Math.max(paint.measureText(stamp), ink.right));
+        }
+        return widest;
     }
 
     /** Today's events show the time, later ones the weekday so the day is obvious. */

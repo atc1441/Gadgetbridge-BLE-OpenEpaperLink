@@ -89,6 +89,15 @@ public final class OEPLPrefs {
     public static final String PREF_HA_ENTITIES = "pref_oepl_weather_ha_entities";
     /** Opens the picker that lists what the instance has, rather than typing ids out. */
     public static final String PREF_HA_PICK = "pref_oepl_weather_ha_pick";
+    /** Opens the screen with the one-off commands: blink, restart, sleep, new firmware. */
+    public static final String PREF_TOOLS = "pref_oepl_weather_tools";
+    /**
+     * Not a setting but the word the service is notified with when a display has been asked to
+     * do something; see {@link OEPLActions}.
+     */
+    public static final String PREF_ACTION = "pref_oepl_weather_action";
+    /** Which colour this display blinks in, so that two of them can be told apart. */
+    public static final String PREF_LED_COLOR = "pref_oepl_weather_led_color";
     /** The four slots of the quartered card, each holding the id of another card. */
     public static final String[] PREF_QUAD = {
             "pref_oepl_weather_quad_1", "pref_oepl_weather_quad_2",
@@ -378,8 +387,103 @@ public final class OEPLPrefs {
         return prefs.getString(PREF_HA_TOKEN, "").trim();
     }
 
+    /**
+     * The colour this display blinks in. Red by default, which is the one colour every one of
+     * these tags can make - the green and blue legs are not fitted on all of them.
+     */
+    public static int ledColor(final SharedPreferences prefs) {
+        switch (prefs.getString(PREF_LED_COLOR, "red")) {
+            case "green":
+                return OEPLProtocol.LED_GREEN;
+            case "blue":
+                return OEPLProtocol.LED_BLUE;
+            case "yellow":
+                return OEPLProtocol.LED_YELLOW;
+            case "white":
+                return OEPLProtocol.LED_WHITE;
+            default:
+                return OEPLProtocol.LED_RED;
+        }
+    }
+
     public static String homeAssistantEntities(final SharedPreferences prefs) {
         return prefs.getString(PREF_HA_ENTITIES, "");
+    }
+
+    /**
+     * The address and the token last typed into any display, kept so that the next display
+     * starts out filled in.
+     * <p>
+     * Every display keeps its own address and its own token - two instances, or a display that
+     * is meant to read nothing at all, have to stay possible - but there is normally one Home
+     * Assistant in a flat and the token is a hundred and eighty characters of random text that
+     * nobody types twice. So the first one that is set is remembered here and written into the
+     * next display as its starting value, which it can then be changed away from like any
+     * other setting.
+     */
+    private static final String LAST_HA_URL = "oepl_weather_last_ha_url";
+    private static final String LAST_HA_TOKEN = "oepl_weather_last_ha_token";
+
+    /**
+     * Remembers this display's address and token as the starting point for the next one.
+     * <p>
+     * An emptied field is not remembered: clearing the address on the display in the hall says
+     * what that display should read, not that the next display should start out blank.
+     */
+    public static void rememberHomeAssistant(@Nullable final SharedPreferences prefs) {
+        if (prefs == null) {
+            return;
+        }
+        final SharedPreferences.Editor editor = GBApplication.getPrefs().getPreferences().edit();
+        final String url = homeAssistantUrl(prefs);
+        final String token = homeAssistantToken(prefs);
+        if (!url.isEmpty()) {
+            editor.putString(LAST_HA_URL, url);
+        }
+        if (!token.isEmpty()) {
+            editor.putString(LAST_HA_TOKEN, token);
+        }
+        editor.apply();
+    }
+
+    /**
+     * Gives a display that has never been told about Home Assistant the last known address and
+     * token, and says whether it got anything.
+     * <p>
+     * Only a field that was never set is filled, which is what keeps this from undoing a
+     * decision: a display whose address was deliberately cleared holds an empty value rather
+     * than no value, and is left alone from then on.
+     */
+    public static boolean seedHomeAssistant(@Nullable final SharedPreferences prefs) {
+        if (prefs == null) {
+            return false;
+        }
+        final SharedPreferences remembered = GBApplication.getPrefs().getPreferences();
+        final SharedPreferences.Editor editor = prefs.edit();
+        boolean filled = false;
+        if (!prefs.contains(PREF_HA_URL)) {
+            final String url = remembered.getString(LAST_HA_URL, "");
+            if (!url.isEmpty()) {
+                editor.putString(PREF_HA_URL, url);
+                filled = true;
+            }
+        }
+        if (!prefs.contains(PREF_HA_TOKEN)) {
+            final String token = remembered.getString(LAST_HA_TOKEN, "");
+            if (!token.isEmpty()) {
+                editor.putString(PREF_HA_TOKEN, token);
+                filled = true;
+            }
+        }
+        if (filled) {
+            editor.apply();
+        }
+        return filled;
+    }
+
+    /** As {@link #seedHomeAssistant(SharedPreferences)}, for a display that is not on screen. */
+    public static boolean seedHomeAssistant(final String address) {
+        return seedHomeAssistant(GBApplication.getDeviceSpecificSharedPrefs(address));
     }
 
     /** The card in one quarter of the quartered design, or an empty string for none. */

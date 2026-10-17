@@ -444,6 +444,10 @@
                 android:key="pref_oepl_weather_read_config"
                 android:title="@string/pref_oepl_weather_read_config_title"
                 android:summary="@string/pref_oepl_weather_read_config_summary" />
+            <Preference
+                android:key="pref_oepl_weather_tools"
+                android:title="@string/oepl_tools_title"
+                android:summary="@string/oepl_tools_summary" />
             <ListPreference
                 android:defaultValue="-1"
                 android:entries="@array/oepl_weather_models"

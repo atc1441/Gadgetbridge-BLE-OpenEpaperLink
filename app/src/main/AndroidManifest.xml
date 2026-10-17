@@ -1224,6 +1224,18 @@
             android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
 
         <activity
+            android:name=".devices.atcbleoeplweather.OEPLToolsActivity"
+            android:exported="false"
+            android:label="@string/oepl_tools_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
+
+        <activity
+            android:name=".devices.atcbleoeplweather.OEPLFirmwareActivity"
+            android:exported="false"
+            android:label="@string/oepl_firmware_title"
+            android:parentActivityName=".devices.atcbleoeplweather.OEPLToolsActivity" />
+
+        <activity
             android:name=".activities.devicesettings.DeviceCardItemsActivity"
             android:label="@string/pref_device_card_items_title"
             android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
