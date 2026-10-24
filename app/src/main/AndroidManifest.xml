@@ -1207,6 +1207,18 @@
             android:parentActivityName=".activities.ControlCenterv2" />
 
         <activity
+            android:name=".devices.atcbleoeplweather.OEPLBlinkActivity"
+            android:exported="false"
+            android:label="@string/oepl_blink_title"
+            android:parentActivityName=".activities.ControlCenterv2" />
+
+        <activity
+            android:name=".devices.atcbleoeplweather.OEPLLocationActivity"
+            android:exported="false"
+            android:label="@string/oepl_location_title"
+            android:parentActivityName=".activities.ControlCenterv2" />
+
+        <activity
             android:name=".devices.atcbleoeplweather.OEPLHomeAssistantActivity"
             android:exported="false"
             android:label="@string/oepl_ha_pick_title"

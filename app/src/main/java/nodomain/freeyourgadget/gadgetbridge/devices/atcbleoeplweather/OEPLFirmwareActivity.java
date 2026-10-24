@@ -274,11 +274,28 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
         if (uri == null) {
             return;
         }
-        byte[] content = null;
-        try (InputStream in = new BufferedInputStream(getContentResolver().openInputStream(uri))) {
-            content = FileUtils.readAll(in, 262144);
-        } catch (final Exception e) {
-            LOG.warn("could not read {}", uri, e);
+        // Off the main thread, for the same reason as on the single display screen: a file
+        // picked out of a cloud folder is fetched when it is opened, and a frozen screen is
+        // one somebody leaves - which used to be the end of the app rather than of the screen.
+        final Thread thread = new Thread(() -> {
+            byte[] read = null;
+            try (InputStream in =
+                         new BufferedInputStream(getContentResolver().openInputStream(uri))) {
+                read = FileUtils.readAll(in, 262144);
+            } catch (final Exception e) {
+                LOG.warn("could not read {}", uri, e);
+            }
+            final byte[] content = read;
+            handler.post(() -> takeFile(uri, content));
+        }, "oepl-firmware-read");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /** Back on the main thread, and only while this screen is still there. */
+    private void takeFile(final Uri uri, @Nullable final byte[] content) {
+        if (isFinishing() || isDestroyed()) {
+            return;
         }
         if (content == null || !OEPLProtocol.looksLikeFirmware(content)) {
             GB.toast(getString(R.string.oepl_tools_firmware_not_firmware), 4000, GB.ERROR);

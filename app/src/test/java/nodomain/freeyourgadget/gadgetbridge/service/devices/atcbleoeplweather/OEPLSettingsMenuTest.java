@@ -404,6 +404,7 @@ public class OEPLSettingsMenuTest {
                 // buttons: they notify when pressed, there is no value to watch
                 OEPLPrefs.PREF_IMAGE_PICK,
                 OEPLPrefs.PREF_HA_PICK,
+                OEPLPrefs.PREF_PLACE_PICK,
                 OEPLPrefs.PREF_READ_CONFIG,
                 OEPLPrefs.PREF_TOOLS,
                 "pref_oepl_weather_pick_design",

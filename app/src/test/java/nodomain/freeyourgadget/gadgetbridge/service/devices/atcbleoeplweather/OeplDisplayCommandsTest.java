@@ -17,7 +17,11 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -123,6 +127,158 @@ public class OeplDisplayCommandsTest {
             assertFalse("a pattern that never ends: " + repeats,
                     (forever[10] & 0xff) == 0xff);
         }
+    }
+
+    /**
+     * The blink is what one panel out of a shelf of identical ones is picked out with, so it
+     * has to be tellable apart from its neighbour's: colour, how many flashes, how many rounds
+     * of them and how bright, each of them stored for that display alone.
+     */
+    @Test
+    public void theBlinkIsShapedTheWayItWasChosenForThisDisplay() {
+        prefs.edit()
+                .putString(OEPLPrefs.PREF_LED_COLOR, "green")
+                .putString(OEPLPrefs.PREF_LED_FLASHES, "10")
+                .putString(OEPLPrefs.PREF_LED_REPEATS, "2")
+                .putString(OEPLPrefs.PREF_LED_BRIGHTNESS, "4")
+                .apply();
+
+        final byte[] pattern = OEPLProtocol.ledPatternArgument(OEPLPrefs.ledColor(prefs),
+                OEPLPrefs.ledFlashes(prefs), OEPLPrefs.ledRepeats(prefs),
+                OEPLPrefs.ledBrightness(prefs));
+
+        assertEquals("the tag reads exactly twelve bytes", 12, pattern.length);
+        assertEquals("brightness in the top half of the byte, pattern mode in the bottom",
+                (byte) 0x31, pattern[0]);
+        assertEquals(OEPLProtocol.LED_GREEN, pattern[1] & 0xff);
+        assertEquals("ten flashes in the group", 10, pattern[2] & 0x0f);
+        assertEquals("two rounds, counted from zero", 1, pattern[10] & 0xff);
+    }
+
+    /** What is left alone blinks the way it always did. */
+    @Test
+    public void aDisplayNobodyChoseForKeepsTheOldBlink() {
+        assertEquals(3, OEPLPrefs.ledFlashes(prefs));
+        assertEquals(5, OEPLPrefs.ledRepeats(prefs));
+        assertEquals(OEPLProtocol.FULL_BRIGHTNESS, OEPLPrefs.ledBrightness(prefs));
+        assertEquals("the same pattern as before any of this was choosable",
+                (byte) 0xf1,
+                OEPLProtocol.ledPatternArgument(OEPLPrefs.ledColor(prefs),
+                        OEPLPrefs.ledFlashes(prefs), OEPLPrefs.ledRepeats(prefs),
+                        OEPLPrefs.ledBrightness(prefs))[0]);
+    }
+
+    /**
+     * The firmware's fields are four bits for the flashes and one byte for the rounds, and a
+     * figure that does not fit one of them is not a longer blink but a different one.
+     */
+    @Test
+    public void aFigureTheTagCouldNotHoldIsBroughtBackInside() {
+        prefs.edit()
+                .putString(OEPLPrefs.PREF_LED_FLASHES, "99")
+                .putString(OEPLPrefs.PREF_LED_REPEATS, "0")
+                .putString(OEPLPrefs.PREF_LED_BRIGHTNESS, "half past three")
+                .apply();
+
+        assertEquals(15, OEPLPrefs.ledFlashes(prefs));
+        assertEquals(1, OEPLPrefs.ledRepeats(prefs));
+        assertEquals("nonsense falls back rather than going dark",
+                OEPLProtocol.FULL_BRIGHTNESS, OEPLPrefs.ledBrightness(prefs));
+    }
+
+    /**
+     * The pattern in full: three groups, each with its own colour, its own number of flashes
+     * and its own gap. Two red, one blue and a second of dark is a blink that is told apart
+     * from the display beside it across a room, which is the whole reason the LED is there.
+     */
+    @Test
+    public void aPatternCarriesThreeColoursAndSurvivesBeingWrittenDown() {
+        final int[] colors = {
+                OEPLProtocol.ledColor(7, 0, 0),
+                OEPLProtocol.ledColor(0, 0, 3),
+                0,                                  // dark: the pause between the rounds
+        };
+        final int[] flashes = {2, 1, 1};
+        final int[] gaps = {3, 3, 10};
+
+        final byte[] pattern = OEPLProtocol.ledPattern(colors, flashes, gaps, 4, 16);
+
+        assertEquals(12, pattern.length);
+        assertEquals((byte) 0xf1, pattern[0]);
+        assertEquals(OEPLProtocol.LED_RED, pattern[1] & 0xff);
+        assertEquals("three ticks apart, two of them", 0x32, pattern[2] & 0xff);
+        assertEquals(OEPLProtocol.LED_BLUE, pattern[4] & 0xff);
+        assertEquals("nothing lit at all is a pause", 0, pattern[7] & 0xff);
+        assertEquals("four rounds, counted from zero", 3, pattern[10] & 0xff);
+
+        final byte[] back = OEPLProtocol.ledPatternFromHex(
+                OEPLProtocol.ledPatternToHex(pattern));
+        assertNotNull("it has to read back as what was written", back);
+        assertArrayEquals(pattern, back);
+    }
+
+    /** The colour is three bits of red, three of green and two of blue, and comes back so. */
+    @Test
+    public void aColourGoesInAndComesOutTheSame() {
+        for (int red = 0; red <= 7; red++) {
+            for (int blue = 0; blue <= 3; blue++) {
+                final int color = OEPLProtocol.ledColor(red, 5, blue);
+                assertEquals(red, OEPLProtocol.redOf(color));
+                assertEquals(5, OEPLProtocol.greenOf(color));
+                assertEquals(blue, OEPLProtocol.blueOf(color));
+                assertTrue("one byte and no more", color >= 0 && color <= 0xff);
+            }
+        }
+        assertEquals("asking for more than the leg has is not another colour",
+                OEPLProtocol.ledColor(7, 7, 3), OEPLProtocol.ledColor(99, 99, 99));
+    }
+
+    /**
+     * The one pattern that may never be stored. The rounds byte holds one less than the
+     * rounds, and the firmware reads 254 in it as "keep going" - a tag that never sleeps
+     * again and a coin cell gone by the morning.
+     */
+    @Test
+    public void aPatternThatWouldNeverEndIsNotReadBack() {
+        final byte[] forever = OEPLProtocol.ledPattern(new int[]{255, 0, 0}, new int[]{1, 1, 1},
+                new int[]{1, 1, 1}, 255, 16);
+        assertNotEquals("the builder may not even make one", 254, forever[10] & 0xff);
+
+        //                                        rounds: fe ---------------------\
+        assertNull("and one from anywhere else is refused",
+                OEPLProtocol.ledPatternFromHex("f1e02200000000000000fe00"));
+        //                            mode 0, which switches the LED off instead of blinking it
+        assertNull("so is something that is not a pattern at all",
+                OEPLProtocol.ledPatternFromHex("f0e022000000000000000300"));
+        assertNull(OEPLProtocol.ledPatternFromHex("nonsense"));
+        assertNull(OEPLProtocol.ledPatternFromHex(""));
+    }
+
+    /** How long it runs, which is what says whether a pattern is a blink or a light show. */
+    @Test
+    public void theLengthOfAPatternIsCountedInTenthsOfASecond() {
+        final byte[] pattern = OEPLProtocol.ledPattern(new int[]{255, 0, 0},
+                new int[]{2, 1, 1}, new int[]{2, 1, 10}, 2, 16);
+        // group one flashes twice, two ticks apart; two and three take one and ten ticks
+        assertEquals(3.0f, OEPLProtocol.ledPatternSeconds(pattern), 0.01f);
+    }
+
+    /** A display nobody has shaped a pattern for keeps the one it always blinked. */
+    @Test
+    public void theShapedPatternWinsOverThePlainOne() {
+        assertArrayEquals("nothing stored: the plain blink",
+                OEPLProtocol.ledPatternArgument(OEPLProtocol.LED_RED, 3, 5),
+                OEPLPrefs.ledPattern(prefs));
+
+        final byte[] shaped = OEPLProtocol.ledPattern(new int[]{OEPLProtocol.LED_GREEN, 0, 0},
+                new int[]{1, 1, 1}, new int[]{5, 5, 5}, 2, 8);
+        OEPLPrefs.storeLedPattern(ADDRESS, shaped);
+        assertArrayEquals(shaped, OEPLPrefs.ledPattern(prefs));
+
+        OEPLPrefs.forgetLedPattern(ADDRESS);
+        assertArrayEquals("and dropping it brings the plain one back",
+                OEPLProtocol.ledPatternArgument(OEPLProtocol.LED_RED, 3, 5),
+                OEPLPrefs.ledPattern(prefs));
     }
 
     @Test

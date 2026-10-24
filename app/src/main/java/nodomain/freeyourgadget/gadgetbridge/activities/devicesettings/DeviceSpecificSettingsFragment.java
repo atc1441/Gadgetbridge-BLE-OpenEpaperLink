@@ -1247,6 +1247,18 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             });
         }
 
+        final Preference oeplPickPlace = findPreference(OEPLPrefs.PREF_PLACE_PICK);
+        if (oeplPickPlace != null) {
+            oeplPickPlace.setOnPreferenceClickListener(preference -> {
+                final android.content.Intent intent = new android.content.Intent(requireContext(),
+                        nodomain.freeyourgadget.gadgetbridge.devices.atcbleoeplweather
+                                .OEPLLocationActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+                startActivity(intent);
+                return true;
+            });
+        }
+
         final Preference oeplPickEntities = findPreference(OEPLPrefs.PREF_HA_PICK);
         if (oeplPickEntities != null) {
             oeplPickEntities.setOnPreferenceClickListener(preference -> {

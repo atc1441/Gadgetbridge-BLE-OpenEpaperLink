@@ -95,6 +95,8 @@ public final class OEPLPrefs {
     public static final String PREF_HA_ENTITIES = "pref_oepl_weather_ha_entities";
     /** Opens the picker that lists what the instance has, rather than typing ids out. */
     public static final String PREF_HA_PICK = "pref_oepl_weather_ha_pick";
+    /** Opens the place search; see {@link #rememberPlace}. */
+    public static final String PREF_PLACE_PICK = "pref_oepl_weather_location_pick";
     /** Opens the screen with the one-off commands: blink, restart, sleep, new firmware. */
     public static final String PREF_TOOLS = "pref_oepl_weather_tools";
     /**
@@ -104,6 +106,14 @@ public final class OEPLPrefs {
     public static final String PREF_ACTION = "pref_oepl_weather_action";
     /** Which colour this display blinks in, so that two of them can be told apart. */
     public static final String PREF_LED_COLOR = "pref_oepl_weather_led_color";
+    /** How the blink is shaped; all three live on the commands screen, not in the list. */
+    public static final String PREF_LED_FLASHES = "pref_oepl_weather_led_flashes";
+    public static final String PREF_LED_REPEATS = "pref_oepl_weather_led_repeats";
+    public static final String PREF_LED_BRIGHTNESS = "pref_oepl_weather_led_brightness";
+    /** The whole twelve byte pattern as hex, once it has been shaped by hand. */
+    public static final String PREF_LED_PATTERN = "pref_oepl_weather_led_pattern";
+    /** A pattern for the next blink only; see {@link #takeLedPatternOnce}. */
+    static final String LED_PATTERN_ONCE = "oepl_weather_led_once";
     /** The four slots of the quartered card, each holding the id of another card. */
     public static final String[] PREF_QUAD = {
             "pref_oepl_weather_quad_1", "pref_oepl_weather_quad_2",
@@ -172,6 +182,10 @@ public final class OEPLPrefs {
             PREF_ADV_INTERVAL,
             PREF_OEPL_PROTOCOL,
             PREF_MODEL));
+
+    /** The place a picked location was called, and the coordinates it belongs to. */
+    public static final String PLACE_NAME = "oepl_weather_place_name";
+    public static final String PLACE_FOR = "oepl_weather_place_for";
 
     // values cached between connections so that the scheduler can work without a link
     public static final String PANEL_WIDTH = "oepl_weather_panel_width";
@@ -393,6 +407,34 @@ public final class OEPLPrefs {
         return prefs.getString(PREF_WEATHER_LOCATION, "").trim();
     }
 
+    /**
+     * What the place picked from the list was called, for a location that is stored as
+     * coordinates.
+     * <p>
+     * It only answers while it still belongs to what is in the location field. Somebody who
+     * types a different place over a picked one gets the name they typed, not the name of the
+     * town they just replaced - which is otherwise exactly the kind of wrong that is hard to
+     * notice, because the panel keeps heading its forecast with a plausible place name.
+     */
+    public static String weatherPlaceName(final SharedPreferences prefs) {
+        final String location = weatherLocation(prefs);
+        if (location.isEmpty()
+                || !location.equals(prefs.getString(PLACE_FOR, ""))) {
+            return "";
+        }
+        return prefs.getString(PLACE_NAME, "");
+    }
+
+    /** Remembers a picked place: the coordinates it is stored as, and what it is called. */
+    public static void rememberPlace(final String address, final String coordinates,
+                                     final String name) {
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .putString(PREF_WEATHER_LOCATION, coordinates)
+                .putString(PLACE_FOR, coordinates)
+                .putString(PLACE_NAME, name)
+                .apply();
+    }
+
     /** Beaufort by default, the way an OpenEPaperLink tag reports wind. */
     public static boolean windAsBeaufort(final SharedPreferences prefs) {
         return !"ms".equals(prefs.getString(PREF_WIND_UNIT, "beaufort"));
@@ -440,6 +482,100 @@ public final class OEPLPrefs {
             default:
                 return OEPLProtocol.LED_RED;
         }
+    }
+
+    /**
+     * How the blink is shaped, and why these are stored per display rather than once.
+     * <p>
+     * Pointing at one display out of a shelf full of them is what the LED is for, and a shelf
+     * is exactly where one blink has to be told apart from the next: three red flashes on one
+     * and ten green ones on its neighbour. The figures are clamped where the firmware's own
+     * fields end - four bits for the flashes in a group, one byte for the rounds - so a value
+     * that was typed into the preferences by hand cannot make a pattern the tag reads as
+     * something else.
+     */
+    public static int ledFlashes(final SharedPreferences prefs) {
+        return clamped(prefs, PREF_LED_FLASHES, 3, 1, 15);
+    }
+
+    /** Rounds of the whole pattern. Never 256, which the firmware reads as "keep going". */
+    public static int ledRepeats(final SharedPreferences prefs) {
+        return clamped(prefs, PREF_LED_REPEATS, 5, 1, 200);
+    }
+
+    public static int ledBrightness(final SharedPreferences prefs) {
+        return clamped(prefs, PREF_LED_BRIGHTNESS, OEPLProtocol.FULL_BRIGHTNESS, 1,
+                OEPLProtocol.FULL_BRIGHTNESS);
+    }
+
+    private static int clamped(final SharedPreferences prefs, final String key,
+                               final int fallback, final int least, final int most) {
+        return Math.max(least, Math.min(most,
+                parseInt(prefs.getString(key, String.valueOf(fallback)), fallback)));
+    }
+
+    /**
+     * The blink this display makes, as the twelve bytes the tag plays.
+     * <p>
+     * A pattern that was shaped by hand is stored whole, because the three groups it is made
+     * of cannot be said in a colour and two counts. Where there is none, the simple choices
+     * are built into the shape they always had - which is what every display that nobody has
+     * opened the editor for keeps blinking.
+     */
+    public static byte[] ledPattern(final SharedPreferences prefs) {
+        final byte[] stored =
+                OEPLProtocol.ledPatternFromHex(prefs.getString(PREF_LED_PATTERN, ""));
+        if (stored != null) {
+            return stored;
+        }
+        // a saved pattern that was made the default stands in for every display nobody has
+        // shaped by hand, so a whole shelf can be given one look without visiting each panel
+        final byte[] fallback = OEPLBlinkPresets.defaultPattern();
+        if (fallback != null) {
+            return fallback;
+        }
+        return OEPLProtocol.ledPatternArgument(ledColor(prefs), ledFlashes(prefs),
+                ledRepeats(prefs), ledBrightness(prefs));
+    }
+
+    /**
+     * A pattern for the next blink and no longer.
+     * <p>
+     * The buttons on the device cards blink a saved pattern at a display without making it
+     * that display's own: pointing at a panel from the main list is a thing done once, and a
+     * display whose blink quietly changed because somebody looked for it would be a setting
+     * nobody asked to change.
+     */
+    public static void blinkOnceWith(final String address, final byte[] pattern) {
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .putString(LED_PATTERN_ONCE, OEPLProtocol.ledPatternToHex(pattern))
+                .apply();
+    }
+
+    /** The one-off pattern if there is one, consumed; otherwise this display's own. */
+    public static byte[] takeLedPatternOnce(final SharedPreferences prefs, final String address) {
+        final byte[] once =
+                OEPLProtocol.ledPatternFromHex(prefs.getString(LED_PATTERN_ONCE, ""));
+        if (once == null) {
+            return ledPattern(prefs);
+        }
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .remove(LED_PATTERN_ONCE)
+                .apply();
+        return once;
+    }
+
+    public static void storeLedPattern(final String address, final byte[] pattern) {
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .putString(PREF_LED_PATTERN, OEPLProtocol.ledPatternToHex(pattern))
+                .apply();
+    }
+
+    /** Back to the plain three-flashes blink, whatever was shaped on top of it. */
+    public static void forgetLedPattern(final String address) {
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .remove(PREF_LED_PATTERN)
+                .apply();
     }
 
     public static String homeAssistantEntities(final SharedPreferences prefs) {

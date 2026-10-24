@@ -42,6 +42,10 @@
                 android:title="@string/pref_oepl_weather_location_title"
                 android:summary="@string/pref_oepl_weather_location_summary"
                 android:dialogTitle="@string/pref_oepl_weather_location_title" />
+            <Preference
+                android:key="pref_oepl_weather_location_pick"
+                android:title="@string/pref_oepl_weather_location_pick_title"
+                android:summary="@string/pref_oepl_weather_location_pick_summary" />
             <ListPreference
                 android:defaultValue="5"
                 android:entries="@array/oepl_weather_forecast_days"

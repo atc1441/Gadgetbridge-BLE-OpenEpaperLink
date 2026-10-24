@@ -54,6 +54,13 @@
             android:layout_height="wrap_content"
             android:text="@string/oepl_tools_color_title" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/oepl_tools_pattern"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/oepl_tools_pattern" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

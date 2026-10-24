@@ -177,14 +177,150 @@ public final class OEPLProtocol {
      */
     public static byte[] ledPatternArgument(final int color, final int flashes,
                                             final int repeats) {
+        return ledPatternArgument(color, flashes, repeats, FULL_BRIGHTNESS);
+    }
+
+    /** The brightest the tag's LED goes; the firmware counts the sixteen steps from one. */
+    public static final int FULL_BRIGHTNESS = 16;
+
+    /**
+     * As above, dimmable. The top half of the first byte is the brightness and the bottom half
+     * the mode, so the two travel together - and a display on a bedside table is a good reason
+     * not to send every blink at full.
+     */
+    public static byte[] ledPatternArgument(final int color, final int flashes,
+                                            final int repeats, final int brightness) {
+        final int level = Math.max(1, Math.min(FULL_BRIGHTNESS, brightness)) - 1;
         final int group = (Math.max(1, Math.min(15, flashes)) & 0x0f) | (2 << 4);
         return new byte[]{
-                (byte) 0xf1,                 // the longest flash the tag can make, pattern mode
+                (byte) ((level << 4) | 0x01), // how bright, and that this is a pattern
                 (byte) color, (byte) group, 0,
                 0, (byte) ((8 << 4) | 1), 0, // a dark group: eight ticks of nothing
                 0, 0, 0,                     // and a third group that is over at once
-                (byte) (Math.max(1, Math.min(200, repeats)) - 1),
+                (byte) (Math.max(1, Math.min(MOST_ROUNDS, repeats)) - 1),
                 0};
+    }
+
+    // ---------------------------------------------------------------- the pattern in full
+    //
+    // What the twelve bytes are, read off the firmware that plays them. The tag runs the
+    // pattern on a tick of a tenth of a second and walks three groups in turn: on each tick a
+    // group counts down its gap, and when the gap is up it makes one flash in its own colour.
+    // After its flashes are used up the next group takes over, and when the third is done the
+    // three start again until the rounds are used up. That is the whole machine - three
+    // colours, three counts, three gaps - and it is what lets one display blink twice red,
+    // once blue and stay dark for a second while the one beside it does something else.
+    //
+    //   0   brightness in the top half, the mode in the bottom (1 = play a pattern)
+    //   1   colour of the first group        2   its gap in the top half, its flashes in the
+    //   3   unused by this firmware              bottom half
+    //   4   colour of the second group       5   likewise
+    //   6   unused
+    //   7   colour of the third group        8   likewise
+    //   9   unused
+    //  10   rounds, counted from zero       11   spare
+    //
+    // A colour is three bits of red, three of green and two of blue, which the tag renders by
+    // how much of each flash it leaves that leg switched on.
+
+    /** Groups in a pattern: the firmware walks exactly three of them. */
+    public static final int GROUPS = 3;
+    /** The largest flash count and gap a group can hold: both are four bit fields. */
+    public static final int MOST_PER_GROUP = 15;
+
+    /**
+     * The most rounds that may be asked for.
+     * <p>
+     * The byte holds one less than the number of rounds, and the firmware reads 255 rounds -
+     * byte 254 - as "keep going until somebody stops you". That is a tag that never sleeps
+     * again and a coin cell gone by the morning, so the figure is kept well short of it.
+     */
+    public static final int MOST_ROUNDS = 200;
+
+    /** A colour byte: three bits of red, three of green, two of blue. */
+    public static int ledColor(final int red, final int green, final int blue) {
+        return ((Math.max(0, Math.min(7, red)) & 0x07) << 5)
+                | ((Math.max(0, Math.min(7, green)) & 0x07) << 2)
+                | (Math.max(0, Math.min(3, blue)) & 0x03);
+    }
+
+    public static int redOf(final int color) {
+        return (color >> 5) & 0x07;
+    }
+
+    public static int greenOf(final int color) {
+        return (color >> 2) & 0x07;
+    }
+
+    public static int blueOf(final int color) {
+        return color & 0x03;
+    }
+
+    /**
+     * Builds the twelve bytes from three groups and the two figures that apply to all of them.
+     *
+     * @param colors  one colour byte per group
+     * @param flashes how many flashes each group makes
+     * @param gaps    tenths of a second between the flashes of each group
+     */
+    public static byte[] ledPattern(final int[] colors, final int[] flashes, final int[] gaps,
+                                    final int repeats, final int brightness) {
+        final int level = Math.max(1, Math.min(FULL_BRIGHTNESS, brightness)) - 1;
+        final byte[] pattern = new byte[12];
+        pattern[0] = (byte) ((level << 4) | 0x01);
+        for (int group = 0; group < GROUPS; group++) {
+            final int count = Math.max(0, Math.min(MOST_PER_GROUP, flashes[group]));
+            final int gap = Math.max(0, Math.min(MOST_PER_GROUP, gaps[group]));
+            pattern[1 + group * 3] = (byte) (colors[group] & 0xff);
+            pattern[2 + group * 3] = (byte) ((gap << 4) | count);
+        }
+        pattern[10] = (byte) (Math.max(1, Math.min(MOST_ROUNDS, repeats)) - 1);
+        return pattern;
+    }
+
+    /** How long a pattern takes, give or take the tenth of a second it is counted in. */
+    public static float ledPatternSeconds(final byte[] pattern) {
+        if (pattern == null || pattern.length != 12) {
+            return 0f;
+        }
+        int ticks = 0;
+        for (int group = 0; group < GROUPS; group++) {
+            final int shape = pattern[2 + group * 3] & 0xff;
+            // a group with no flashes still makes one, and no gap means one flash per tick
+            ticks += Math.max(1, shape & 0x0f) * Math.max(1, (shape >> 4) & 0x0f);
+        }
+        return ticks * ((pattern[10] & 0xff) + 1) / 10f;
+    }
+
+    /** The pattern as it is written into the settings, so that twelve bytes survive a restart. */
+    public static String ledPatternToHex(final byte[] pattern) {
+        final StringBuilder hex = new StringBuilder(24);
+        for (final byte value : pattern) {
+            hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+        }
+        return hex.toString();
+    }
+
+    /** Reads one back, or null for anything that is not a pattern this firmware would play. */
+    @androidx.annotation.Nullable
+    public static byte[] ledPatternFromHex(final String hex) {
+        if (hex == null || hex.length() != 24) {
+            return null;
+        }
+        final byte[] pattern = new byte[12];
+        for (int i = 0; i < 12; i++) {
+            try {
+                pattern[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+            } catch (final NumberFormatException e) {
+                return null;
+            }
+        }
+        // the bottom half of the first byte says what the tag should do with the rest, and
+        // anything but "play a pattern" would switch the LED off instead of blinking it
+        if ((pattern[0] & 0x0f) != 0x01) {
+            return null;
+        }
+        return (pattern[10] & 0xff) == 254 ? null : pattern;
     }
 
     /**

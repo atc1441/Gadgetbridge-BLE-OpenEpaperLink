@@ -248,8 +248,8 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             switch (action) {
                 case OEPLActions.BLINK:
                     builder.write(OEPLProtocol.UUID_CHARACTERISTIC, OEPLProtocol.command(
-                            OEPLProtocol.CMD_SET_LED,
-                            OEPLProtocol.ledPatternArgument(OEPLPrefs.ledColor(prefs), 3, 5)));
+                            OEPLProtocol.CMD_SET_LED, OEPLPrefs.takeLedPatternOnce(
+                                    prefs, getDevice().getAddress())));
                     break;
                 case OEPLActions.REBOOT:
                     builder.write(OEPLProtocol.UUID_CHARACTERISTIC,
@@ -284,7 +284,13 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             renderExecutor.schedule(() -> commandSessionOver(what), 10, TimeUnit.SECONDS);
             return;
         }
-        builder.run(() -> commandSessionOver(what));
+        // Nothing is ended here. The queue is done with a command as soon as the write has
+        // gone out, which is a long way before the display has said anything about it: the
+        // answer comes back as a notification, and at a slow connection interval that is
+        // hundreds of milliseconds later. Closing the session from inside the queue dropped the
+        // link in that gap, so the display carried the command out - the LED really did blink -
+        // while the app had already written it off as unanswered. The answer ends the session
+        // now, and the stop behind it is there for a display that truly never gives one.
         renderExecutor.schedule(() -> commandSessionOver(what), 6, TimeUnit.SECONDS);
     }
 
@@ -411,6 +417,14 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
      * Asked for from two places and therefore written to happen once. Counting it as a finished
      * run matters: the scheduler is holding a wake lock waiting for one, and the display *was*
      * reached, so the retry ladder has no business climbing.
+     * <p>
+     * Silence is not worth saying anything about. Whether a command is answered at all is a
+     * question about the firmware rather than about the command: the older of the two ways to
+     * drive the LED is answered by nothing, and the commands that do answer grew that answer
+     * over time. The characteristic is written to with a response, so a command that got this
+     * far was handed over - what is missing when nothing comes back is the confirmation, not
+     * the deed. Only the confirmation is worth a word; its absence goes to the status line,
+     * where it can be looked up, and nowhere else.
      */
     private synchronized void commandSessionOver(final String what) {
         if (commandSessionOver) {
@@ -419,11 +433,9 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         commandSessionOver = true;
         cancelWatchdog();
         OEPLStatusStore.recordCommand(getDevice().getAddress(),
-                commandAcknowledged ? what + " ok" : what + " unanswered");
+                commandAcknowledged ? what + " ok" : what + " sent");
         if (!commandAcknowledged) {
-            LOG.warn("{} never answered the command {}", getDevice().getAddress(), what);
-            GB.toast(getContext().getString(R.string.oepl_tools_no_answer),
-                    Toast.LENGTH_LONG, GB.WARN);
+            LOG.info("{} carried out {} without saying so", getDevice().getAddress(), what);
         }
         awaitedCommand = null;
         disconnectIfTransient();

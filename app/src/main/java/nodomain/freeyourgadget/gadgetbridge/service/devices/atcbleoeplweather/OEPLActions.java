@@ -78,6 +78,17 @@ public final class OEPLActions {
         return false;
     }
 
+    /**
+     * Asks a display to blink one particular pattern, rather than its own.
+     *
+     * @return true when the display is connected and it is being done straight away.
+     */
+    public static boolean requestBlink(final Context context, final GBDevice device,
+                                       final byte[] pattern) {
+        OEPLPrefs.blinkOnceWith(device.getAddress(), pattern);
+        return request(context, device, BLINK);
+    }
+
     /** Writes the action down, without deciding when it is carried out. */
     static void arm(final SharedPreferences prefs, final String action) {
         if (!ORDER.contains(action)) {

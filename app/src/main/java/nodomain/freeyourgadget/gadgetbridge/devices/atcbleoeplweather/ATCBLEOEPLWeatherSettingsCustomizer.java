@@ -164,6 +164,11 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
                 OEPLContentOptions.uses(content, Option.WEATHER));
         show(handler, OEPLPrefs.PREF_WEATHER_LOCATION,
                 OEPLContentOptions.uses(content, Option.WEATHER));
+        show(handler, OEPLPrefs.PREF_PLACE_PICK,
+                OEPLContentOptions.uses(content, Option.WEATHER));
+        // the place as it was picked, because what is stored for it is a pair of coordinates
+        // and nobody recognises their own town by those
+        summary(handler, OEPLPrefs.PREF_PLACE_PICK, pickedPlace(handler));
         show(handler, OEPLPrefs.PREF_FORECAST_DAYS,
                 OEPLContentOptions.uses(content, Option.FORECAST_DAYS));
         show(handler, OEPLPrefs.PREF_FORECAST_HOURS,
@@ -287,6 +292,17 @@ public class ATCBLEOEPLWeatherSettingsCustomizer implements DeviceSpecificSettin
     }
 
     /** The label of a list preference's current choice, not its stored value. */
+    /** "Berlin · 52.5200,13.4050", or null while nothing was picked from the list. */
+    private String pickedPlace(final DeviceSpecificSettingsHandler handler) {
+        final Preference preference = handler.findPreference(OEPLPrefs.PREF_PLACE_PICK);
+        if (preference == null || preference.getSharedPreferences() == null) {
+            return null;
+        }
+        final SharedPreferences prefs = preference.getSharedPreferences();
+        final String name = OEPLPrefs.weatherPlaceName(prefs);
+        return name.isEmpty() ? null : name + " · " + OEPLPrefs.weatherLocation(prefs);
+    }
+
     private String entry(final DeviceSpecificSettingsHandler handler, final String key) {
         final ListPreference preference = handler.findPreference(key);
         if (preference == null || preference.getEntry() == null) {

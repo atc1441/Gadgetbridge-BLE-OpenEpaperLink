@@ -55,6 +55,8 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.ATCBLEOEPLWeatherDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLActions;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLBlinkPresets;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLProtocol;
@@ -645,6 +647,68 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
                         nodomain.freeyourgadget.gadgetbridge.util.GB.INFO);
             }
         });
+        // and one per blink pattern that was marked for the list; see OEPLBlinkPresets
+        for (final OEPLBlinkPresets.Preset preset : OEPLBlinkPresets.onCards()) {
+            actions.add(new BlinkAction(preset.name, preset.pattern));
+        }
         return actions;
+    }
+
+    /**
+     * Blinking one saved pattern at a display, from the list the displays are in.
+     * <p>
+     * Pointing at one panel out of a shelf of identical ones is what the LED is for, and the
+     * shelf is the device list - so a pattern worth reaching from there sits among the other
+     * icons on every card rather than three screens inside the display being looked for.
+     * <p>
+     * The pattern is sent for this blink only and does not become that display's own: looking
+     * for a panel may not quietly change what it blinks from then on.
+     */
+    private static final class BlinkAction implements DeviceCardAction {
+        private final String name;
+        private final byte[] pattern;
+
+        BlinkAction(final String name, final byte[] pattern) {
+            this.name = name;
+            this.pattern = pattern;
+        }
+
+        @NonNull
+        @Override
+        public String getId() {
+            // the name, so that the order the icons were put in survives a pattern being
+            // added or dropped - the row remembers its items by this
+            return "oepl_weather_blink_" + name;
+        }
+
+        @Override
+        public int getIcon(@NonNull final GBDevice device) {
+            return R.drawable.ic_lightbulb;
+        }
+
+        @NonNull
+        @Override
+        public String getDescription(@NonNull final GBDevice device,
+                                     @NonNull final Context context) {
+            return context.getString(R.string.oepl_blink_this, name);
+        }
+
+        @Override
+        public String getLabel(@NonNull final GBDevice device, @NonNull final Context context) {
+            return name;
+        }
+
+        @Override
+        public boolean isVisible(@NonNull final GBDevice device) {
+            return true; // the display is asleep almost always; the blink waits for it
+        }
+
+        @Override
+        public void onClick(@NonNull final GBDevice device, @NonNull final Context context) {
+            final boolean now = OEPLActions.requestBlink(context, device, pattern);
+            nodomain.freeyourgadget.gadgetbridge.util.GB.toast(context.getString(
+                            now ? R.string.oepl_tools_sent : R.string.oepl_tools_queued), 2500,
+                    nodomain.freeyourgadget.gadgetbridge.util.GB.INFO);
+        }
     }
 }

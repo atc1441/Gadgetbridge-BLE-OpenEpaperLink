@@ -36,6 +36,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
@@ -177,8 +179,13 @@ public final class OpenMeteoClient {
                     + "&forecast_days=7";
             final String body = get(url);
             final JSONObject doc = new JSONObject(body);
-            final WeatherSpec spec = parse(doc, resolved.name);
-            final OeplWeather rich = OeplWeather.parse(doc, resolved.name);
+            // Coordinates have no name of their own, and a place picked out of a list of
+            // namesakes is stored as coordinates - so the name it was picked under is kept
+            // beside them. Without that the card would head a forecast with "52.5200,13.4050".
+            final String named = resolved.name.isEmpty()
+                    ? OEPLPrefs.weatherPlaceName(prefs) : resolved.name;
+            final WeatherSpec spec = parse(doc, named);
+            final OeplWeather rich = OeplWeather.parse(doc, named);
             final long now = System.currentTimeMillis();
             synchronized (OpenMeteoClient.class) {
                 cached = spec;
@@ -276,6 +283,100 @@ public final class OpenMeteoClient {
             this.longitude = longitude;
             this.name = name;
         }
+    }
+
+    /**
+     * One candidate the geocoder offered for a name that was typed in.
+     * <p>
+     * Place names are not unique and the ones that repeat are rarely the obscure ones: there
+     * are a dozen Springfields, three Frankfurts and a Berlin in several countries. Taking the
+     * first answer picks one of them by population and says nothing about it, which is how a
+     * display ends up showing the weather of a town on another continent that happens to share
+     * its name. So the answers are offered as they come back, each with what tells it apart -
+     * the region it is in, the country, and its coordinates.
+     */
+    public static class Match {
+        public final String name;
+        /** The administrative area, which is usually what separates two namesakes. */
+        public final String region;
+        public final String country;
+        public final double latitude;
+        public final double longitude;
+        /** Inhabitants, where the service knows: a village and a city read differently. */
+        public final int population;
+
+        Match(final String name, final String region, final String country,
+              final double latitude, final double longitude, final int population) {
+            this.name = name;
+            this.region = region;
+            this.country = country;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.population = population;
+        }
+
+        /** "Thuringia, Germany" - everything but the name itself, for the second line. */
+        public String where() {
+            if (region.isEmpty()) {
+                return country;
+            }
+            return country.isEmpty() ? region : region + ", " + country;
+        }
+
+        /**
+         * What is stored for this place. The coordinates rather than the name, because the
+         * name is exactly what was ambiguous - a stored name would be looked up again and
+         * could come back as the other town the next time the service reorders its answers.
+         */
+        public String coordinates() {
+            return String.format(Locale.ROOT, "%.4f,%.4f", latitude, longitude);
+        }
+    }
+
+    /**
+     * Offers every place the geocoder knows under this name, nearest match first.
+     *
+     * @param language the two letter code the names should come back in, may be empty
+     */
+    public static List<Match> search(final String query, final int limit, final String language)
+            throws Exception {
+        final List<Match> matches = new ArrayList<>();
+        if (query == null || query.trim().isEmpty()) {
+            return matches;
+        }
+        final String url = GEOCODING + "?count=" + Math.max(1, Math.min(100, limit))
+                + "&name=" + URLEncoder.encode(query.trim(), "UTF-8")
+                + (language.isEmpty() ? "" : "&language=" + URLEncoder.encode(language, "UTF-8"));
+        return parseMatches(new JSONObject(get(url)), query.trim());
+    }
+
+    /** Split out from the request so the reading can be tested against a canned answer. */
+    static List<Match> parseMatches(final JSONObject doc, final String query) {
+        final List<Match> matches = new ArrayList<>();
+        final JSONArray results = doc.optJSONArray("results");
+        if (results == null) {
+            return matches;
+        }
+        for (int i = 0; i < results.length(); i++) {
+            final JSONObject one = results.optJSONObject(i);
+            if (one == null || !one.has("latitude") || !one.has("longitude")) {
+                continue;
+            }
+            // admin1 is the state or province and is what usually tells namesakes apart;
+            // admin2 is added where a country repeats a name inside one of its own regions
+            final String admin1 = one.optString("admin1", "");
+            final String admin2 = one.optString("admin2", "");
+            final String region = admin2.isEmpty() || admin2.equals(admin1) ? admin1
+                    : admin2 + ", " + admin1;
+            matches.add(new Match(
+                    one.optString("name", query),
+                    region,
+                    one.optString("country", ""),
+                    one.optDouble("latitude", 0),
+                    one.optDouble("longitude", 0),
+                    one.optInt("population", 0)));
+        }
+        return matches;
     }
 
     /** Accepts "lat,lon" directly, otherwise looks the place name up. */

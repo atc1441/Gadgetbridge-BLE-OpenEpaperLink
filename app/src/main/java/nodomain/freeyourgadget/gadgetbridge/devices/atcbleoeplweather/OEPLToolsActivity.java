@@ -23,6 +23,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Button;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -65,7 +67,7 @@ public class OEPLToolsActivity extends AbstractGBActivity {
     private static final int FIRMWARE_LIMIT = 262144;
 
     private GBDevice device;
-    private Button color;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     /** Chosen while the display was out of reach, written as soon as it answers. */
     @Nullable
@@ -102,9 +104,14 @@ public class OEPLToolsActivity extends AbstractGBActivity {
         }
         setTitle(device.getAliasOrName());
 
-        color = findViewById(R.id.oepl_tools_color);
-        showColor();
-        color.setOnClickListener(v -> askColor());
+        new Choice(R.id.oepl_tools_color, OEPLPrefs.PREF_LED_COLOR, "red",
+                R.array.oepl_weather_led_colors, R.array.oepl_weather_led_colors_values,
+                R.string.oepl_tools_color, R.string.oepl_tools_color_title);
+        findViewById(R.id.oepl_tools_pattern).setOnClickListener(v -> {
+            final Intent intent = new Intent(this, OEPLBlinkActivity.class);
+            intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+            startActivity(intent);
+        });
 
         findViewById(R.id.oepl_tools_blink).setOnClickListener(v ->
                 ask(OEPLActions.BLINK));
@@ -190,32 +197,67 @@ public class OEPLToolsActivity extends AbstractGBActivity {
         return GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
     }
 
-    private void showColor() {
-        final String[] names = getResources().getStringArray(R.array.oepl_weather_led_colors);
-        color.setText(getString(R.string.oepl_tools_color, names[colorIndex()]));
-    }
+    /**
+     * One of the four things that shape the blink: which colour, how many flashes, how many
+     * rounds of them, how bright.
+     * <p>
+     * They sit here rather than in the settings list because they belong to the button they
+     * shape - the blink is a thing done once, not a property of the display - and because that
+     * is where they are wanted: a shelf of identical panels is told apart by giving each one a
+     * blink of its own, and that is decided with a finger on the button, not three menus away.
+     */
+    private final class Choice {
+        private final Button button;
+        private final String key;
+        private final String fallback;
+        private final int names;
+        private final int values;
+        private final int label;
+        private final int title;
 
-    private int colorIndex() {
-        final String[] values =
-                getResources().getStringArray(R.array.oepl_weather_led_colors_values);
-        final int at = Arrays.asList(values)
-                .indexOf(prefs().getString(OEPLPrefs.PREF_LED_COLOR, "red"));
-        return at < 0 ? 0 : at;
-    }
+        Choice(final int view, final String key, final String fallback, final int names,
+               final int values, final int label, final int title) {
+            this.button = findViewById(view);
+            this.key = key;
+            this.fallback = fallback;
+            this.names = names;
+            this.values = values;
+            this.label = label;
+            this.title = title;
+            show();
+            button.setOnClickListener(v -> ask());
+        }
 
-    private void askColor() {
-        final String[] names = getResources().getStringArray(R.array.oepl_weather_led_colors);
-        final String[] values =
-                getResources().getStringArray(R.array.oepl_weather_led_colors_values);
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.oepl_tools_color_title)
-                .setSingleChoiceItems(names, colorIndex(), (dialog, which) -> {
-                    prefs().edit().putString(OEPLPrefs.PREF_LED_COLOR, values[which]).apply();
-                    showColor();
-                    dialog.dismiss();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        private String[] names() {
+            return getResources().getStringArray(names);
+        }
+
+        private String[] values() {
+            return getResources().getStringArray(values);
+        }
+
+        /** Where the stored value sits in the list, or the first entry when it is not in it. */
+        private int at() {
+            final int at = Arrays.asList(values()).indexOf(prefs().getString(key, fallback));
+            return at < 0 ? 0 : at;
+        }
+
+        private void show() {
+            button.setText(getString(label, names()[at()]));
+        }
+
+        private void ask() {
+            final String[] values = values();
+            new AlertDialog.Builder(OEPLToolsActivity.this)
+                    .setTitle(title)
+                    .setSingleChoiceItems(names(), at(), (dialog, which) -> {
+                        prefs().edit().putString(key, values[which]).apply();
+                        show();
+                        dialog.dismiss();
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        }
     }
 
     /**
@@ -231,16 +273,33 @@ public class OEPLToolsActivity extends AbstractGBActivity {
         if (uri == null) {
             return;
         }
-        final byte[] firmware;
-        try (InputStream in = new BufferedInputStream(getContentResolver().openInputStream(uri))) {
-            firmware = nodomain.freeyourgadget.gadgetbridge.util.FileUtils
-                    .readAll(in, FIRMWARE_LIMIT);
-        } catch (final Exception e) {
-            LOG.warn("could not read {}", uri, e);
-            GB.toast(getString(R.string.oepl_tools_firmware_not_firmware), 3000, GB.ERROR);
+        // Read away from the main thread. The chooser is free to hand over a file that does
+        // not sit on the phone at all - one out of a cloud folder is fetched over the network
+        // when it is opened - and reading that on the main thread freezes the screen for as
+        // long as it takes. Which is exactly long enough to press back, and the confirmation
+        // then had no window left to open in and took the app down with it.
+        final Thread thread = new Thread(() -> {
+            byte[] read = null;
+            try (InputStream in =
+                         new BufferedInputStream(getContentResolver().openInputStream(uri))) {
+                read = nodomain.freeyourgadget.gadgetbridge.util.FileUtils
+                        .readAll(in, FIRMWARE_LIMIT);
+            } catch (final Exception e) {
+                LOG.warn("could not read {}", uri, e);
+            }
+            final byte[] firmware = read;
+            handler.post(() -> offer(uri, firmware));
+        }, "oepl-firmware-read");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /** Back on the main thread, and only while there is still a screen to ask on. */
+    private void offer(final Uri uri, @Nullable final byte[] firmware) {
+        if (gone()) {
             return;
         }
-        if (!OEPLProtocol.looksLikeFirmware(firmware)) {
+        if (firmware == null || !OEPLProtocol.looksLikeFirmware(firmware)) {
             GB.toast(getString(R.string.oepl_tools_firmware_not_firmware), 4000, GB.ERROR);
             return;
         }
@@ -257,6 +316,11 @@ public class OEPLToolsActivity extends AbstractGBActivity {
                 .setPositiveButton(R.string.oepl_tools_firmware_go, (d, w) -> write(uri))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    /** Whether this screen is on its way out, and nothing may be shown on it any more. */
+    private boolean gone() {
+        return isFinishing() || isDestroyed();
     }
 
     /**
