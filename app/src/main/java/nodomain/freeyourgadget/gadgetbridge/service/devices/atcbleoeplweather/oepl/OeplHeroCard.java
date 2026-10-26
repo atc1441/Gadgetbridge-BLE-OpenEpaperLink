@@ -67,11 +67,11 @@ public class OeplHeroCard extends OeplCard {
         final float badgeH = Math.min(c.height * 0.17f, Math.max(12f, c.width * 0.075f));
         // nothing under eight pixels: a badge that cannot be read is a row of room taken
         // from the figure underneath it, which is the whole point of this card
-        final float badgeText = c.sizeForHeight(badgeH * 0.62f, badgeH, 8f);
+        final float badgeText = c.sizeForHeight(badgeH * 0.62f, badgeH, OeplCanvas.READABLE);
         if (readings.size() > 1 && badgeText > 0f && c.height >= 90f) {
             final String stamp = new SimpleDateFormat("EE dd. MMM", Locale.getDefault())
                     .format(new Date());
-            final float stampSize = c.sizeForHeight(badgeH * 0.6f, badgeH, 8f);
+            final float stampSize = c.sizeForHeight(badgeH * 0.6f, badgeH, OeplCanvas.READABLE);
             final float stampWidth = c.measure(stamp, stampSize) + pad;
             c.text(stamp, c.width - pad, top + (badgeH - c.lineHeight(stampSize)) / 2f,
                     stampSize, OeplCanvas.RIGHT, c.ink);
@@ -154,7 +154,7 @@ public class OeplHeroCard extends OeplCard {
     private void hero(final OeplCanvas c, final OeplReading reading, final RectF box) {
         final String value = reading.display(fahrenheit);
         final int color = reading.accent ? c.accent : c.ink;
-        final float labelSize = c.sizeForHeight(box.height() * 0.2f, box.height() * 0.26f, 8f);
+        final float labelSize = c.sizeForHeight(box.height() * 0.2f, box.height() * 0.26f, OeplCanvas.READABLE);
         final float labelHeight = labelSize > 0f ? c.lineHeight(labelSize) : 0f;
         final float figureHeight = box.height() - labelHeight;
 
@@ -177,7 +177,7 @@ public class OeplHeroCard extends OeplCard {
             // name: it cannot be abbreviated, only set smaller, and smaller is what it gets
             // before anything is cut off it.
             c.textSqueezed(reading.label, box.left, box.top + figureHeight, labelSize,
-                    OeplCanvas.LEFT, c.ink, box.width(), Math.max(8f, labelSize * 0.4f));
+                    OeplCanvas.LEFT, c.ink, box.width(), Math.max(OeplCanvas.READABLE, labelSize * 0.4f));
         }
     }
 
@@ -187,7 +187,7 @@ public class OeplHeroCard extends OeplCard {
         // the height alone asks for sixty pixel type in a column six characters wide, and
         // every appointment then reads "16:56 ..."
         final float size = Math.min(c.sizeForHeight(box.height() * 0.2f,
-                box.height() * 0.24f, 8f), box.width() / 6.5f);
+                box.height() * 0.24f, 12), box.width() / 6.5f);
         if (size <= 0f) {
             return;
         }

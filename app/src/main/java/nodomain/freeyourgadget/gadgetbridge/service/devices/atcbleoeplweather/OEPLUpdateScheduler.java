@@ -247,16 +247,33 @@ public final class OEPLUpdateScheduler {
      * show up on the panel at some unrelated later time.
      */
     public static void requestLiveUpdate(final Context context, final GBDevice device) {
+        requestLiveUpdate(context, device, false);
+    }
+
+    /**
+     * @param byHand true when a person just changed what the display is to show. Then the
+     *               shortest time between two pushes does not apply: it is there so that a
+     *               burst of notifications cannot thrash the panel, and somebody typing a new
+     *               text into the settings is not a burst of notifications. They are standing
+     *               in front of the display waiting for it to change.
+     */
+    public static void requestLiveUpdate(final Context context, final GBDevice device,
+                                         final boolean byHand) {
         final SharedPreferences prefs =
                 GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
-        if (!OEPLPrefs.liveUpdates(prefs)) {
+        if (!byHand && !OEPLPrefs.liveUpdates(prefs)) {
             return;
         }
-        if (OEPLQuietHours.covers(prefs, System.currentTimeMillis())) {
+        if (!byHand && OEPLQuietHours.covers(prefs, System.currentTimeMillis())) {
             // a message arriving at two in the morning is not worth a panel flashing in a dark
-            // room; the alarm for the end of the window is already armed and will carry it
+            // room; the alarm for the end of the window is already armed and will carry it.
+            // Somebody changing the display by hand at two in the morning means it though.
             LOG.debug("{} is in its quiet hours, not pushing a live update",
                     device.getAddress());
+            return;
+        }
+        if (byHand) {
+            requestUpdateNow(context, device);
             return;
         }
         final long since = System.currentTimeMillis()
@@ -266,9 +283,20 @@ public final class OEPLUpdateScheduler {
         armIn(context, device.getAddress(), delay, REASON_LIVE, true);
     }
 
-    /** The user asked for it, so go now and do not wait for anything. */
+    /**
+     * The user asked for it, so go now and do not wait for anything.
+     * <p>
+     * That includes not waiting for the retry ladder. A display that has been out of reach for
+     * a while is being tried every half hour by then, and the ladder is right for a panel
+     * nobody is looking at - but somebody who has just typed a new text into the settings is
+     * standing in front of it. So the count of failures is cleared first: this attempt goes
+     * now, and if the tag happens to be asleep the next one follows in a minute rather than in
+     * half an hour.
+     */
     public static void requestUpdateNow(final Context context, final GBDevice device) {
         final String address = device.getAddress();
+        GBApplication.getDeviceSpecificSharedPrefs(address).edit()
+                .putInt(OEPLStatusStore.CONSECUTIVE_FAILURES, 0).apply();
         final Thread thread = new Thread(() -> run(context, address, REASON_MANUAL),
                 "oepl-update-now");
         thread.setDaemon(true);

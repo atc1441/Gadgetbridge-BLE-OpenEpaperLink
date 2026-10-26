@@ -26,6 +26,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.WeatherIcons;
 
@@ -150,7 +152,7 @@ public class WeatherContent implements CardContent {
         int pairGuard = 0;
         while (high.measureText(hi) + pad * 1.4f + small.measureText(lo)
                 > area.width() - pad * 2f && small.getTextSize() > 9f && pairGuard++ < 64) {
-            small.setTextSize(Math.max(9f, small.getTextSize() * 0.94f));
+            small.setTextSize(Math.max(OeplCanvas.READABLE, small.getTextSize() * 0.94f));
             high.setTextSize(small.getTextSize());
         }
 
@@ -168,7 +170,7 @@ public class WeatherContent implements CardContent {
         }
 
         // what is left over carries the reading and the pictogram
-        final float band = Math.max(12f, floor - area.top);
+        final float band = Math.max(OeplCanvas.READABLE, floor - area.top);
         final float iconSize = Math.min(band * 0.92f, area.width() * 0.30f);
         final String temp = style.temperature(spec.getCurrentTemp());
         final Paint big = style.paint(style.ink, true, band * 0.92f);
@@ -180,8 +182,8 @@ public class WeatherContent implements CardContent {
         final float room = area.width() - iconSize - gap - pad * 2;
         while (big.measureText(temp) + unit.measureText(unitText) > room
                 && big.getTextSize() > 6f && guard++ < 64) {
-            big.setTextSize(big.getTextSize() * 0.94f);
-            unit.setTextSize(big.getTextSize() * 0.38f);
+            big.setTextSize(Math.max(OeplCanvas.READABLE, big.getTextSize() * 0.94f));
+            unit.setTextSize(Math.max(OeplCanvas.READABLE, big.getTextSize() * 0.38f));
         }
 
         final float groupW = iconSize + gap + big.measureText(temp) + unit.measureText(unitText);
@@ -235,7 +237,7 @@ public class WeatherContent implements CardContent {
                     + lo.measureText(style.shortTemperature(d.getMinTemp())));
         }
         while (widest + gap > tempW && hi.getTextSize() > 6f) {
-            hi.setTextSize(hi.getTextSize() * 0.94f);
+            hi.setTextSize(Math.max(OeplCanvas.READABLE, hi.getTextSize() * 0.94f));
             lo.setTextSize(hi.getTextSize());
             widest *= 0.94f;
         }
@@ -245,7 +247,7 @@ public class WeatherContent implements CardContent {
             final float base = Math.min(area.top + rowH * (i + 0.68f),
                     style.baselineAbove(area.bottom, lo));
             final String name = dayName(i + 1);
-            style.fitNoSmallerThan(day, name, nameW, 7f);
+            style.fitNoSmallerThan(day, name, nameW, OeplCanvas.READABLE);
             style.drawEllipsised(canvas, name, area.left, base, nameW, day);
 
             WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
@@ -274,7 +276,7 @@ public class WeatherContent implements CardContent {
 
         final float colW = area.width() / days;
         final Paint day = style.paint(style.ink, true,
-                Math.max(8f, Math.min(area.height() * 0.28f, colW * 0.36f)));
+                Math.max(12f, Math.min(area.height() * 0.28f, colW * 0.36f)));
         final Paint hi = style.paint(style.accent, true, day.getTextSize());
         final Paint lo = style.paint(style.ink, false, day.getTextSize());
 
@@ -293,8 +295,8 @@ public class WeatherContent implements CardContent {
             if (widest <= colW - figureGap || hi.getTextSize() <= 7f) {
                 break;
             }
-            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
-            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+            hi.setTextSize(Math.max(OeplCanvas.READABLE, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(OeplCanvas.READABLE, lo.getTextSize() * 0.94f));
         }
 
         final float tempBase = style.baselineAbove(area.bottom, hi);
@@ -312,7 +314,7 @@ public class WeatherContent implements CardContent {
             widestDay = Math.max(widestDay, day.measureText(dayName(i + 1)));
         }
         if (widestDay > colW * 0.95f) {
-            style.fitNoSmallerThan(day, widestDayName(day, days), colW * 0.95f, 7f);
+            style.fitNoSmallerThan(day, widestDayName(day, days), colW * 0.95f, OeplCanvas.READABLE);
         }
 
         for (int i = 0; i < days; i++) {
@@ -327,11 +329,18 @@ public class WeatherContent implements CardContent {
                     cx, iconTop + iconSize / 2f, iconSize, style.ink, style.accent);
 
             final String max = style.shortTemperature(d.getMaxTemp());
-            final String min = style.shortTemperature(d.getMinTemp());
-            final float total = hi.measureText(max) + lo.measureText(min) + figureGap;
+            // as in the forecast card: where both will not fit the column at a size that can
+            // be read, the day's high stays and its low goes
+            final String min = hi.measureText(max) + figureGap
+                    + lo.measureText(style.shortTemperature(d.getMinTemp())) > colW
+                    ? "" : style.shortTemperature(d.getMinTemp());
+            final float total = hi.measureText(max) + lo.measureText(min)
+                    + (min.isEmpty() ? 0f : figureGap);
             final float startX = cx - total / 2f;
             canvas.drawText(max, startX, tempBase, hi);
-            canvas.drawText(min, startX + hi.measureText(max) + figureGap, tempBase, lo);
+            if (!min.isEmpty()) {
+                canvas.drawText(min, startX + hi.measureText(max) + figureGap, tempBase, lo);
+            }
         }
     }
 

@@ -5445,6 +5445,7 @@
         <item>@string/oepl_content_panel_hero</item>
         <item>@string/oepl_content_panel_list</item>
         <item>@string/oepl_content_panel_graph</item>
+        <item>@string/oepl_content_panel_wall</item>
         <item>@string/oepl_content_weather</item>
         <item>@string/oepl_content_date</item>
         <item>@string/oepl_content_calendar</item>
@@ -5490,6 +5491,7 @@
         <item>panel_hero</item>
         <item>panel_list</item>
         <item>panel_graph</item>
+        <item>panel_wall</item>
         <item>weather</item>
         <item>date</item>
         <item>calendar</item>
@@ -5547,6 +5549,7 @@
         <item>@string/oepl_content_panel_list</item>
         <item>@string/oepl_content_panel_graph</item>
         <item>@string/oepl_content_panel_quad</item>
+        <item>@string/oepl_content_panel_wall</item>
         <item>@string/oepl_content_weather</item>
         <item>@string/oepl_content_date</item>
         <item>@string/oepl_content_calendar</item>
@@ -5592,6 +5595,7 @@
         <item>panel_list</item>
         <item>panel_graph</item>
         <item>panel_quad</item>
+        <item>panel_wall</item>
         <item>weather</item>
         <item>date</item>
         <item>calendar</item>

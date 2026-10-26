@@ -41,6 +41,19 @@ public class OeplCalendarWeekCard extends OeplCard {
     /** Below this a column holds neither a heading nor a box with a word in it. */
     private static final float MIN_COLUMN = 46f;
 
+    /**
+     * Whether an area is large enough for the grid, or whether this card would fall back to
+     * the list of what is coming up.
+     * <p>
+     * It is asked from outside as well: a sheet that puts this card beside an appointment
+     * list has to know that it is getting a grid, because what it gets otherwise is the same
+     * list twice over - which is how it was reported from a 4.2 inch panel.
+     */
+    public static boolean fitsAsGrid(final float width, final float height, final int days) {
+        final int wanted = Math.max(1, Math.min(7, days));
+        return width >= wanted * MIN_COLUMN + 26f && height >= 130f;
+    }
+
     private final List<CalendarEvent> events;
     private final int days;
 
@@ -53,6 +66,11 @@ public class OeplCalendarWeekCard extends OeplCard {
     @Override
     public boolean hasData() {
         return events != null;
+    }
+
+    /** How many days it was asked for, which decides whether a grid fits an area. */
+    public int days() {
+        return days;
     }
 
     @Override
@@ -95,14 +113,14 @@ public class OeplCalendarWeekCard extends OeplCard {
         // A column per day plus the hour gutter needs room. Below that the grid says less than
         // a plain list of what is coming up, so that is what a small tag gets instead - a week
         // view squeezed into a price tag is a pattern of lines, not a calendar.
-        if (w < days * MIN_COLUMN + 26f || h < 130f) {
+        if (!fitsAsGrid(w, h, days)) {
             new OeplCalendarListCard(events, 9, heading(starts)).paint(c);
             return;
         }
 
         // The hour gutter is measured first, from the panel alone: the headings want to know
         // how wide a column is, and the columns are whatever the gutter leaves over.
-        final float labelSize = Math.max(7f, Math.min(h * 0.075f, 18f));
+        final float labelSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.075f, 18f));
         final float gutter = c.measure(OeplCanvas.number(24), labelSize) + 5f;
         final float columnWidth = (w - gutter - 1f) / days;
 
@@ -111,19 +129,19 @@ public class OeplCalendarWeekCard extends OeplCard {
         // column week came out as a row of single letters and ellipses.
         final float headRoom = h * 0.15f;
         final float nameSize = c.sizeForHeight(Math.min(columnWidth * 0.46f, headRoom * 0.52f),
-                headRoom * 0.52f, 7f);
+                headRoom * 0.52f, OeplCanvas.READABLE);
         final float numberSize = nameSize * 0.92f;
         final float headerBottom = c.lineHeight(nameSize) + c.lineHeight(numberSize) + 2f;
 
         // all day entries stack into their own band between the headings and the grid
-        final float bandRow = Math.max(7f, Math.min(h * 0.115f, w * 0.07f));
+        final float bandRow = Math.max(OeplCanvas.READABLE, Math.min(h * 0.115f, w * 0.07f));
         final int bands = Math.min(allDay.isEmpty() ? 0 : 2, allDay.size());
         final float gridTop = headerBottom + bands * bandRow;
 
         // An hour row has to stay thick enough to hold a box with a readable label. When the
         // day does not fit, the window shrinks around the first appointment rather than letting
         // the rows collapse into each other.
-        final float minRow = Math.max(7f, h * 0.055f);
+        final float minRow = Math.max(OeplCanvas.READABLE, h * 0.055f);
         final int maxRows = Math.max(1, (int) ((h - gridTop) / minRow));
         if (maxHour - minHour > maxRows) {
             maxHour = minHour + maxRows;
@@ -154,10 +172,10 @@ public class OeplCalendarWeekCard extends OeplCard {
             final float top = headerBottom + row * bandRow + 1f;
             c.fillRect(left, top, width, bandRow - 2f, c.paper);
             c.strokeRect(left, top, width, bandRow - 2f, c.accent, 1f);
-            final float bandSize = c.sizeForHeight(bandRow * 0.82f, bandRow - 2f, 6f);
+            final float bandSize = c.sizeForHeight(bandRow * 0.82f, bandRow - 2f, OeplCanvas.READABLE);
             if (bandSize > 0f) {
                 c.textSqueezed(e.getTitle(), left + 2f, top, bandSize, OeplCanvas.LEFT,
-                        c.ink, width - 4f, Math.max(7f, bandSize * 0.45f));
+                        c.ink, width - 4f, Math.max(OeplCanvas.READABLE, bandSize * 0.45f));
             }
             row++;
         }
@@ -232,14 +250,14 @@ public class OeplCalendarWeekCard extends OeplCard {
             // eight pixels or no title at all: the box alone still says that the hour is
             // taken, while a line of grey dust inside it says nothing
             final float titleSize = c.sizeForHeight(Math.min(h * 0.085f, columnWidth * 0.3f),
-                    Math.min(boxHeight - 2f, h - top - 2f), 8f);
+                    Math.min(boxHeight - 2f, h - top - 2f), 12);
             if (titleSize > 0f) {
                 // Shrunk to fit the box before it is cut, and shrunk a long way: a column of
                 // this grid is fifty pixels wide, which is one word, so the choice is between
                 // "Zahnarzt" set half the size of the hour labels and "Zah…". Eight pixels
                 // is where the panel's own quantiser stops it.
                 c.textSqueezed(e.getTitle(), left + 2f, top + 1f, titleSize, OeplCanvas.LEFT,
-                        c.ink, width - 4f, Math.max(8f, titleSize * 0.45f));
+                        c.ink, width - 4f, Math.max(OeplCanvas.READABLE, titleSize * 0.45f));
             }
         }
     }

@@ -83,7 +83,7 @@ public class OeplGraphCard extends OeplCard {
         // eight pixels or nothing, here as everywhere: the curve says more on its own than
         // it does under a line of grey dust
         final float headSize = c.sizeForHeight(Math.min(c.height * 0.14f, c.width * 0.07f),
-                c.height * 0.18f, 8f);
+                c.height * 0.18f, 12);
         if (headSize > 0f && c.height >= 90f) {
             final String now = tempFine(weather.current.temperature) + "°";
             c.rowEnds(weather.location, now, top, headSize, c.ink,
@@ -94,7 +94,7 @@ public class OeplGraphCard extends OeplCard {
 
         // what the axes need: hour labels along the bottom, two degree labels down the left
         final float labelSize = c.sizeForHeight(Math.min(c.height * 0.11f, c.width * 0.055f),
-                c.height * 0.14f, 8f);
+                c.height * 0.14f, 12);
         final float labelHeight = labelSize > 0f ? c.lineHeight(labelSize) : 0f;
 
         float peakRain = 0f;

@@ -62,6 +62,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRssClient;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplSunCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplTilesCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWallCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeather;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeatherCard;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
@@ -249,6 +250,15 @@ public final class OeplSettings {
         cases.add(one(OeplCardFactory.MONTH, "an empty month"));
         cases.add(one(OeplCardFactory.MONTH, "a day with four appointments on it"));
         cases.add(stress(OeplCardFactory.MONTH, "caption=long"));
+
+        for (final int days : new int[]{3, 5, 7}) {
+            cases.add(one(OeplCardFactory.WALL, "days=" + days + ", entries=4, forecast=5"));
+        }
+        cases.add(one(OeplCardFactory.WALL, "days=7, entries=8, forecast=7"));
+        cases.add(one(OeplCardFactory.WALL, "days=7, entries=4, forecast=0"));
+        cases.add(one(OeplCardFactory.WALL, "an empty diary"));
+        cases.add(one(OeplCardFactory.WALL, "no weather at all"));
+        cases.add(stress(OeplCardFactory.WALL, "days=7, entries=8, forecast=7, long"));
 
         cases.add(one(OeplCardFactory.QUAD, "one quarter"));
         cases.add(one(OeplCardFactory.QUAD, "two quarters"));
@@ -469,6 +479,15 @@ public final class OeplSettings {
                     return new OeplMonthCard(crowdedDay(), "Kalender");
                 }
                 return new OeplMonthCard(OeplDemo.events(), caption(s));
+            case OeplCardFactory.WALL:
+                return new OeplWallCard(
+                        s.contains("no weather") ? null : OeplDemo.weather(),
+                        s.contains("empty diary") ? Collections.emptyList() : OeplDemo.events(),
+                        OeplDemo.beyondTheWeather(),
+                        s.contains("days=") ? number(s, "days=") : 7,
+                        s.contains("entries=") ? number(s, "entries=") : 4,
+                        s.contains("forecast=") ? number(s, "forecast=") : 5,
+                        true, "Kalender");
             case OeplCardFactory.QUAD:
                 return new QuadContent(quarters(s));
 

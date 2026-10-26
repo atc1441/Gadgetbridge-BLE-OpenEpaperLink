@@ -65,13 +65,25 @@ public class OeplDashboardTest {
 
     // ------------------------------------------------------------------ the tiles
 
+    /**
+     * A figure has to survive the panel: two or three colours and a quantiser that turns a
+     * thin stroke into paper.
+     * <p>
+     * The floor is both a share of the panel and an absolute size, because the two say
+     * different things. A large panel now divides into more tiles than the eight it used to -
+     * a seven inch display showing eight values in enormous type wastes most of itself - so
+     * its figures are a smaller share of it than they were. They are not smaller: thirty odd
+     * pixels on a 800 by 480 panel is a figure read from the other side of a room, and there
+     * are twelve of them instead of eight.
+     */
     @Test
     public void aTileFigureStaysBigEnoughToSurviveThePanel() {
         // the twelve values of a fully configured display, on the shapes a tag really has
         for (final int[] shape : new int[][]{{384, 184}, {296, 128}, {400, 300}, {800, 480}}) {
             final float biggest = biggestFigure("panel_grid", shape[0], shape[1]);
             assertTrue(String.format("the figures on a %dx%d grid came out %.1f px",
-                    shape[0], shape[1], biggest), biggest >= shape[1] * 0.1f);
+                    shape[0], shape[1], biggest),
+                    biggest >= Math.max(14f, shape[1] * 0.08f));
 
             // and with half the values a sentence rather than a figure, which is what a
             // Home Assistant state often is: the sentences are cut, the figures stay large
@@ -92,13 +104,22 @@ public class OeplDashboardTest {
         assertFalse(OeplGridCard.isFigure(null));
     }
 
+    /**
+     * How many values a panel is divided into follows the panel. A shelf label holds a
+     * handful and wants the handful that matter; a display on a wall holds two dozen, and
+     * filling it with the same handful in enormous type is the card wasting what it was
+     * given - which is how this was reported.
+     */
     @Test
-    public void aSmallPanelShowsFewerValuesRatherThanSmallerOnes() {
-        final int large = tiles(800, 480);
+    public void aLargePanelShowsMoreValuesRatherThanLargerOnes() {
+        final int large = tiles(960, 672);
+        final int medium = tiles(800, 480);
         final int small = tiles(296, 128);
-        assertTrue("a large panel should hold more tiles than a shelf label",
-                large >= small);
-        assertTrue("no panel shows more than a glance can take in", large <= 8);
+        assertTrue("a wall panel holds more than a shelf label", large > small);
+        assertTrue("and no fewer than the one a size down", large >= medium);
+        assertTrue("a shelf label still holds a handful", small >= 4 && small <= 8);
+        assertTrue("but no panel is divided past what a glance takes in",
+                OeplGridCard.maxTiles(2560, 1440) <= 24);
         assertTrue("even a price tag shows something", tiles(152, 152) >= 1);
     }
 

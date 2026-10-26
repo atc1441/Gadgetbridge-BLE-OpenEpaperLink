@@ -48,18 +48,49 @@ public class OeplCanvas {
         this.accent = accent;
     }
 
+    /**
+     * The size under which text is drawn hard rather than smoothed.
+     * <p>
+     * Anti aliasing paints the edge of a letter in grey, which is a promise this panel cannot
+     * keep: it has two or three colours, and the quantiser that reduces the picture to them
+     * throws every grey pixel to one side or the other. Measured on the bundled face, that
+     * loses between two fifths and two thirds of the ink a line is drawn with - and at the
+     * small end it is the thin strokes that go, which is how a caption turns into gravel.
+     * Drawn hard, nothing is lost at all and half again as many strokes survive. Above this
+     * size the stems are thick enough that only their edges are grey, and smoothing is worth
+     * more than it costs.
+     */
+    public static final float SMOOTH_FROM = 13f;
+
+    /**
+     * The smallest type this project puts on a panel, and the number every card's floor is
+     * taken from.
+     * <p>
+     * It is a physical size rather than a taste: the panels here run at about five pixels to
+     * the millimetre, so twelve pixels is a capital letter a shade under two millimetres -
+     * which is what a person reads a tag at arm's length by, and about what a telephone book
+     * was set in. Below that the letters are still there, they are simply no longer read, and
+     * a card that shows twelve values nobody reads is worth less than one showing six that
+     * are. So nothing is ever set smaller: a card that cannot fit what it has at this size
+     * shows fewer of them instead.
+     */
+    public static final float READABLE = 10f;
+
     public Paint textPaint(final float size, final int color) {
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        // nothing smaller than the panel can be read at, whatever a layout asks for
+        final float set = Math.max(READABLE, size);
+        final Paint p = new Paint(set >= SMOOTH_FROM ? Paint.ANTI_ALIAS_FLAG : 0);
         p.setTypeface(OeplFonts.text());
-        p.setTextSize(Math.max(5f, size));
+        p.setTextSize(set);
         p.setColor(color);
         return p;
     }
 
     public Paint iconPaint(final float size, final int color) {
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final float set = Math.max(5f, size);
+        final Paint p = new Paint(set >= SMOOTH_FROM ? Paint.ANTI_ALIAS_FLAG : 0);
         p.setTypeface(OeplFonts.icons() != null ? OeplFonts.icons() : OeplFonts.text());
-        p.setTextSize(Math.max(5f, size));
+        p.setTextSize(set);
         p.setColor(color);
         return p;
     }
@@ -145,6 +176,13 @@ public class OeplCanvas {
             while (text.length() > 1 && paint.measureText(text + "…") > maxWidth) {
                 text = text.substring(0, text.length() - 1);
             }
+            // A word of which two letters survive is not a short word, it is a riddle: "Za"
+            // for "Zahnarzt" tells a reader nothing they could not guess from the box being
+            // there at all. Under three letters the label is left out and the room goes to
+            // whatever else the row holds.
+            if (text.trim().length() < 3) {
+                return;
+            }
             text = text + "…";
             if (paint.measureText(text) > maxWidth) {
                 // Not even one letter and an ellipsis fit. The mark used to go in on its own
@@ -163,7 +201,7 @@ public class OeplCanvas {
      * seven pixels is where the panel's own quantiser takes over.
      */
     public static float floorFor(final float size) {
-        return Math.max(7f, size * 0.5f);
+        return Math.max(READABLE, size * 0.6f);
     }
 
     /**
@@ -278,8 +316,7 @@ public class OeplCanvas {
         // away altogether. It is set at the smallest size the panel still shows and cut to the
         // box instead, which costs the end of a sentence rather than the whole of it.
         final float size = fillingSize(text, maxWidth, maxHeight);
-        textFillingAtClipped(text, cx, cy,
-                Math.max(size, Math.min(9f, Math.max(7f, maxHeight * 0.4f))), color, maxWidth);
+        textFillingAtClipped(text, cx, cy, Math.max(size, READABLE), color, maxWidth);
     }
 
     /** As {@link #textFillingClipped}, at a size that was worked out for several lines at once. */
@@ -530,7 +567,7 @@ public class OeplCanvas {
             // caption that would have to go below two thirds of the row is cut after all.
             final float room = x1 - x0 - used;
             final Paint paint = textPaint(size, leftColor);
-            fitNoSmallerThan(paint, left, room, Math.max(7f, size * 0.62f));
+            fitNoSmallerThan(paint, left, room, Math.max(READABLE, size * 0.62f));
             if (paint.measureText(left) <= room) {
                 draw(left, x0, y, LEFT, paint);
             } else {

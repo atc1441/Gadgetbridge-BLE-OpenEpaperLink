@@ -19,6 +19,9 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.c
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+import android.graphics.Rect;
 import android.graphics.RectF;
 
 import androidx.annotation.Nullable;
@@ -41,8 +44,19 @@ public class ClockContent implements CardContent {
         final String time = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
         final Paint paint = style.paint(style.ink, true, area.height() * 1.05f);
         style.fit(paint, time, area.width() * 0.94f);
-        final Paint.FontMetrics fm = paint.getFontMetrics();
-        final float baseline = area.top + (area.height() - (fm.ascent + fm.descent)) / 2f;
+        // Fitted to the height by the ink the figures really leave rather than by the face's
+        // metrics, and centred on that ink. A language whose digits are taller than the
+        // bundled face's - Burmese writes its own - overflowed a box fitted to the metrics by
+        // a fifth of the panel.
+        final Rect ink = new Rect();
+        paint.getTextBounds(time, 0, time.length(), ink);
+        int guard = 0;
+        while (ink.height() > area.height() * 0.96f
+                && paint.getTextSize() > OeplCanvas.READABLE && guard++ < 64) {
+            paint.setTextSize(Math.max(OeplCanvas.READABLE, paint.getTextSize() * 0.94f));
+            paint.getTextBounds(time, 0, time.length(), ink);
+        }
+        final float baseline = area.top + (area.height() - ink.height()) / 2f - ink.top;
         canvas.drawText(time, area.left + (area.width() - paint.measureText(time)) / 2f,
                 baseline, paint);
     }

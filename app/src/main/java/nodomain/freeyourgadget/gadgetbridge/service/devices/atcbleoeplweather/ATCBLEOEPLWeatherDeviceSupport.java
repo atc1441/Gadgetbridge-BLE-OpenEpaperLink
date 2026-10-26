@@ -1376,7 +1376,11 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
      * time, so this normally goes through the scheduler rather than straight down the link.
      */
     private void redrawNow(final SharedPreferences prefs, final String changedKey) {
-        // the cached picture is stale, otherwise the identical-image check would skip the push
+        // The cached picture is stale, otherwise the identical-image check would skip the
+        // push - and the quiet hours and the shortest time between two pushes do not apply to
+        // this one either. Both of those exist so that what the phone does by itself cannot
+        // thrash the panel; this is a person who has just changed what the display shows and
+        // is waiting in front of it.
         prefs.edit().putLong(OEPLPrefs.LAST_IMAGE_CRC, 0L).apply();
         forced = true;
         if (OEPLPrefs.PREF_WEATHER_SOURCE.equals(changedKey)

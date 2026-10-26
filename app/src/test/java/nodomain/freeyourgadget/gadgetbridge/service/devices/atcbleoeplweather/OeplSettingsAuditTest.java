@@ -37,6 +37,7 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardContent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardStyle;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
 
 /**
  * Every design, in every setting it can be put into, on every panel the catalogue knows.
@@ -481,12 +482,12 @@ public class OeplSettingsAuditTest {
             }
         }
 
-        // Ink that is there and cannot be seen. A panel has two or three colours and a
-        // quantiser that turns a thin grey stroke into paper, so a line under six pixels is
-        // not small type, it is a smear - and a card that produces one has shrunk something
-        // it should have cut instead.
+        // Ink that is there and cannot be read. The panels here run at about five pixels to
+        // the millimetre, so anything under OeplCanvas.READABLE is a line of letters that are
+        // present and not read - and a card that produces one has shrunk something it should
+        // have dropped or cut instead.
         for (final OeplInkRecorder.Run run : texts) {
-            if (!run.icon && run.size > 0f && run.size < 6f) {
+            if (!run.icon && run.size > 0f && run.size < OeplCanvas.READABLE - 0.5f) {
                 report.add("text too small for the panel to show",
                         where + "  " + run + String.format(" at %.1f px", run.size));
             }

@@ -22,6 +22,7 @@ import android.graphics.Typeface;
 
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
 
 /**
@@ -45,10 +46,18 @@ public class CardStyle {
         this.fahrenheit = fahrenheit;
     }
 
+    /**
+     * A line of text. Under {@link OeplCanvas#SMOOTH_FROM} pixels it is drawn hard rather than
+     * smoothed: the panel has no grey to put an anti aliased edge in, and the quantiser throws
+     * most of such an edge away - which at these sizes is most of the letter. See the note
+     * there, which is where it was measured.
+     */
     public Paint paint(final int color, final boolean bold, final float size) {
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        // as on the OEPL canvas: never under what the panel can be read at
+        final float set = Math.max(OeplCanvas.READABLE, size);
+        final Paint p = new Paint(set >= OeplCanvas.SMOOTH_FROM ? Paint.ANTI_ALIAS_FLAG : 0);
         p.setColor(color);
-        p.setTextSize(Math.max(6f, size));
+        p.setTextSize(set);
         p.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         return p;
     }
@@ -59,8 +68,9 @@ public class CardStyle {
             return;
         }
         int guard = 0;
-        while (paint.measureText(text) > maxWidth && paint.getTextSize() > 6f && guard++ < 64) {
-            paint.setTextSize(paint.getTextSize() * 0.94f);
+        while (paint.measureText(text) > maxWidth
+                && paint.getTextSize() > OeplCanvas.READABLE && guard++ < 64) {
+            paint.setTextSize(Math.max(OeplCanvas.READABLE, paint.getTextSize() * 0.94f));
         }
     }
 
@@ -79,7 +89,7 @@ public class CardStyle {
             return;
         }
         final float asked = paint.getTextSize();
-        fitNoSmallerThan(paint, text, maxWidth, Math.max(7f, asked * 0.5f));
+        fitNoSmallerThan(paint, text, maxWidth, Math.max(OeplCanvas.READABLE, asked * 0.6f));
         try {
             draw(canvas, text, x, y, maxWidth, paint);
         } finally {
@@ -92,6 +102,10 @@ public class CardStyle {
         if (paint.measureText(text) > maxWidth) {
             while (text.length() > 1 && paint.measureText(text + "…") > maxWidth) {
                 text = text.substring(0, text.length() - 1);
+            }
+            // as on the OEPL canvas: two letters and a mark are a riddle, not a label
+            if (text.trim().length() < 3) {
+                return;
             }
             text = text + "…";
             if (paint.measureText(text) > maxWidth) {
@@ -180,7 +194,8 @@ public class CardStyle {
         int guard = 0;
         while (paint.measureText(text) > maxWidth && paint.getTextSize() > floor
                 && guard++ < 64) {
-            paint.setTextSize(Math.max(floor, paint.getTextSize() * 0.94f));
+            paint.setTextSize(Math.max(Math.max(floor, OeplCanvas.READABLE),
+                    paint.getTextSize() * 0.94f));
         }
     }
 

@@ -4512,6 +4512,7 @@
     <string name="oepl_content_panel_list">Werteliste</string>
     <string name="oepl_content_panel_graph">Temperaturkurve</string>
     <string name="oepl_content_panel_quad">Vier Viertel</string>
+    <string name="oepl_content_panel_wall">Wandzeitung (Woche, Wetter, Termine)</string>
     <string name="oepl_content_panel_month">Monatsblatt</string>
     <string name="oepl_quad_none">(nichts)</string>
     <string name="oepl_group_weather">Wetter</string>
@@ -4526,6 +4527,8 @@
     <string name="oepl_reading_rain">Regen</string>
     <string name="oepl_reading_wind">Wind</string>
     <string name="oepl_reading_humidity">Feuchte</string>
+    <string name="oepl_reading_tomorrow">Morgen</string>
+    <string name="oepl_reading_sun">Sonne</string>
     <string name="oepl_reading_events">Termine</string>
     <string name="oepl_reading_display">Display</string>
     <string name="oepl_state_on">an</string>

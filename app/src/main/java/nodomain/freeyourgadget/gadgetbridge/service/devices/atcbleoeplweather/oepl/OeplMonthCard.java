@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -71,9 +72,9 @@ public class OeplMonthCard extends OeplCard {
         // too small for seven columns shows the list of what is coming up instead - and a way
         // out taken halfway through leaves both cards on the panel, one over the other.
         final float cell = (w - pad * 2f) / 7f;
-        final float headSize = c.sizeForHeight(Math.min(h * 0.12f, w * 0.07f), h * 0.15f, 8f);
+        final float headSize = c.sizeForHeight(Math.min(h * 0.12f, w * 0.07f), h * 0.15f, OeplCanvas.READABLE);
         final float headHeight = headSize > 0f ? c.lineHeight(headSize) * 1.05f : 0f;
-        final float nameSize = c.sizeForHeight(Math.min(cell * 0.42f, 13f), cell * 0.5f, 7f);
+        final float nameSize = c.sizeForHeight(Math.min(cell * 0.42f, 13f), cell * 0.5f, OeplCanvas.READABLE);
         final float nameHeight = nameSize > 0f ? c.lineHeight(nameSize) * 1.05f + 2f : 0f;
 
         final Calendar first = (Calendar) today.clone();
@@ -120,8 +121,20 @@ public class OeplMonthCard extends OeplCard {
         }
 
         final float numberSize = c.sizeForHeight(Math.min(rowHeight * 0.52f, cell * 0.5f),
-                rowHeight * 0.6f, 7f);
-        final int[] counts = counts(first, days);
+                rowHeight * 0.6f, OeplCanvas.READABLE);
+        final List<List<String>> onDay = onEachDay(first, days);
+
+        // What a cell holds depends on how large a cell is. On a price tag it is a number and
+        // a row of dots - a title at that size is two letters and a mark. On a panel on a
+        // wall a cell is the size of a postage stamp and holds what the day actually is: the
+        // dots say that something is on, the titles say what, and the whole point of hanging
+        // a month on a wall is reading it from the doorway.
+        final float titleSize = cell >= 56f && rowHeight >= 46f
+                ? c.sizeForHeight(Math.min(rowHeight * 0.17f, cell * 0.17f),
+                rowHeight * 0.2f, OeplCanvas.READABLE) : 0f;
+        final float numberLine = numberSize > 0f ? c.lineHeight(numberSize) * 0.92f : 0f;
+        final int titleRoom = titleSize > 0f
+                ? (int) ((rowHeight - numberLine - 3f) / c.lineHeight(titleSize)) : 0;
 
         for (int day = 1; day <= days; day++) {
             final int index = lead + day - 1;
@@ -134,12 +147,29 @@ public class OeplMonthCard extends OeplCard {
                 // first thing found on a sheet of thirty equal boxes
                 c.fillRect(left + 1f, cellTop + 1f, cell - 2f, rowHeight - 2f, c.accent);
             }
+            final List<String> titles = onDay.get(day);
+            final int color = isToday ? c.paper : c.ink;
             if (numberSize > 0f) {
-                c.text(OeplCanvas.number(day), left + cell / 2f, cellTop + rowHeight * 0.08f,
-                        numberSize, OeplCanvas.CENTER, isToday ? c.paper : c.ink);
+                // the number moves into the corner once the cell is a page of its own, so the
+                // titles under it get the width rather than being written around it
+                final boolean corner = titleRoom >= 1 && !titles.isEmpty();
+                c.text(OeplCanvas.number(day), corner ? left + 3f : left + cell / 2f,
+                        cellTop + rowHeight * 0.06f, numberSize,
+                        corner ? OeplCanvas.LEFT : OeplCanvas.CENTER, color);
             }
-            dots(c, counts[day], left, cellTop, cell, rowHeight, numberSize,
-                    isToday ? c.paper : c.ink);
+            if (titleRoom >= 1 && !titles.isEmpty()) {
+                float line = cellTop + rowHeight * 0.06f + numberLine;
+                for (int i = 0; i < Math.min(titleRoom, titles.size()); i++) {
+                    // the last line that fits says how many are left rather than one more title
+                    final boolean last = i == titleRoom - 1 && titles.size() > titleRoom;
+                    c.textClipped(last ? "+" + OeplCanvas.number(titles.size() - i)
+                                    : titles.get(i), left + 3f, line, titleSize,
+                            OeplCanvas.LEFT, color, cell - 6f);
+                    line += c.lineHeight(titleSize);
+                }
+            } else {
+                dots(c, titles.size(), left, cellTop, cell, rowHeight, numberSize, color);
+            }
         }
     }
 
@@ -195,26 +225,35 @@ public class OeplMonthCard extends OeplCard {
     }
 
     /**
-     * How many appointments fall on each day of this month, counted by the days an entry
-     * covers rather than by the moment it begins at.
+     * What is on each day of this month, by the days an entry covers rather than by the moment
+     * it begins at.
      * <p>
-     * So a holiday over three days puts a dot on all three - which is what somebody looking
-     * for a free weekend is looking at the sheet for - and an all day entry lands on the day
-     * it is written on rather than on whatever day its midnight in UTC falls on here. See
-     * {@link OeplDays}.
+     * So a holiday over three days is on all three - which is what somebody looking for a free
+     * weekend is looking at the sheet for - and an all day entry lands on the day it is
+     * written on rather than on whatever day its midnight in UTC falls on here. See
+     * {@link OeplDays}. The titles are in the calendar's own order, so the first of a day is
+     * the first that day brings.
      */
-    private int[] counts(final Calendar first, final int days) {
+    private List<List<String>> onEachDay(final Calendar first, final int days) {
         final Calendar cell = (Calendar) first.clone();
         cell.set(Calendar.DAY_OF_MONTH, 1);
         cell.set(Calendar.HOUR_OF_DAY, 0);
         cell.set(Calendar.MINUTE, 0);
         cell.set(Calendar.SECOND, 0);
         cell.set(Calendar.MILLISECOND, 0);
-        final int[] counts = new int[days + 1];
+        final List<List<String>> onDay = new ArrayList<>(days + 1);
+        onDay.add(Collections.emptyList()); // there is no day zero
         for (int day = 1; day <= days; day++) {
-            counts[day] = OeplDays.countOnDay(events, cell.getTimeInMillis());
+            final List<String> titles = new ArrayList<>();
+            for (final CalendarEvent event : events) {
+                if (OeplDays.coversDay(event, cell.getTimeInMillis())) {
+                    final String title = event.getTitle() == null ? "" : event.getTitle().trim();
+                    titles.add(title.isEmpty() ? "-" : title);
+                }
+            }
+            onDay.add(titles);
             cell.add(Calendar.DAY_OF_MONTH, 1);
         }
-        return counts;
+        return onDay;
     }
 }

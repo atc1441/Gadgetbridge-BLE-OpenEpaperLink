@@ -43,8 +43,21 @@ import java.util.Locale;
  */
 public class OeplGridCard extends OeplCard {
 
-    /** More than this on one panel and no single value is worth looking at any more. */
-    private static final int MAX_TILES = 8;
+    /**
+     * The most tiles a panel of a given size is worth dividing into.
+     * <p>
+     * It used to be eight whatever the panel was, which is right for a price tag and wrong
+     * for a seven inch display on a wall: eight tiles across 960 by 672 are the size of a
+     * playing card each, holding one number and a word. A tile is comfortable at about 150 by
+     * 100 - a symbol, a figure a room can be read from, and a caption - so that is what the
+     * panel is divided by, and the result is capped at two dozen, beyond which a wall of
+     * tiles stops being read and starts being scanned.
+     */
+    public static int maxTiles(final float width, final float height) {
+        final int cols = Math.max(1, (int) (width / 150f));
+        final int rows = Math.max(1, (int) (height / 100f));
+        return Math.max(8, Math.min(24, cols * rows));
+    }
     /** Below this a tile cannot hold a figure that survives the quantiser. */
     private static final float MIN_TILE_HEIGHT = 32f;
     private static final float MIN_TILE_WIDTH = 68f;
@@ -77,7 +90,7 @@ public class OeplGridCard extends OeplCard {
         // floor everywhere on this card - a line thinner than that leaves grey dust on the
         // panel once the quantiser has been over it, and dust is worse than a blank.
         final float headSize = c.sizeForHeight(Math.min(c.height * 0.12f, c.width * 0.065f),
-                c.height * 0.16f, 8f);
+                c.height * 0.16f, 12);
         if (headSize > 0f && c.height >= 110f) {
             final String stamp = stamp(c, headSize, c.width - pad * 2f);
             c.rowEnds(headline, stamp, 0f, headSize, c.ink, c.ink, pad, c.width - pad, pad * 2f);
@@ -87,10 +100,11 @@ public class OeplGridCard extends OeplCard {
         }
 
         final float gridHeight = c.height - top;
+        final int most = maxTiles(c.width, gridHeight);
         final int[] grid = grid(readings.size(), c.width, gridHeight);
         final int cols = grid[0];
         final int rows = grid[1];
-        final int shown = Math.min(Math.min(readings.size(), MAX_TILES), cols * rows);
+        final int shown = Math.min(Math.min(readings.size(), most), cols * rows);
         if (shown == 0) {
             return;
         }
@@ -103,7 +117,7 @@ public class OeplGridCard extends OeplCard {
         // No caption rather than an unreadable one: under about eight pixels the panel's
         // quantiser leaves grey dust where the word was, and the room is better spent on the
         // figure. sizeForHeight answers 0 when not even the floor fits.
-        final float labelSize = c.sizeForHeight(Math.min(h * 0.22f, 14f), h * 0.26f, 8f);
+        final float labelSize = c.sizeForHeight(Math.min(h * 0.22f, 14f), h * 0.26f, OeplCanvas.READABLE);
         final float labelHeight = labelSize > 0f ? c.lineHeight(labelSize) : 0f;
 
         // One size for every figure on the card, taken from the figure that has the least
@@ -133,7 +147,7 @@ public class OeplGridCard extends OeplCard {
         }
         // and whatever it came out as, never thinner than the panel can show: a figure that
         // only fits at five pixels is a figure nobody reads, so it is set at the floor and cut
-        valueSize = Math.max(valueSize, Math.min(9f, Math.max(7f, h * 0.3f)));
+        valueSize = Math.max(valueSize, OeplCanvas.READABLE);
 
         for (int i = 0; i < shown; i++) {
             final float left = (i % cols) * tileW + inset;
@@ -224,8 +238,27 @@ public class OeplGridCard extends OeplCard {
             c.canvas.restore();
         }
         final RectF box = valueBox(c, reading, w, band);
-        c.textFillingAtClipped(reading.display(fahrenheit), x + (box.left + box.right) / 2f,
-                bandCentre, valueSize, color, box.width());
+        final String value = reading.display(fahrenheit);
+        // A value that is a sentence rather than a figure - an appointment's title, a state
+        // Home Assistant words - is set across the lines the tile has room for instead of
+        // being cut. On a large panel a tile is two hundred pixels tall, and leaving "Tuev
+        // weitermelden" as "Tuev weiterm..." in that much room is the card wasting what it
+        // was given. Figures are untouched: they stay one line, all of them the same size.
+        final String[] lines = c.measure(value, valueSize) > box.width()
+                ? paragraph(c, value, box.width(), band, valueSize) : null;
+        if (lines != null) {
+            final float size = sentenceSize(c, value, box.width(), valueSize);
+            final float lineHeight = c.lineHeight(size);
+            float top = bandCentre - lineHeight * lines.length / 2f;
+            for (final String one : lines) {
+                c.textClipped(one, x + (box.left + box.right) / 2f, top, size,
+                        OeplCanvas.CENTER, color, box.width());
+                top += lineHeight;
+            }
+        } else {
+            c.textFillingAtClipped(value, x + (box.left + box.right) / 2f,
+                    bandCentre, valueSize, color, box.width());
+        }
 
         final float bar = barHeight(reading, h);
         if (bar > 0f) {
@@ -245,6 +278,66 @@ public class OeplGridCard extends OeplCard {
         }
     }
 
+    /**
+     * The size a sentence is set in: small enough that its longest word fits the column, and
+     * never under what the panel can show. A figure keeps the size every other figure has;
+     * only prose is allowed to be smaller, because only prose can be made to fit that way.
+     */
+    private float sentenceSize(final OeplCanvas c, final String text, final float maxWidth,
+                               final float valueSize) {
+        float size = valueSize;
+        int guard = 0;
+        while (size > 9f && guard++ < 64 && longestWord(c, text, size) > maxWidth) {
+            size = Math.max(9f, size * 0.94f);
+        }
+        return size;
+    }
+
+    private float longestWord(final OeplCanvas c, final String text, final float size) {
+        float longest = 0f;
+        for (final String word : text.trim().split("\\s+")) {
+            longest = Math.max(longest, c.measure(word, size));
+        }
+        return longest;
+    }
+
+    /**
+     * A sentence broken across as many lines as the tile has room for, or null when it is one
+     * word - a machine has no business hyphenating a word, so that one is cut as before.
+     */
+    private String[] paragraph(final OeplCanvas c, final String text, final float maxWidth,
+                               final float band, final float valueSize) {
+        final String trimmed = text == null ? "" : text.trim();
+        if (!trimmed.contains(" ")) {
+            return null;
+        }
+        final float size = sentenceSize(c, trimmed, maxWidth, valueSize);
+        final int room = (int) (band / c.lineHeight(size));
+        if (room < 2) {
+            return null; // no room for a second line, so nothing is gained by breaking it
+        }
+        final java.util.List<String> lines = new java.util.ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (final String word : trimmed.split("\\s+")) {
+            final String candidate = line.length() == 0 ? word : line + " " + word;
+            if (c.measure(candidate, size) <= maxWidth || line.length() == 0) {
+                line.setLength(0);
+                line.append(candidate);
+            } else {
+                lines.add(line.toString());
+                line.setLength(0);
+                line.append(word);
+                if (lines.size() == room - 1) {
+                    break;
+                }
+            }
+        }
+        if (line.length() > 0 && lines.size() < room) {
+            lines.add(line.toString());
+        }
+        return lines.size() < 2 ? null : lines.toArray(new String[0]);
+    }
+
     private Paint outline(final OeplCanvas c) {
         final Paint paint = new Paint();
         paint.setColor(c.ink);
@@ -260,7 +353,7 @@ public class OeplGridCard extends OeplCard {
      * twelve illegible boxes, and the four that matter most are a dashboard.
      */
     static int[] grid(final int count, final float width, final float height) {
-        final int wanted = Math.min(count, MAX_TILES);
+        final int wanted = Math.min(count, maxTiles(width, height));
         int bestCols = 0;
         int bestRows = 0;
         int bestTiles = 0;

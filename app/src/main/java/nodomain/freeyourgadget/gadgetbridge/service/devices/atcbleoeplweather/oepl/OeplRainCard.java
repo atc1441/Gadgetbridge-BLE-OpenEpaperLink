@@ -82,11 +82,11 @@ public class OeplRainCard extends OeplCard {
         final float scale = Math.max(2f, (float) Math.ceil(peak));
 
         // the place and the scale share one line and are measured against each other
-        final float headSize = Math.max(8f, Math.min(h * 0.17f, w * 0.13f));
+        final float headSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.17f, w * 0.13f));
         c.rowEnds(weather.location, Math.round(scale) + "mm", 0, headSize, c.ink, c.ink,
                 pad, w - pad, pad * 2);
 
-        final float labelSize = Math.max(6f, Math.min(h * 0.12f, w * 0.07f));
+        final float labelSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.12f, w * 0.07f));
         final float top = c.lineHeight(headSize) * 1.02f;
         final float bottom = h - c.lineHeight(labelSize);
 

@@ -28,6 +28,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplDays;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
 
@@ -87,8 +89,12 @@ public class CalendarContent implements CardContent {
         // touch the appointment next to it.
         final float maxColumn = (area.width() - pad * 5) * 0.45f;
         float timeColumn = widest(when, events, count);
-        while (timeColumn > maxColumn && when.getTextSize() > 6f) {
-            when.setTextSize(Math.max(6f, when.getTextSize() * 0.94f));
+        // the same floor in the condition as in the body, or the loop can never reach the
+        // one and never leave by the other
+        int guard = 0;
+        while (timeColumn > maxColumn && when.getTextSize() > OeplCanvas.READABLE
+                && guard++ < 64) {
+            when.setTextSize(Math.max(OeplCanvas.READABLE, when.getTextSize() * 0.94f));
             timeColumn = widest(when, events, count);
         }
 

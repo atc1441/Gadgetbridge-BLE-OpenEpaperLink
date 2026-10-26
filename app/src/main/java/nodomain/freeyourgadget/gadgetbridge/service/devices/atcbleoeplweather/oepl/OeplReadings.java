@@ -24,6 +24,7 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -70,16 +71,37 @@ public final class OeplReadings {
                                             final SharedPreferences prefs,
                                             @Nullable final OeplWeather weather,
                                             final List<CalendarEvent> events) {
+        return collect(context, device, prefs, weather, events, SMALL_PANEL);
+    }
+
+    /** What a tag with no room to spare shows: the shape this collector had for years. */
+    public static final int SMALL_PANEL = 8;
+
+    /**
+     * Everything the dashboard cards draw, collected once and in one order.
+     * <p>
+     * How much is collected depends on how much the panel can show. A price tag holds eight
+     * values and wants the eight that matter; a seven inch panel on a wall holds two dozen,
+     * and filling it with the same eight in enormous type wastes most of it. So the parts
+     * that can go on - the agenda above all, which is a list rather than a value - are asked
+     * for as many rows as there is room for.
+     *
+     * @param room how many values the card expects to be able to draw
+     */
+    public static List<OeplReading> collect(final Context context, final GBDevice device,
+                                            final SharedPreferences prefs,
+                                            @Nullable final OeplWeather weather,
+                                            final List<CalendarEvent> events, final int room) {
         final Set<String> groups = OEPLPrefs.readingGroups(prefs);
         final List<OeplReading> readings = new ArrayList<>();
         if (groups.contains(GROUP_WEATHER)) {
-            weather(context, prefs, weather, readings);
+            weather(context, prefs, weather, readings, room);
         }
         if (groups.contains(GROUP_HOUSE)) {
             house(context, readings);
         }
         if (groups.contains(GROUP_EVENTS)) {
-            events(context, events, readings);
+            events(context, events, readings, room);
         }
         if (groups.contains(GROUP_DEVICES)) {
             devices(context, device, prefs, readings);
@@ -91,7 +113,7 @@ public final class OeplReadings {
 
     private static void weather(final Context context, final SharedPreferences prefs,
                                 @Nullable final OeplWeather weather,
-                                final List<OeplReading> out) {
+                                final List<OeplReading> out, final int room) {
         if (weather == null || !weather.hasData()) {
             return;
         }
@@ -127,6 +149,25 @@ public final class OeplReadings {
                     now.humidity + " %")
                     .withFontGlyph(String.valueOf(OeplIcons.UMBRELLA))
                     .withPercent(now.humidity));
+        }
+
+        // What a larger panel gets on top: the day after this one, and when the sun does its
+        // two things. Neither is worth a tile on a price tag, and both are worth one on a wall.
+        if (room >= SMALL_PANEL + 4) {
+            if (weather.upcomingDays().size() > 1) {
+                final OeplWeather.Day next = weather.upcomingDays().get(1);
+                out.add(new OeplReading(section,
+                        context.getString(R.string.oepl_reading_tomorrow), "")
+                        .withRange(next.minTemperature, next.maxTemperature)
+                        .withFontGlyph(OeplIcons.weather(next.wmoCode, false)));
+            }
+            if (weather.sunrise > 0L && weather.sunset > 0L) {
+                final SimpleDateFormat clock = weather.format("HH:mm");
+                out.add(new OeplReading(section, context.getString(R.string.oepl_reading_sun),
+                        clock.format(new java.util.Date(weather.sunrise * 1000L)) + " - "
+                                + clock.format(new java.util.Date(weather.sunset * 1000L)))
+                        .withFontGlyph(String.valueOf(OeplIcons.SUNRISE)));
+            }
         }
     }
 
@@ -211,7 +252,7 @@ public final class OeplReadings {
     // ------------------------------------------------------------------ the agenda
 
     private static void events(final Context context, final List<CalendarEvent> events,
-                               final List<OeplReading> out) {
+                               final List<OeplReading> out, final int room) {
         if (events == null || events.isEmpty()) {
             return;
         }
@@ -224,10 +265,16 @@ public final class OeplReadings {
                 .withShape(OeplGlyphs.Glyph.CALENDAR)
                 .accented(today > 0));
 
-        // the next one by name, which is the single most useful line on a hall display
-        final CalendarEvent next = events.get(0);
-        out.add(new OeplReading(section, time(next), title(next))
-                .withShape(OeplGlyphs.Glyph.CLOCK));
+        // The next one by name, which is the single most useful line on a hall display -
+        // and on a panel with room for them, the ones after it as well. An appointment is the
+        // one thing on this card that is a list rather than a value: "3" says that the day is
+        // busy, the three lines say what it is busy with.
+        final int wanted = Math.max(1, Math.min((room - SMALL_PANEL) / 2 + 1, events.size()));
+        for (int i = 0; i < wanted; i++) {
+            final CalendarEvent event = events.get(i);
+            out.add(new OeplReading(section, time(event), title(event))
+                    .withShape(OeplGlyphs.Glyph.CLOCK));
+        }
     }
 
     private static String title(final CalendarEvent event) {

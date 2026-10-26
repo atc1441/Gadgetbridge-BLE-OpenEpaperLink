@@ -23,6 +23,8 @@ import android.graphics.RectF;
 
 import androidx.annotation.Nullable;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+
 import java.util.List;
 
 /** Battery levels of the other gadgets paired with Gadgetbridge. */
@@ -75,7 +77,7 @@ public class StatusContent implements CardContent {
         // nothing. So the names are measured at the smallest size they may be set in, and the
         // bar keeps whatever is left over - down to a fifth of the row, which is as narrow as
         // a bar can be and still be read as one.
-        final Paint smallest = style.paint(style.ink, false, Math.max(7f, textSize * 0.5f));
+        final Paint smallest = style.paint(style.ink, false, Math.max(OeplCanvas.READABLE, textSize * 0.5f));
         float widestName = 0f;
         float widestValue = 0f;
         for (int i = 0; i < count; i++) {

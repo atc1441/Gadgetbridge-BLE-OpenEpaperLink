@@ -77,7 +77,7 @@ public class OeplPosterCard extends OeplCard {
 
         // the lines under the headline take their room first, measured as one block, and the
         // headline fills whatever is left over - it is the part that may be any size at all
-        float bodySize = c.sizeForHeight(Math.min(h * 0.17f, w * 0.1f), h * 0.22f, 7f);
+        float bodySize = c.sizeForHeight(Math.min(h * 0.17f, w * 0.1f), h * 0.22f, OeplCanvas.READABLE);
         int shown = 0;
         float bodyBlock = 0f;
         if (!lines.isEmpty() && bodySize > 0f) {

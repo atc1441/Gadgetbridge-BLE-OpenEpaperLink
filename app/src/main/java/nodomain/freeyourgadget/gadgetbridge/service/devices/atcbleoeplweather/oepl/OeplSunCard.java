@@ -64,9 +64,9 @@ public class OeplSunCard extends OeplCard {
 
         // the times sit on the baseline of the horizon, so their line is reserved first and the
         // arc gets what is left above it
-        final float timeSize = c.sizeForHeight(Math.min(h * 0.17f, w * 0.1f), h * 0.26f, 7f);
+        final float timeSize = c.sizeForHeight(Math.min(h * 0.17f, w * 0.1f), h * 0.26f, OeplCanvas.READABLE);
         final float timeLine = timeSize > 0f ? c.lineHeight(timeSize) : 0f;
-        final float lengthSize = c.sizeForHeight(Math.min(h * 0.14f, w * 0.085f), h * 0.22f, 7f);
+        final float lengthSize = c.sizeForHeight(Math.min(h * 0.14f, w * 0.085f), h * 0.22f, OeplCanvas.READABLE);
 
         // The arc is never taller than it is half wide - on a tall tag a dome drawn to the
         // room available comes out as an egg, which is not the shape of a day. Whatever that

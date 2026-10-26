@@ -58,7 +58,7 @@ public class OeplListCard extends OeplCard {
         // thin grey strokes into paper, so a row that does not fit is dropped rather than set
         // in a size nobody can read.
         final int sections = (int) countSections();
-        final float floor = Math.max(8f, Math.min(c.height * 0.055f, 11f));
+        final float floor = Math.max(OeplCanvas.READABLE, Math.min(c.height * 0.055f, 11f));
         final float wanted = (c.height - pad * 2f) / (readings.size() + sections * 0.8f);
         // and sized by the width as well: on a panel that is tall for its width a row sized
         // off the height alone came out seventy pixels high on a panel 152 wide, where the
@@ -66,7 +66,7 @@ public class OeplListCard extends OeplCard {
         final float size = Math.max(floor, Math.min(Math.max(wanted * 0.8f, floor),
                 Math.min(c.height * 0.14f, c.width * 0.15f)));
         final float rowHeight = c.lineHeight(size) * 1.12f;
-        final float headingSize = Math.max(8f, size * 0.82f);
+        final float headingSize = Math.max(OeplCanvas.READABLE, size * 0.82f);
         final float headingHeight = c.lineHeight(headingSize) * 1.25f;
 
         float y = pad;
@@ -133,7 +133,7 @@ public class OeplListCard extends OeplCard {
         // in: a row reduced to two letters and a bar says less than one without the bar, and
         // the percentage stands in the value column either way.
         final float barRoom = Math.min(c.width * 0.26f, (right - left) * 0.45f);
-        final float nameRoom = c.measure(reading.label, Math.max(7f, size * 0.5f));
+        final float nameRoom = c.measure(reading.label, Math.max(OeplCanvas.READABLE, size * 0.5f));
         if (reading.percent >= 0 && right - left - barRoom > Math.max(size * 4f, nameRoom)) {
             final float barW = barRoom;
             final float barH = Math.max(2f, size * 0.52f);

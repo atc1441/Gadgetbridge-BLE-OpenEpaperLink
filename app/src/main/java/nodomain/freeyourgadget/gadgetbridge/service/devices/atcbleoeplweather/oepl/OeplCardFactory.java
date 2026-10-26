@@ -97,6 +97,8 @@ public final class OeplCardFactory {
     public static final String QUAD = "panel_quad";
     /** The month as a sheet, with a dot per appointment and today marked. */
     public static final String MONTH = "panel_month";
+    /** The week, the weather and what is coming up, each in a region of its own. */
+    public static final String WALL = "panel_wall";
 
     private OeplCardFactory() {
     }
@@ -109,7 +111,7 @@ public final class OeplCardFactory {
     public static boolean needsWeather(final String id) {
         return WEATHER.equals(id) || FORECAST.equals(id) || RAIN.equals(id) || DATE.equals(id)
                 || BIG.equals(id) || RANGE.equals(id) || SUN.equals(id) || TILES.equals(id)
-                || GRAPH.equals(id) || needsReadings(id);
+                || GRAPH.equals(id) || WALL.equals(id) || needsReadings(id);
     }
 
     public static boolean needsFeed(final String id) {
@@ -118,7 +120,7 @@ public final class OeplCardFactory {
 
     /** The three cards that draw whatever {@link OeplReadings} collected. */
     public static boolean needsReadings(final String id) {
-        return GRID.equals(id) || HERO.equals(id) || LIST.equals(id);
+        return GRID.equals(id) || HERO.equals(id) || LIST.equals(id) || WALL.equals(id);
     }
 
     /** True for the cards that put entity states from a Home Assistant instance on the panel. */
@@ -199,6 +201,11 @@ public final class OeplCardFactory {
                 // the month, so the calendar is read for the whole of it rather than for the
                 // week the other cards are configured for
                 return new OeplMonthCard(monthEvents(context, device), caption(context, prefs));
+            case WALL:
+                return new OeplWallCard(weather(prefs), events(context, device),
+                        beyondTheWeather(context, readings(context, device, prefs)),
+                        OEPLPrefs.calendarDays(prefs), OEPLPrefs.calendarEvents(prefs),
+                        OEPLPrefs.forecastDays(prefs), beaufort, caption(context, prefs));
             case WEATHER:
             default:
                 return new OeplWeatherCard(weather(prefs), beaufort);
@@ -270,7 +277,43 @@ public final class OeplCardFactory {
     private static List<OeplReading> readings(final Context context, final GBDevice device,
                                               final SharedPreferences prefs) {
         return OeplReadings.collect(context, device, prefs, weather(prefs),
-                events(context, device));
+                events(context, device), room(prefs));
+    }
+
+    /**
+     * How many values the display the card is being built for can actually show.
+     * <p>
+     * The collector used to gather the same handful whatever it was being gathered for, which
+     * left a seven inch panel showing eight values the size of playing cards while the rest of
+     * the calendar sat unread on the phone. The display reported its own panel when it was
+     * paired, so the number of tiles that panel divides into is known here - and that is how
+     * many values are worth collecting.
+     */
+    private static int room(final SharedPreferences prefs) {
+        final int hardware = prefs.getInt(OEPLPrefs.DETECTED_HARDWARE_TYPE, -1);
+        final OEPLTagTypes.TagType type = hardware >= 0
+                ? OEPLTagTypes.byHardwareType(hardware) : null;
+        if (type == null || type.width < 64 || type.height < 64) {
+            return OeplReadings.SMALL_PANEL; // nothing known about it yet
+        }
+        return OeplGridCard.maxTiles(type.width, type.height);
+    }
+
+    /**
+     * The readings a sheet that draws the weather itself should still be given: everything
+     * except the weather. A column with the place and the day's range written across the top
+     * of it, and the same two numbers in a list underneath, says them twice.
+     */
+    private static List<OeplReading> beyondTheWeather(final Context context,
+                                                      final List<OeplReading> readings) {
+        final String weather = context.getString(R.string.oepl_section_weather);
+        final List<OeplReading> rest = new ArrayList<>();
+        for (final OeplReading reading : readings) {
+            if (!weather.equals(reading.section)) {
+                rest.add(reading);
+            }
+        }
+        return rest;
     }
 
     /**

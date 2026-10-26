@@ -40,10 +40,23 @@ public class OeplForecastCard extends OeplCard {
 
     public OeplForecastCard(@Nullable final OeplWeather weather, final int days,
                             final boolean beaufort) {
+        this(weather, days, beaufort, true);
+    }
+
+    /**
+     * @param headline whether the place and what it is doing now go across the top. A sheet
+     *                 that has already said both directly above this card asks for them to be
+     *                 left out, and the days get the room instead.
+     */
+    public OeplForecastCard(@Nullable final OeplWeather weather, final int days,
+                            final boolean beaufort, final boolean headline) {
         super(beaufort);
         this.weather = weather;
         this.requestedDays = days;
+        this.headline = headline;
     }
+
+    private final boolean headline;
 
     @Override
     public boolean hasData() {
@@ -71,9 +84,11 @@ public class OeplForecastCard extends OeplCard {
         // without the present is a card that answers the second question and not the first:
         // somebody standing in front of it wants to know what to put on now, and then what
         // the week holds.
-        final float headSize = h * 0.125f;
-        c.rowEnds(weather.location, now(), h * 0.005f, headSize, c.ink,
-                inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
+        final float headSize = headline ? h * 0.125f : 0f;
+        if (headline) {
+            c.rowEnds(weather.location, now(), h * 0.005f, headSize, c.ink,
+                    inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
+        }
 
         // From today on: a forecast held over from yesterday would otherwise put a day that
         // is over into the first column, where the reader takes it for today.
@@ -101,7 +116,8 @@ public class OeplForecastCard extends OeplCard {
         final float column = w / days;
         // under the headline rather than at a fixed fraction of the card: a place name set in
         // a script that stacks its marks takes a taller line than the metrics promise
-        final float top = Math.max(h * 0.16f, h * 0.005f + c.lineHeight(headSize));
+        final float top = headline
+                ? Math.max(h * 0.16f, h * 0.005f + c.lineHeight(headSize)) : h * 0.02f;
 
         // and the size the pair is set in is the one at which it fits that column
         float tempSize = Math.min(h * 0.15f, column * 0.28f);
@@ -201,9 +217,13 @@ public class OeplForecastCard extends OeplCard {
         final float pad = Math.max(2f, w * 0.03f);
 
         final float headSize = Math.min(h * 0.07f, w * 0.16f);
-        c.rowEnds(weather.location, now(), 0, headSize, c.ink,
-                inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
-        final float top = headSize * 1.25f;
+        if (headline) {
+            c.rowEnds(weather.location, now(), 0, headSize, c.ink,
+                    inkOrAccent(c, weather.current.temperature < 0f), pad, w - pad, pad * 2f);
+        }
+        // the headline's own line rather than a multiple of its size: floored up on a small
+        // tag, it is taller than the card assumed and the first sky symbol sat in it
+        final float top = headline ? c.lineHeight(headSize) * 1.05f : pad;
 
         final List<OeplWeather.Day> forecast = weather.upcomingDays();
         // as with the columns: a row thinner than this holds nothing anybody reads, so a tag
@@ -221,7 +241,7 @@ public class OeplForecastCard extends OeplCard {
 
             // the millimetres go under the weekday at two thirds its size, and are left out
             // rather than set under seven pixels, where the panel shows a smudge
-            final float rainSize = Math.max(7f, textSize * 0.62f);
+            final float rainSize = Math.max(OeplCanvas.READABLE, textSize * 0.62f);
             final boolean withRain = day.precipitation > 0.05f && row > textSize * 1.9f
                     && textSize * 0.62f >= 7f;
             final float firstLine = middle - textSize * (withRain ? 0.95f : 0.55f);

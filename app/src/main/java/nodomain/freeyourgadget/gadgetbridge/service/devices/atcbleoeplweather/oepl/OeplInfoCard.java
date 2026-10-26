@@ -56,11 +56,11 @@ public class OeplInfoCard extends OeplCard {
         final float h = c.height;
         final float pad = Math.max(2f, w * 0.017f);
 
-        final float headSize = Math.max(8f, Math.min(h * 0.17f, w * 0.14f));
+        final float headSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.17f, w * 0.14f));
         c.textClipped(heading, pad, 0, headSize, OeplCanvas.LEFT, c.accent, w - pad * 2);
 
         final float top = c.lineHeight(headSize) * 1.05f;
-        final float rowSize = Math.max(7f, Math.min(Math.min(h * 0.125f, w * 0.085f),
+        final float rowSize = Math.max(OeplCanvas.READABLE, Math.min(Math.min(h * 0.125f, w * 0.085f),
                 (h - top) / Math.max(1, rows.size()) * 0.82f));
         final float rowHeight = Math.max(c.lineHeight(rowSize),
                 (h - top) / Math.max(1, Math.min(rows.size(),

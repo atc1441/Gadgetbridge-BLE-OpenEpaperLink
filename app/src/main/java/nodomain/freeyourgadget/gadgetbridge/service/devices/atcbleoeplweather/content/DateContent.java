@@ -27,6 +27,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+
 /**
  * The date in large type. E-paper cannot be refreshed often enough for a ticking clock, so the
  * day is the headline and the update time stays small, in the status strip.
@@ -55,7 +57,7 @@ public class DateContent implements CardContent {
         final Paint word = style.paint(style.accent, true,
                 Math.min(area.height() * 0.22f, Math.max(9f, column * 0.26f)));
         final Paint sub = style.paint(style.ink, false,
-                Math.min(area.height() * 0.17f, Math.max(8f, column * 0.22f)));
+                Math.min(area.height() * 0.17f, Math.max(12f, column * 0.22f)));
         // A quarter of a price tag leaves this card a column some forty pixels wide, which no
         // size of "Wednesday" fits into. The locale has a short form of its own for exactly
         // that, and "Wed" is read where "Wedn…" is only puzzled over - so the abbreviation
@@ -63,7 +65,7 @@ public class DateContent implements CardContent {
         final String weekday = shortest(style, word, column, now, "EEEE", "EEE", "EE");
         final String month = shortest(style, sub, column, now, "MMMM", "MMM", "MMMMM");
         style.fitNoSmallerThan(word, weekday, column, 9f);
-        style.fitNoSmallerThan(sub, month, column, 8f);
+        style.fitNoSmallerThan(sub, month, column, OeplCanvas.READABLE);
 
         final float groupW = numberW + pad
                 + Math.max(word.measureText(weekday), sub.measureText(month));
@@ -72,14 +74,19 @@ public class DateContent implements CardContent {
 
         canvas.drawText(day, left, area.top + area.height() * 0.78f, number);
         final float weekdayBase = area.top + area.height() * 0.48f;
-        // the month goes under the weekday, not at a fixed fraction of the card: a line of a
-        // script that stacks its marks is taller than the one the metrics promise
+        // The month goes under the weekday rather than at a fixed fraction of the card - a
+        // line of a script that stacks its marks is taller than the metrics promise, and on a
+        // small panel both lines are at the floor rather than at the fraction asked for. Where
+        // the two would then share a line, the month goes: the weekday and the day of the
+        // month are what this card is for.
         final float monthBase = Math.max(area.top + area.height() * 0.72f,
-                weekdayBase + style.lineHeight(word) * 0.8f);
+                weekdayBase + style.lineHeight(word));
         style.drawEllipsised(canvas, weekday, textLeft, weekdayBase,
                 area.right - textLeft - pad, word);
-        style.drawEllipsised(canvas, month, textLeft, monthBase,
-                area.right - textLeft - pad, sub);
+        if (monthBase + style.lineHeight(sub) * 0.3f <= area.bottom) {
+            style.drawEllipsised(canvas, month, textLeft, monthBase,
+                    area.right - textLeft - pad, sub);
+        }
     }
 
     /**

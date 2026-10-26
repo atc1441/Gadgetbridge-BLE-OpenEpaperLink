@@ -57,7 +57,7 @@ public class OeplRangeCard extends OeplCard {
         final float h = c.height;
         final float pad = Math.max(2f, w * 0.025f);
 
-        final float headSize = c.sizeForHeight(Math.min(h * 0.14f, w * 0.085f), h * 0.2f, 7f);
+        final float headSize = c.sizeForHeight(Math.min(h * 0.14f, w * 0.085f), h * 0.2f, OeplCanvas.READABLE);
         final boolean head = headSize > 0f && !weather.location.isEmpty() && h >= 72f;
         final float top = head ? c.lineHeight(headSize) * 1.05f : Math.max(1f, h * 0.02f);
         if (head) {
@@ -75,7 +75,7 @@ public class OeplRangeCard extends OeplCard {
                 (int) ((h - top) / 11f)));
         final float row = (h - top) / days;
         final float textSize = c.sizeForHeight(Math.min(row * 0.72f, w * 0.14f), row * 0.94f,
-                6f);
+                12);
         if (textSize <= 0f) {
             return;
         }

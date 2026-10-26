@@ -26,6 +26,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.WeatherIcons;
 
@@ -117,13 +119,13 @@ public class ForecastContent implements CardContent {
             if (widest <= colW - figureGap || hi.getTextSize() <= 7f) {
                 break;
             }
-            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
-            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+            hi.setTextSize(Math.max(OeplCanvas.READABLE, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(OeplCanvas.READABLE, lo.getTextSize() * 0.94f));
         }
 
         // the weekday fits its column in every language, or it is set smaller until it does:
         // "Mon" and "segunda-feira" are the same column
-        style.fitNoSmallerThan(day, widestDayName(day, count), colW * 0.95f, 7f);
+        style.fitNoSmallerThan(day, widestDayName(day, count), colW * 0.95f, OeplCanvas.READABLE);
 
         for (int i = 0; i < count; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);
@@ -146,8 +148,13 @@ public class ForecastContent implements CardContent {
 
             // both figures go side by side under the bar, where nothing can overlap them
             final String h = style.shortTemperature(d.getMaxTemp());
-            final String l = style.shortTemperature(d.getMinTemp());
-            final float gap = figureGap;
+            // Where the pair will not fit the column even at the smallest readable size, the
+            // low goes and the high stays. Two figures written through each other are two
+            // figures nobody can read; one is one.
+            final String l = hi.measureText(h) + figureGap
+                    + lo.measureText(style.shortTemperature(d.getMinTemp())) > colW
+                    ? "" : style.shortTemperature(d.getMinTemp());
+            final float gap = l.isEmpty() ? 0f : figureGap;
             final float total = hi.measureText(h) + gap + lo.measureText(l);
             // the pair under the first and the last column has to stay on the card even when it
             // is wider than the column it belongs to
@@ -185,8 +192,8 @@ public class ForecastContent implements CardContent {
             if (figures <= area.width() * 0.52f || hi.getTextSize() <= 7f) {
                 break;
             }
-            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
-            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+            hi.setTextSize(Math.max(OeplCanvas.READABLE, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(OeplCanvas.READABLE, lo.getTextSize() * 0.94f));
         }
 
         final float figuresLeft = area.right - pad - figures;
@@ -202,7 +209,7 @@ public class ForecastContent implements CardContent {
         // panel narrower than its own labels the figures take half the row and leave the day
         // thirteen pixels, where "Mo" set small still says which day it is and a cut one says
         // nothing. The widest of the days decides the size, so they all come out the same.
-        style.fitNoSmallerThan(day, widestDayName(day, count), dayRoom, 7f);
+        style.fitNoSmallerThan(day, widestDayName(day, count), dayRoom, OeplCanvas.READABLE);
 
         for (int i = 0; i < count; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);

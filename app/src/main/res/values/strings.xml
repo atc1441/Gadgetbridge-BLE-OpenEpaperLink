@@ -5558,6 +5558,7 @@
     <string name="oepl_content_panel_list">Value list</string>
     <string name="oepl_content_panel_graph">Temperature curve</string>
     <string name="oepl_content_panel_quad">Four quarters</string>
+    <string name="oepl_content_panel_wall">Wall sheet (week, weather, agenda)</string>
     <string name="oepl_content_panel_month">Month sheet</string>
     <string name="oepl_quad_none">(nothing)</string>
     <string name="oepl_group_weather">Weather</string>
@@ -5572,6 +5573,8 @@
     <string name="oepl_reading_rain">Rain</string>
     <string name="oepl_reading_wind">Wind</string>
     <string name="oepl_reading_humidity">Humidity</string>
+    <string name="oepl_reading_tomorrow">Tomorrow</string>
+    <string name="oepl_reading_sun">Sun</string>
     <string name="oepl_reading_events">Appointments</string>
     <string name="oepl_reading_display">Display</string>
     <string name="oepl_state_on">on</string>

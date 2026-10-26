@@ -70,6 +70,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplRssClient;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplSunCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplTilesCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWallCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeather;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplWeatherCard;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
@@ -93,7 +94,7 @@ public final class OeplDemo {
             // our own designs, which own the whole panel as well
             "panel_big", "panel_bars", "panel_sun", "panel_tiles", "panel_board",
             "panel_poster", "panel_grid", "panel_hero", "panel_list", "panel_graph",
-            "panel_quad", "panel_month",
+            "panel_quad", "panel_month", "panel_wall",
             // the cards with the Gadgetbridge frame around them
             "weather", "date", "calendar", "text", "status", "weather_calendar", "weather_date",
             "date_calendar", "clock", "notifications", "music", "hourly", "forecast",
@@ -231,6 +232,9 @@ public final class OeplDemo {
                 return new OeplTilesCard(weather(), true);
             case OeplCardFactory.MONTH:
                 return new OeplMonthCard(events(), stress ? "Familienkalender" : "Kalender");
+            case OeplCardFactory.WALL:
+                return new OeplWallCard(weather(), events(), beyondTheWeather(), 7, 6, 5,
+                        true, stress ? "Familienkalender" : "Kalender");
             case OeplCardFactory.BOARD:
                 return new OeplBoardCard(events(), 6,
                         stress ? "Termine der ganzen Familie" : "Termine");
@@ -443,6 +447,17 @@ public final class OeplDemo {
     }
 
     /** The colours a three colour tag has, which is what a picture is reduced to. */
+    /** The readings without the weather ones, as the wall sheet is handed them. */
+    public static List<OeplReading> beyondTheWeather() {
+        final List<OeplReading> rest = new ArrayList<>();
+        for (final OeplReading reading : readings(true, true)) {
+            if (reading.section != null && !reading.section.startsWith("Draussen")) {
+                rest.add(reading);
+            }
+        }
+        return rest;
+    }
+
     public static int[] palette() {
         return OEPLImageCodec.palette(3, false);
     }

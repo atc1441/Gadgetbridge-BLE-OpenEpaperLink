@@ -54,8 +54,8 @@ public class OeplBigTemperatureCard extends OeplCard {
 
         // the head carries the place and the sky, the foot the range and the wind; both only
         // appear while a line of them is small enough to leave the figure the larger half
-        final float headSize = c.sizeForHeight(Math.min(h * 0.15f, w * 0.1f), h * 0.22f, 7f);
-        final float footSize = c.sizeForHeight(Math.min(h * 0.13f, w * 0.09f), h * 0.2f, 7f);
+        final float headSize = c.sizeForHeight(Math.min(h * 0.15f, w * 0.1f), h * 0.22f, OeplCanvas.READABLE);
+        final float footSize = c.sizeForHeight(Math.min(h * 0.13f, w * 0.09f), h * 0.2f, OeplCanvas.READABLE);
         final boolean head = headSize > 0f && !weather.location.isEmpty();
         final boolean foot = footSize > 0f && !weather.upcomingDays().isEmpty() && h >= 70f;
 

@@ -58,18 +58,40 @@ public class OeplCalendarListCard extends OeplCard {
         final float pad = Math.max(2f, w * 0.017f);
 
         // the caption and the date share one line, so neither may be sized on its own
-        final float headSize = Math.max(8f, Math.min(h * 0.145f, w * 0.11f));
+        final float headSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.145f, w * 0.11f));
         c.rowEnds(caption, new SimpleDateFormat("EE d.M.", Locale.getDefault())
                         .format(new Date()), h * 0.01f, headSize, c.ink, c.ink,
                 pad, w - pad, pad * 2);
 
         final float top = h * 0.01f + c.lineHeight(headSize) * 1.05f;
-        // a row has to fit the width as well: on a narrow tag a row sized off the height alone
-        // left nothing but a single letter of the title beside the time
-        final float rowSize = Math.max(7f, Math.min(h * 0.125f, w * 0.095f));
-        final float rowHeight = c.lineHeight(rowSize) * 1.08f;
-        final int fits = (int) ((h - top) / rowHeight);
+        // A row has to fit the width as well - on a narrow tag a row sized off the height
+        // alone left nothing but a single letter of the title beside the time - and it stops
+        // growing at a size a wall is read from. An eighth of a seven inch panel is eighty
+        // pixel type, which is five appointments and a great deal of paper; the room that
+        // frees goes to the rest of the list and to where each appointment is.
+        final float rowSize = Math.max(OeplCanvas.READABLE, Math.min(Math.min(h * 0.125f, w * 0.095f), MAX_ROW));
+        final float minRow = c.lineHeight(rowSize) * 1.08f;
+        final int fits = (int) ((h - top) / minRow);
         final int count = Math.min(Math.min(maxEntries, fits), events.size());
+        if (count <= 0) {
+            return;
+        }
+        // whatever is left over is shared out between the rows rather than left at the foot
+        final float rowHeight = Math.max(minRow, (h - top - pad) / count);
+        final float placeSize = Math.max(OeplCanvas.READABLE, rowSize * 0.62f);
+        // only when there is a place to write, and room for the line it goes on: a second
+        // line reserved for nothing is a gap down the middle of every entry
+        boolean anyPlace = false;
+        for (int i = 0; i < count; i++) {
+            anyPlace |= !place(events.get(i)).isEmpty();
+        }
+        final boolean withPlace = anyPlace && rowHeight >= c.lineHeight(rowSize)
+                + c.lineHeight(placeSize) * 1.1f;
+        // what an entry occupies, as against what it is given: on a tall panel the rows are
+        // spread out, and the mark for what is running now belongs to the line rather than to
+        // the gap around it
+        final float entry = (withPlace ? c.lineHeight(rowSize) + c.lineHeight(placeSize)
+                : c.lineHeight(rowSize)) * 1.08f;
         float timeColumn = 0f;
         for (int i = 0; i < count; i++) {
             timeColumn = Math.max(timeColumn, c.measure(when(events.get(i)), rowSize));
@@ -99,14 +121,45 @@ public class OeplCalendarListCard extends OeplCard {
             final boolean running = OeplDays.runningNow(event);
             int color = c.ink;
             if (running) {
-                c.fillRect(0, y - rowHeight * 0.06f, w, rowHeight * 0.98f, c.accent);
+                c.fillRect(0, y - entry * 0.06f, w, entry, c.accent);
                 color = c.paper;
+            } else if (i > 0 && rowHeight > entry * 1.35f) {
+                // spread out, a list needs its rules back, or it reads as a page of fragments
+                final float rule = Math.round(y - (rowHeight - entry) / 2f);
+                c.line(pad, rule, w - pad, rule, c.ink, 1f);
             }
             c.textClipped(when(event), pad, y, rowSize, OeplCanvas.LEFT, color,
                     timeColumn - pad);
             c.textClipped(event.getTitle(), pad + timeColumn, y + (rowSize - titleSize) * 0.4f,
                     titleSize, OeplCanvas.LEFT, color, titleRoom);
+            // where it is, under what it is, when the row has the height for a second line:
+            // on a panel on a wall that is the line somebody walks up to read
+            if (withPlace) {
+                final String place = place(event);
+                if (!place.isEmpty()) {
+                    c.textClipped(place, pad + timeColumn, y + c.lineHeight(rowSize),
+                            placeSize, OeplCanvas.LEFT, color, titleRoom);
+                }
+            }
         }
+    }
+
+    /**
+     * The largest a row is set, however much room there is. Past this a list stops being a
+     * list and becomes a poster of five appointments, and the panel it is on holds twenty.
+     */
+    private static final float MAX_ROW = 34f;
+
+    /** Where an appointment is, if it says: the place, or else the first line of its note. */
+    private static String place(final CalendarEvent event) {
+        final String location = event.getLocation() == null ? "" : event.getLocation().trim();
+        if (!location.isEmpty()) {
+            return location;
+        }
+        final String description = event.getDescription() == null
+                ? "" : event.getDescription().trim();
+        final int line = description.indexOf('\n');
+        return line > 0 ? description.substring(0, line) : description;
     }
 
     /**

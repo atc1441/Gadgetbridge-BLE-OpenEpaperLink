@@ -60,7 +60,7 @@ public class OeplBoardCard extends OeplCard {
 
         // the strip across the top is the board's header; it is reversed, so its text is drawn
         // in the paper colour and its height has to hold a whole line
-        final float headSize = c.sizeForHeight(Math.min(h * 0.16f, w * 0.1f), h * 0.22f, 7f);
+        final float headSize = c.sizeForHeight(Math.min(h * 0.16f, w * 0.1f), h * 0.22f, OeplCanvas.READABLE);
         float top = Math.max(1f, h * 0.02f);
         if (headSize > 0f) {
             final float strip = c.lineHeight(headSize) * 1.1f;
@@ -71,16 +71,20 @@ public class OeplBoardCard extends OeplCard {
             top = strip + Math.max(1f, h * 0.02f);
         }
 
-        final float rowSize = c.sizeForHeight(Math.min(h * 0.13f, w * 0.085f), h * 0.2f, 6f);
+        // as on the appointment list: a row stops growing at a size a board is read from,
+        // and what that frees goes to the rest of the departures
+        final float rowSize = Math.min(32f,
+                c.sizeForHeight(Math.min(h * 0.13f, w * 0.085f), h * 0.2f, OeplCanvas.READABLE));
         if (rowSize <= 0f) {
             return;
         }
-        final float rowHeight = c.lineHeight(rowSize) * 1.25f;
-        final int fits = (int) ((h - top) / rowHeight);
+        final float minRow = c.lineHeight(rowSize) * 1.25f;
+        final int fits = (int) ((h - top) / minRow);
         final int count = Math.min(Math.min(maxEntries, fits), events.size());
         if (count <= 0) {
             return;
         }
+        final float rowHeight = Math.max(minRow, (h - top - pad) / count);
 
         float timeColumn = 0f;
         for (int i = 0; i < count; i++) {

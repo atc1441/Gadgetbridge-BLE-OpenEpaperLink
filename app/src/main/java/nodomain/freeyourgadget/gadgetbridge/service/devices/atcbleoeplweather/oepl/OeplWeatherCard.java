@@ -64,7 +64,7 @@ public class OeplWeatherCard extends OeplCard {
 
         // never under what the panel can show: on the smallest tags a fifth of the height is
         // five pixels, and a place name set in five pixels is a smudge in the corner
-        final float headSize = Math.max(7f, h * 0.20f);
+        final float headSize = Math.max(OeplCanvas.READABLE, h * 0.20f);
         final String windValue = wind(now.windSpeed);
         final float windWidth = c.measure(windValue, headSize);
         final float arrowSize = headSize * 0.9f;
@@ -114,16 +114,23 @@ public class OeplWeatherCard extends OeplCard {
         final float pad = Math.max(2f, w * 0.03f);
         final OeplWeather.Current now = weather.current;
 
-        final float head = Math.min(h * 0.10f, w * 0.22f);
+        // the two lines at the top are as tall as the panel allows, but never under what can
+        // be read - so on the smallest tags they are as tall as the floor, and the card has to
+        // reckon with that rather than with the tenth of the height it asked for
+        final float head = Math.max(OeplCanvas.READABLE, Math.min(h * 0.10f, w * 0.22f));
         c.textFilling(weather.location, w / 2f, head * 0.6f, w - pad * 2, head, c.ink);
 
-        float y = head * 1.25f;
-        if (!weather.upcomingDays().isEmpty()) {
+        float y = c.lineHeight(head) * 1.05f;
+        final float rangeRoom = Math.max(OeplCanvas.READABLE, head * 0.8f);
+        // the day's range is the first thing to go when the panel cannot hold every line at a
+        // size that can be read: the reading itself and the sky matter more
+        if (!weather.upcomingDays().isEmpty()
+                && y + c.lineHeight(rangeRoom) < h * 0.42f) {
             final OeplWeather.Day today = weather.upcomingDays().get(0);
-            final float range = head * 0.8f;
+            final float range = rangeRoom;
             c.textFilling(temp(today.minTemperature) + " / " + temp(today.maxTemperature)
                     + "°", w / 2f, y + range * 0.5f, w - pad * 2, range, c.ink);
-            y += range * 1.2f;
+            y += c.lineHeight(range) * 1.05f;
         }
 
         // the pictogram takes the middle, the temperature and the wind sit under it
