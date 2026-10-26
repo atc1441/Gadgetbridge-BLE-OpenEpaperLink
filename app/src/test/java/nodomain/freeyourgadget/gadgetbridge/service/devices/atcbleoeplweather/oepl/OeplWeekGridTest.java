@@ -1,0 +1,277 @@
+/*  Copyright (C) 2026 Gadgetbridge contributors
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import android.graphics.Bitmap;
+import android.graphics.RectF;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TimeZone;
+
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLImageCodec;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OeplDemo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OeplInkRecorder;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.content.CardStyle;
+import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
+
+/**
+ * The week grid: which day each column stands for, and whether a reader can tell.
+ * <p>
+ * Both faults this guards against were on the panel at once. The columns were stepped on by a
+ * fixed day length, so on the two days a year the clocks change one date was headed twice and
+ * every appointment behind it sat under the wrong heading. And the headings themselves were
+ * sized to the panel rather than to the column they go in, so a week on a 400 by 300 display
+ * came out as a row of single letters and ellipses - "S…" twice over, which is how the display
+ * reported it.
+ */
+@RunWith(RobolectricTestRunner.class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = 34, manifest = Config.NONE)
+public class OeplWeekGridTest {
+
+    /** The night the clocks go back in Germany: that Sunday is twenty five hours long. */
+    private static Calendar theDayTheClocksGoBack() {
+        final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"),
+                Locale.GERMANY);
+        c.clear();
+        c.set(2026, Calendar.OCTOBER, 25, 12, 0, 0);
+        return c;
+    }
+
+    @Before
+    public void loadFonts() {
+        OeplDemo.loadFonts();
+    }
+
+    @Test
+    public void everyColumnOfTheWeekIsItsOwnDayWhenTheClocksChange() {
+        final long[] starts = OeplCalendarWeekCard.dayStarts(theDayTheClocksGoBack(), 7);
+        assertEquals("seven columns and the end of the window", 8, starts.length);
+
+        final Calendar when = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"),
+                Locale.GERMANY);
+        final Set<Integer> dates = new HashSet<>();
+        for (int i = 0; i < 7; i++) {
+            when.setTimeInMillis(starts[i]);
+            assertEquals("a column starts at midnight", 0, when.get(Calendar.HOUR_OF_DAY));
+            dates.add(when.get(Calendar.DAY_OF_MONTH));
+        }
+        assertEquals("no date may be headed twice", 7, dates.size());
+    }
+
+    /**
+     * Whatever the settings ask for, those are the next days: a display on a wall shows what
+     * is still to come, so a full week is today and the six days after it rather than the
+     * calendar week today happens to fall in.
+     */
+    @Test
+    public void everyWindowStartsToday() {
+        final Calendar sunday = theDayTheClocksGoBack();
+        final Calendar when = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"),
+                Locale.GERMANY);
+
+        for (final int days : new int[]{1, 3, 7}) {
+            final long[] starts = OeplCalendarWeekCard.dayStarts(sunday, days);
+            when.setTimeInMillis(starts[0]);
+            assertEquals(days + " days begin today", 25, when.get(Calendar.DAY_OF_MONTH));
+
+            final Calendar end = (Calendar) sunday.clone();
+            end.set(Calendar.HOUR_OF_DAY, 0);
+            end.set(Calendar.MINUTE, 0);
+            end.set(Calendar.SECOND, 0);
+            end.set(Calendar.MILLISECOND, 0);
+            end.add(Calendar.DAY_OF_MONTH, days);
+            assertEquals("and end " + days + " days later", end.getTimeInMillis(),
+                    starts[days]);
+        }
+
+        final long[] three = OeplCalendarWeekCard.dayStarts(sunday, 3);
+        when.setTimeInMillis(three[2]);
+        assertEquals("the day after the long night is the 27th", 27,
+                when.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /**
+     * The appointment and the heading above it have to agree. Stepped on by a fixed day length,
+     * the column after the long night was headed with the date before it while already holding
+     * the next day's appointments.
+     */
+    @Test
+    public void anAppointmentSitsUnderTheHeadingOfItsOwnDay() {
+        final Calendar sunday = theDayTheClocksGoBack();
+        final long[] starts = OeplCalendarWeekCard.dayStarts(sunday, 3);
+
+        final Calendar monday = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"),
+                Locale.GERMANY);
+        monday.clear();
+        monday.set(2026, Calendar.OCTOBER, 26, 9, 0, 0);
+
+        final int column = OeplCalendarWeekCard.dayOf(starts, monday.getTimeInMillis());
+        final Calendar heading = Calendar.getInstance(TimeZone.getTimeZone("Europe/Berlin"),
+                Locale.GERMANY);
+        heading.setTimeInMillis(starts[column]);
+        assertEquals("the column it lands in is the one headed monday", 26,
+                heading.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /**
+     * An all day entry covers the columns of the days it is written on, and the midnight that
+     * ends the last of them belongs to that day rather than to the next one.
+     * <p>
+     * Android hands such an entry over as midnights in UTC, so in this time zone it looks like
+     * it starts at two in the morning and ends at one the morning after - which had a holiday
+     * that was over on Sunday evening drawn across Monday as well. {@link OeplDays} is what
+     * turns those two stamps back into days; {@link OeplAllDayTest} checks it on its own and on
+     * the other cards, and this is the week grid's own share of it.
+     */
+    @Test
+    public void anAllDayEntryEndsWithItsLastDay() {
+        final TimeZone before = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"));
+        try {
+            final long[] starts = OeplCalendarWeekCard.dayStarts(theDayTheClocksGoBack(), 7);
+
+            // a single day, the sunday the window starts on
+            final CalendarEvent sunday = allDayInOctober(25, 1);
+            assertEquals(0, OeplCalendarWeekCard.column(starts, OeplDays.firstDay(sunday)));
+            assertEquals("and it ends with that sunday", 0,
+                    OeplCalendarWeekCard.column(starts, OeplDays.lastDay(sunday)));
+
+            // three days in the middle of the window
+            final CalendarEvent holiday = allDayInOctober(28, 3);
+            assertEquals(3, OeplCalendarWeekCard.column(starts, OeplDays.firstDay(holiday)));
+            assertEquals(5, OeplCalendarWeekCard.column(starts, OeplDays.lastDay(holiday)));
+
+            // one that was over before the window began, and one still to come
+            assertEquals("behind us", -1, OeplCalendarWeekCard.column(starts,
+                    OeplDays.lastDay(allDayInOctober(23, 1))));
+            assertEquals("ahead of us", 7, OeplCalendarWeekCard.column(starts,
+                    OeplDays.firstDay(allDayInOctober(32, 2))));
+        } finally {
+            TimeZone.setDefault(before);
+        }
+    }
+
+    /** An all day entry in october 2026, as android stores one: midnights in UTC. */
+    private static CalendarEvent allDayInOctober(final int day, final int length) {
+        final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.GERMANY);
+        c.clear();
+        c.set(2026, Calendar.OCTOBER, day, 0, 0, 0);
+        final long begin = c.getTimeInMillis();
+        c.add(Calendar.DAY_OF_MONTH, length);
+        return event(begin, c.getTimeInMillis(), day, "Urlaub", true);
+    }
+
+    /**
+     * Seven columns on a 400 by 300 panel, each headed with a day somebody can read. This is
+     * the panel the fault was reported from.
+     */
+    @Test
+    public void everyColumnIsHeadedWithADayThatCanBeRead() {
+        final Locale before = Locale.getDefault();
+        Locale.setDefault(Locale.GERMANY);
+        try {
+            final List<OeplInkRecorder.Run> runs = draw(400, 300, 7);
+
+            final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
+            final long[] starts = OeplCalendarWeekCard.dayStarts(Calendar.getInstance(), 7);
+            for (int i = 0; i < 7; i++) {
+                final String name = weekday.format(new Date(starts[i])).replace(".", "");
+                int found = 0;
+                for (final OeplInkRecorder.Run run : runs) {
+                    if (run.text && name.equals(run.what)) {
+                        found++;
+                    }
+                }
+                assertEquals(name + " heads exactly one column", 1, found);
+            }
+
+            for (final OeplInkRecorder.Run run : runs) {
+                assertFalse("nothing on this panel has to be cut: " + run.what,
+                        run.text && run.what.contains("…"));
+            }
+        } finally {
+            Locale.setDefault(before);
+        }
+    }
+
+    /** Everything stays inside the panel, headings and hour gutter included. */
+    @Test
+    public void nothingReachesOverTheEdge() {
+        for (final int[] panel : new int[][]{{400, 300}, {800, 480}, {384, 184}}) {
+            for (final int days : new int[]{1, 3, 7}) {
+                for (final OeplInkRecorder.Run run : draw(panel[0], panel[1], days)) {
+                    assertTrue(run.what + " at " + panel[0] + "x" + panel[1]
+                                    + " reaches outside the panel",
+                            run.wanted.left >= -1f && run.wanted.top >= -1f
+                                    && run.wanted.right <= panel[0] + 1f
+                                    && run.wanted.bottom <= panel[1] + 1f);
+                }
+            }
+        }
+    }
+
+    private static List<OeplInkRecorder.Run> draw(final int w, final int h, final int days) {
+        final Bitmap sheet = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        final OeplInkRecorder recorder = new OeplInkRecorder(sheet);
+        new OeplCalendarWeekCard(events(), days).draw(recorder,
+                new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE, OEPLImageCodec.RED,
+                        false),
+                new RectF(0f, 0f, w, h));
+        return recorder.runs();
+    }
+
+    /** Days still to come, with something on them, all of it short enough to be drawn whole. */
+    private static List<CalendarEvent> events() {
+        final Calendar day = Calendar.getInstance();
+        day.set(Calendar.HOUR_OF_DAY, 0);
+        day.set(Calendar.MINUTE, 0);
+        day.set(Calendar.SECOND, 0);
+        day.set(Calendar.MILLISECOND, 0);
+        final long start = day.getTimeInMillis();
+        final List<CalendarEvent> events = new ArrayList<>();
+        events.add(event(start + 9 * 3600_000L, start + 10 * 3600_000L, 1, "Sport", false));
+        events.add(event(start + 13 * 3600_000L, start + 15 * 3600_000L, 2, "Arzt", false));
+        events.add(event(start + 3 * 86400_000L + 11 * 3600_000L,
+                start + 3 * 86400_000L + 12 * 3600_000L, 3, "Markt", false));
+        return events;
+    }
+
+    private static CalendarEvent event(final long begin, final long end, final int id,
+                                       final String title, final boolean allDay) {
+        return new CalendarEvent(begin, end, id, id, title, "", "", "cal", "acc", 0, 0,
+                allDay, "me", "LOCAL", "1", null, 0, 0);
+    }
+}

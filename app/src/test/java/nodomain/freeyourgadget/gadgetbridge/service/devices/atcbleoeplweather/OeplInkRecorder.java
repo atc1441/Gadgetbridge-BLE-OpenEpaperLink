@@ -27,6 +27,8 @@ import android.graphics.RectF;
 import java.util.ArrayList;
 import java.util.List;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
+
 /**
  * A canvas that draws normally and writes down where every piece of ink landed.
  * <p>
@@ -60,12 +62,32 @@ public class OeplInkRecorder extends Canvas {
         /** The text, or a short word for the kind of shape it was. */
         public final String what;
         public final boolean text;
+        /**
+         * The colour it was drawn in. A card has three to work with, and which of them a piece
+         * of ink gets decides whether it can be seen at all: accent on accent is invisible on
+         * the two colour tags, where the accent is the ink.
+         */
+        public final int color;
+        /** The type size of a text run, zero for a shape: what decides whether it is legible. */
+        public final float size;
+        /** True for a shape that was filled rather than stroked, which covers what is under it. */
+        public final boolean filled;
+        /**
+         * True when the run was set in the pictogram face. Those are text to the canvas and
+         * shapes to a reader: a five pixel letter is a smear, a five pixel arrow is an arrow.
+         */
+        public final boolean icon;
 
-        Run(final RectF box, final RectF wanted, final String what, final boolean text) {
+        Run(final RectF box, final RectF wanted, final String what, final boolean text,
+            final int color, final float size, final boolean filled, final boolean icon) {
             this.box = box;
             this.wanted = wanted;
             this.what = what;
             this.text = text;
+            this.color = color;
+            this.size = size;
+            this.filled = filled;
+            this.icon = icon;
         }
 
         /** False once the clip has eaten the whole run. */
@@ -279,6 +301,10 @@ public class OeplInkRecorder extends Canvas {
         if (wanted.width() <= 0f || wanted.height() <= 0f) {
             return;
         }
-        runs.add(new Run(box, wanted, what, text));
+        runs.add(new Run(box, wanted, what, text, paint == null ? 0 : paint.getColor(),
+                text && paint != null ? paint.getTextSize() : 0f,
+                paint != null && paint.getStyle() == Paint.Style.FILL,
+                text && paint != null && paint.getTypeface() != null
+                        && paint.getTypeface().equals(OeplFonts.icons())));
     }
 }

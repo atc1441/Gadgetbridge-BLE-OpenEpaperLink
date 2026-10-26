@@ -172,8 +172,12 @@ public class OeplHeroCard extends OeplCard {
                 box.top + figureHeight / 2f, box.right - figureLeft, figureHeight * 0.96f,
                 color);
         if (labelSize > 0f) {
-            c.textClipped(reading.label, box.left, box.top + figureHeight, labelSize,
-                    OeplCanvas.LEFT, c.ink, box.width());
+            // the name under the figure is sized off the panel, so on a tall narrow one it is
+            // asked for in sixty pixel type where the name needs a third of that. It is a
+            // name: it cannot be abbreviated, only set smaller, and smaller is what it gets
+            // before anything is cut off it.
+            c.textSqueezed(reading.label, box.left, box.top + figureHeight, labelSize,
+                    OeplCanvas.LEFT, c.ink, box.width(), Math.max(8f, labelSize * 0.4f));
         }
     }
 
@@ -195,8 +199,10 @@ public class OeplHeroCard extends OeplCard {
             if (y + c.lineHeight(size) > box.bottom + 0.5f) {
                 break;
             }
+            // an all day entry by the day it is written on rather than by the instant it
+            // carries, which is a weekday out in half the world - see OeplDays
             final String when = event.isAllDay()
-                    ? day.format(new Date(event.getBegin()))
+                    ? day.format(OeplDays.dayOf(event))
                     : clock.format(new Date(event.getBegin()));
             final float stampWidth = c.measure(when, size) + pad;
             c.text(when, box.left, y, size, OeplCanvas.LEFT, c.ink);

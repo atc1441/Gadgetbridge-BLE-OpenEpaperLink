@@ -170,12 +170,17 @@ public class QuadContent implements CardContent {
     private void pane(final Canvas canvas, final CardStyle style, final CardContent part,
                       final RectF cell) {
         final String heading = part.fullBleed() ? null : part.title();
-        if (heading == null || heading.isEmpty() || cell.height() < 60f) {
+        // A pane heading has to earn its line. On a quarter of a price tag it comes out at
+        // seven pixels, which the panel's quantiser leaves as a grey smear - and it takes a
+        // sixth of the pane away from the card that was actually asked for. Nine pixels is
+        // where a bold line still survives the panel; under that the heading is left out and
+        // the content gets the whole pane.
+        final float headSize = Math.min(cell.height() * 0.12f, cell.width() * 0.09f);
+        if (heading == null || heading.isEmpty() || cell.height() < 60f || headSize < 9f) {
             part.draw(canvas, style, cell);
             return;
         }
-        final Paint paint = style.paint(style.ink, true,
-                Math.max(7f, Math.min(cell.height() * 0.12f, cell.width() * 0.09f)));
+        final Paint paint = style.paint(style.ink, true, headSize);
         style.drawTopEllipsised(canvas, heading, cell.left, cell.top, cell.width(), paint);
         final float used = style.lineHeight(paint) * 1.05f;
         part.draw(canvas, style, new RectF(cell.left, cell.top + used, cell.right,

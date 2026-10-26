@@ -102,13 +102,37 @@ public class ForecastContent implements CardContent {
         bar.setStrokeCap(Paint.Cap.ROUND);
         bar.setStrokeWidth(barW);
 
+        // The two figures of a day have to fit the column they belong to, not merely the
+        // card: in Fahrenheit they are three digits wide where Celsius has two, and the pair
+        // under one day then ran into the pair under the next.
+        final float figureGap = colW * 0.08f;
+        for (int guard = 0; guard < 24; guard++) {
+            float widest = 0f;
+            for (int i = 0; i < count; i++) {
+                final WeatherSpec.Daily d = spec.getForecasts().get(i);
+                widest = Math.max(widest,
+                        hi.measureText(style.shortTemperature(d.getMaxTemp())) + figureGap
+                                + lo.measureText(style.shortTemperature(d.getMinTemp())));
+            }
+            if (widest <= colW - figureGap || hi.getTextSize() <= 7f) {
+                break;
+            }
+            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+        }
+
+        // the weekday fits its column in every language, or it is set smaller until it does:
+        // "Mon" and "segunda-feira" are the same column
+        style.fitNoSmallerThan(day, widestDayName(day, count), colW * 0.95f, 7f);
+
         for (int i = 0; i < count; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);
             final float cx = area.left + colW * (i + 0.5f);
 
             final String name = dayName(i + 1);
-            canvas.drawText(name, cx - day.measureText(name) / 2f,
-                    area.top + area.height() * 0.15f, day);
+            style.drawEllipsised(canvas, name,
+                    Math.max(area.left, cx - Math.min(day.measureText(name), colW * 0.95f) / 2f),
+                    area.top + area.height() * 0.15f, colW * 0.95f, day);
 
             WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
                     cx, area.top + area.height() * 0.33f,
@@ -123,7 +147,7 @@ public class ForecastContent implements CardContent {
             // both figures go side by side under the bar, where nothing can overlap them
             final String h = style.shortTemperature(d.getMaxTemp());
             final String l = style.shortTemperature(d.getMinTemp());
-            final float gap = colW * 0.08f;
+            final float gap = figureGap;
             final float total = hi.measureText(h) + gap + lo.measureText(l);
             // the pair under the first and the last column has to stay on the card even when it
             // is wider than the column it belongs to
@@ -174,6 +198,12 @@ public class ForecastContent implements CardContent {
         }
         final float dayRoom = room - (iconSize > 0f ? iconSize + gap : 0f);
 
+        // The weekday is an abbreviation already, so it is set smaller rather than cut: on a
+        // panel narrower than its own labels the figures take half the row and leave the day
+        // thirteen pixels, where "Mo" set small still says which day it is and a cut one says
+        // nothing. The widest of the days decides the size, so they all come out the same.
+        style.fitNoSmallerThan(day, widestDayName(day, count), dayRoom, 7f);
+
         for (int i = 0; i < count; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);
             final float base = area.top + rowH * (i + 0.68f);
@@ -190,6 +220,22 @@ public class ForecastContent implements CardContent {
             canvas.drawText(h, figuresLeft, base, hi);
             canvas.drawText(l, area.right - pad - lo.measureText(l), base, lo);
         }
+    }
+
+    /**
+     * The widest of the weekday names that are drawn, so that one size fits them all. It is
+     * measured rather than counted: "Wed" has as many letters as "Tue" and is wider, and the
+     * one that does not fit is the one that ends up cut.
+     */
+    private String widestDayName(final Paint paint, final int count) {
+        String widest = dayName(1);
+        for (int i = 2; i <= count; i++) {
+            final String name = dayName(i);
+            if (paint.measureText(name) > paint.measureText(widest)) {
+                widest = name;
+            }
+        }
+        return widest;
     }
 
     private String dayName(final int daysFromNow) {

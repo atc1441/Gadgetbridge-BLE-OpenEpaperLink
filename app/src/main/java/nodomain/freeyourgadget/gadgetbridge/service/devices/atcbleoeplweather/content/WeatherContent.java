@@ -138,11 +138,21 @@ public class WeatherContent implements CardContent {
             style.fitNoSmallerThan(cond, condition, area.width() - pad * 2, 9f);
         }
 
-        final float smallSize = Math.max(9f, h * 0.16f);
+        // Sized by the width as well as by the height. On a panel that is tall for its
+        // width - a tag turned on its side, where the card is handed 152 by 522 - the height
+        // alone asks for eighty pixel figures, and the second of the two then stood a long way
+        // past the right hand edge of the panel.
+        final float smallSize = Math.max(9f, Math.min(h * 0.16f, area.width() * 0.22f));
         final Paint small = style.paint(style.ink, smallSize < 12f, smallSize);
         final Paint high = style.paint(style.accent, true, small.getTextSize());
         final String hi = style.shortTemperature(spec.getTodayMaxTemp());
         final String lo = style.shortTemperature(spec.getTodayMinTemp());
+        int pairGuard = 0;
+        while (high.measureText(hi) + pad * 1.4f + small.measureText(lo)
+                > area.width() - pad * 2f && small.getTextSize() > 9f && pairGuard++ < 64) {
+            small.setTextSize(Math.max(9f, small.getTextSize() * 0.94f));
+            high.setTextSize(small.getTextSize());
+        }
 
         float floor = area.bottom;
         float condBase = 0f;
@@ -235,8 +245,8 @@ public class WeatherContent implements CardContent {
             final float base = Math.min(area.top + rowH * (i + 0.68f),
                     style.baselineAbove(area.bottom, lo));
             final String name = dayName(i + 1);
-            style.fit(day, name, nameW);
-            canvas.drawText(name, area.left, base, day);
+            style.fitNoSmallerThan(day, name, nameW, 7f);
+            style.drawEllipsised(canvas, name, area.left, base, nameW, day);
 
             WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
                     area.left + nameW + iconW * 0.5f, base - rowH * 0.22f,
@@ -268,6 +278,25 @@ public class WeatherContent implements CardContent {
         final Paint hi = style.paint(style.accent, true, day.getTextSize());
         final Paint lo = style.paint(style.ink, false, day.getTextSize());
 
+        // The two figures of a day have to fit the column they stand under: in Fahrenheit they
+        // are three digits wide where Celsius has two, and one day's pair then ran into the
+        // next day's.
+        final float figureGap = colW * 0.08f;
+        for (int guard = 0; guard < 24; guard++) {
+            float widest = 0f;
+            for (int i = 0; i < days; i++) {
+                final WeatherSpec.Daily d = spec.getForecasts().get(i);
+                widest = Math.max(widest,
+                        hi.measureText(style.shortTemperature(d.getMaxTemp())) + figureGap
+                                + lo.measureText(style.shortTemperature(d.getMinTemp())));
+            }
+            if (widest <= colW - figureGap || hi.getTextSize() <= 7f) {
+                break;
+            }
+            hi.setTextSize(Math.max(7f, hi.getTextSize() * 0.94f));
+            lo.setTextSize(Math.max(7f, lo.getTextSize() * 0.94f));
+        }
+
         final float tempBase = style.baselineAbove(area.bottom, hi);
         final float tempTop = tempBase + hi.getFontMetrics().ascent;
         final float dayTop = area.top + ruleH + Math.max(1f, area.height() * 0.04f);
@@ -275,22 +304,47 @@ public class WeatherContent implements CardContent {
         final float iconTop = dayTop + style.lineHeight(day) * 0.95f;
         final float iconSize = Math.min(Math.max(6f, tempTop - iconTop), colW * 0.52f);
 
+        // The weekday has to fit its column. Written straight out it is Monday in German and
+        // segunda-feira in Portuguese, and the strip then had one day's name written through
+        // the next one's. One size for all of them, taken from the widest.
+        float widestDay = 0f;
+        for (int i = 0; i < days; i++) {
+            widestDay = Math.max(widestDay, day.measureText(dayName(i + 1)));
+        }
+        if (widestDay > colW * 0.95f) {
+            style.fitNoSmallerThan(day, widestDayName(day, days), colW * 0.95f, 7f);
+        }
+
         for (int i = 0; i < days; i++) {
             final WeatherSpec.Daily d = spec.getForecasts().get(i);
             final float cx = area.left + colW * (i + 0.5f);
             final String name = dayName(i + 1);
-            canvas.drawText(name, cx - day.measureText(name) / 2f, dayBase, day);
+            style.drawEllipsised(canvas, name,
+                    Math.max(area.left, cx - Math.min(day.measureText(name), colW * 0.95f) / 2f),
+                    dayBase, colW * 0.95f, day);
 
             WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
                     cx, iconTop + iconSize / 2f, iconSize, style.ink, style.accent);
 
             final String max = style.shortTemperature(d.getMaxTemp());
             final String min = style.shortTemperature(d.getMinTemp());
-            final float total = hi.measureText(max) + lo.measureText(min) + colW * 0.08f;
+            final float total = hi.measureText(max) + lo.measureText(min) + figureGap;
             final float startX = cx - total / 2f;
             canvas.drawText(max, startX, tempBase, hi);
-            canvas.drawText(min, startX + hi.measureText(max) + colW * 0.08f, tempBase, lo);
+            canvas.drawText(min, startX + hi.measureText(max) + figureGap, tempBase, lo);
         }
+    }
+
+    /** The widest of the weekday names drawn, measured rather than counted. */
+    private String widestDayName(final Paint paint, final int days) {
+        String widest = dayName(1);
+        for (int i = 2; i <= days; i++) {
+            final String name = dayName(i);
+            if (paint.measureText(name) > paint.measureText(widest)) {
+                widest = name;
+            }
+        }
+        return widest;
     }
 
     private String dayName(final int daysFromNow) {

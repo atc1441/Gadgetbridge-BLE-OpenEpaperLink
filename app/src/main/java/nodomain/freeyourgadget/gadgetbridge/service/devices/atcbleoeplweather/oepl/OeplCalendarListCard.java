@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -76,12 +75,28 @@ public class OeplCalendarListCard extends OeplCard {
             timeColumn = Math.max(timeColumn, c.measure(when(events.get(i)), rowSize));
         }
         timeColumn = Math.min(timeColumn + pad * 2, w * 0.42f);
-        final long now = System.currentTimeMillis();
+
+        // One size for all the titles rather than one per row. A line set half the size of the
+        // one above it reads as a fault even when it is the line that survived whole, so the
+        // list is set from the longest title it has to hold - as far down as three quarters of
+        // the row, which is a list that is still read at a glance. Only what does not fit even
+        // then is squeezed on its own line, which is what the drawing does by itself.
+        final float titleRoom = w - timeColumn - pad * 2;
+        float titleSize = rowSize;
+        for (int i = 0; i < count; i++) {
+            final float width = c.measure(events.get(i).getTitle(), rowSize);
+            if (width > titleRoom && width > 0f) {
+                // three quarters of the row, and never under the seven pixels the panel can
+                // still show: in a quarter of a tag the rows are already at their floor
+                titleSize = Math.min(titleSize, Math.max(Math.min(rowSize, 7f),
+                        Math.max(rowSize * 0.75f, rowSize * titleRoom / width)));
+            }
+        }
 
         for (int i = 0; i < count; i++) {
             final CalendarEvent event = events.get(i);
             final float y = top + i * rowHeight;
-            final boolean running = event.getBegin() <= now && event.getEnd() > now;
+            final boolean running = OeplDays.runningNow(event);
             int color = c.ink;
             if (running) {
                 c.fillRect(0, y - rowHeight * 0.06f, w, rowHeight * 0.98f, c.accent);
@@ -89,29 +104,30 @@ public class OeplCalendarListCard extends OeplCard {
             }
             c.textClipped(when(event), pad, y, rowSize, OeplCanvas.LEFT, color,
                     timeColumn - pad);
-            c.textClipped(event.getTitle(), pad + timeColumn, y, rowSize, OeplCanvas.LEFT, color,
-                    w - timeColumn - pad * 2);
+            c.textClipped(event.getTitle(), pad + timeColumn, y + (rowSize - titleSize) * 0.4f,
+                    titleSize, OeplCanvas.LEFT, color, titleRoom);
         }
     }
 
-    /** A time for anything starting today, a date for anything later. */
+    /**
+     * A time for anything starting today, a date for anything later, a dash for an all day
+     * entry that today falls into.
+     * <p>
+     * An all day entry is read by the days it is written on rather than by the instants it
+     * carries: a holiday that began last week and is still running reads as today's, and one
+     * later in the week carries the date it really falls on instead of one a couple of hours
+     * out - see {@link OeplDays}.
+     */
     private String when(final CalendarEvent event) {
         if (event.isAllDay()) {
-            return sameDay(event.getBegin())
+            return OeplDays.coversToday(event)
                     ? "—"
-                    : new SimpleDateFormat("d.M.", Locale.getDefault()).format(event.getBegin());
+                    : new SimpleDateFormat("d.M.", Locale.getDefault())
+                    .format(OeplDays.dayOf(event));
         }
-        if (sameDay(event.getBegin())) {
+        if (OeplDays.beginsToday(event)) {
             return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(event.getBegin());
         }
         return new SimpleDateFormat("d.M.", Locale.getDefault()).format(event.getBegin());
-    }
-
-    private static boolean sameDay(final long millis) {
-        final Calendar a = Calendar.getInstance();
-        final Calendar b = Calendar.getInstance();
-        b.setTimeInMillis(millis);
-        return a.get(Calendar.YEAR) == b.get(Calendar.YEAR)
-                && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR);
     }
 }

@@ -125,8 +125,15 @@ public class OeplGridCard extends OeplCard {
             }
         }
         if (valueSize == Float.MAX_VALUE) {
-            valueSize = anySize; // nothing on this card is a figure, so they all share again
+            // Nothing on this card is a figure: every tile holds a sentence. Sharing the
+            // smallest of their sizes would set the whole panel in four pixels, which it
+            // shows as nothing at all, so they share a size that can still be read and are
+            // cut to their tiles instead.
+            valueSize = anySize;
         }
+        // and whatever it came out as, never thinner than the panel can show: a figure that
+        // only fits at five pixels is a figure nobody reads, so it is set at the floor and cut
+        valueSize = Math.max(valueSize, Math.min(9f, Math.max(7f, h * 0.3f)));
 
         for (int i = 0; i < shown; i++) {
             final float left = (i % cols) * tileW + inset;
@@ -201,7 +208,10 @@ public class OeplGridCard extends OeplCard {
                       final float labelSize, final float labelHeight) {
         final int color = reading.accent ? c.accent : c.ink;
         final float radius = Math.min(w, h) * 0.14f;
-        final float inner = inner(h);
+        // from the smaller side of the tile. Taken from the height alone, a tile four times
+        // taller than it is wide got a thirty eight pixel margin on a panel eighty wide -
+        // which left the caption no column at all and so no width to be cut to.
+        final float inner = inner(Math.min(w, h));
         c.canvas.drawRoundRect(new RectF(x, y, x + w, y + h), radius, radius, outline(c));
 
         final float band = band(reading, h, labelHeight);

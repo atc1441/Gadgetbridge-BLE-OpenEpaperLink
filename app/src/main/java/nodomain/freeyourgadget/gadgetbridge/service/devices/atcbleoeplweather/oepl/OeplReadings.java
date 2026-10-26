@@ -216,13 +216,9 @@ public final class OeplReadings {
             return;
         }
         final String section = context.getString(R.string.oepl_section_events);
-        final long endOfDay = endOfToday();
-        int today = 0;
-        for (final CalendarEvent event : events) {
-            if (event.getBegin() <= endOfDay) {
-                today++;
-            }
-        }
+        // by the days an entry covers: a holiday that runs over today is one of today's, and
+        // an all day entry carries a date rather than a moment - see OeplDays
+        final int today = OeplDays.countOnDay(events, OeplDays.today());
         out.add(new OeplReading(section, context.getString(R.string.oepl_reading_events),
                 String.valueOf(today))
                 .withShape(OeplGlyphs.Glyph.CALENDAR)
@@ -242,18 +238,10 @@ public final class OeplReadings {
     private static String time(final CalendarEvent event) {
         if (event.isAllDay()) {
             return new java.text.SimpleDateFormat("EEE", Locale.getDefault())
-                    .format(new java.util.Date(event.getBegin()));
+                    .format(OeplDays.dayOf(event));
         }
         return new java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
                 .format(new java.util.Date(event.getBegin()));
-    }
-
-    private static long endOfToday() {
-        final java.util.Calendar c = java.util.Calendar.getInstance();
-        c.set(java.util.Calendar.HOUR_OF_DAY, 23);
-        c.set(java.util.Calendar.MINUTE, 59);
-        c.set(java.util.Calendar.SECOND, 59);
-        return c.getTimeInMillis();
     }
 
     // ------------------------------------------------------------------ the batteries

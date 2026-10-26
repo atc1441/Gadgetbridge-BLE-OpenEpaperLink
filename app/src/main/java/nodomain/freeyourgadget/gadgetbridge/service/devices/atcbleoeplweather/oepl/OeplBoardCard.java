@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -89,13 +88,26 @@ public class OeplBoardCard extends OeplCard {
         }
         timeColumn = Math.min(timeColumn, w * 0.36f);
         final float titleLeft = pad + timeColumn + pad * 2f;
-        final long now = System.currentTimeMillis();
+
+        // one size for every line of the board, taken from the longest of them: a board where
+        // one departure is set smaller than the others is read as a different kind of entry
+        final float titleRoom = w - titleLeft - pad;
+        float titleSize = rowSize;
+        for (int i = 0; i < count; i++) {
+            final float width = c.measure(events.get(i).getTitle(), rowSize);
+            if (width > titleRoom && width > 0f) {
+                // as in the appointment list: three quarters of the row at most, and never
+                // under the seven pixels the panel can still show
+                titleSize = Math.min(titleSize, Math.max(Math.min(rowSize, 7f),
+                        Math.max(rowSize * 0.75f, rowSize * titleRoom / width)));
+            }
+        }
 
         for (int i = 0; i < count; i++) {
             final CalendarEvent event = events.get(i);
             final float rowTop = top + i * rowHeight;
             final float textTop = rowTop + (rowHeight - c.lineHeight(rowSize)) / 2f;
-            final boolean running = event.getBegin() <= now && event.getEnd() > now;
+            final boolean running = OeplDays.runningNow(event);
 
             // the running entry is marked by a block in front of its time rather than by a bar
             // across the row: on a board the eye goes down the left edge
@@ -105,8 +117,8 @@ public class OeplBoardCard extends OeplCard {
             }
             c.textClipped(time(event), pad + timeColumn, textTop, rowSize, OeplCanvas.RIGHT,
                     running ? c.accent : c.ink, timeColumn);
-            c.textClipped(event.getTitle(), titleLeft, textTop, rowSize, OeplCanvas.LEFT,
-                    c.ink, w - titleLeft - pad);
+            c.textClipped(event.getTitle(), titleLeft, textTop + (rowSize - titleSize) * 0.4f,
+                    titleSize, OeplCanvas.LEFT, c.ink, titleRoom);
 
             // the rule belongs to the row above it, and the last one is left out so that it
             // cannot land on the panel edge
@@ -117,23 +129,21 @@ public class OeplBoardCard extends OeplCard {
         }
     }
 
-    /** A clock time for today, a date for anything further out, a dash for an all day entry. */
+    /**
+     * A clock time for today, a date for anything further out, a dash for an all day entry
+     * that today falls into. All day entries go by the days they are written on rather than by
+     * the instants they carry - see {@link OeplDays}.
+     */
     private String time(final CalendarEvent event) {
         if (event.isAllDay()) {
-            return today(event.getBegin()) ? "——" : new SimpleDateFormat("d.M.",
-                    Locale.getDefault()).format(event.getBegin());
+            return OeplDays.coversToday(event)
+                    ? "——"
+                    : new SimpleDateFormat("d.M.", Locale.getDefault())
+                    .format(OeplDays.dayOf(event));
         }
-        if (today(event.getBegin())) {
+        if (OeplDays.beginsToday(event)) {
             return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(event.getBegin());
         }
         return new SimpleDateFormat("EE HH:mm", Locale.getDefault()).format(event.getBegin());
-    }
-
-    private static boolean today(final long millis) {
-        final Calendar now = Calendar.getInstance();
-        final Calendar then = Calendar.getInstance();
-        then.setTimeInMillis(millis);
-        return now.get(Calendar.YEAR) == then.get(Calendar.YEAR)
-                && now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR);
     }
 }

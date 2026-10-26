@@ -60,8 +60,11 @@ public class OeplListCard extends OeplCard {
         final int sections = (int) countSections();
         final float floor = Math.max(8f, Math.min(c.height * 0.055f, 11f));
         final float wanted = (c.height - pad * 2f) / (readings.size() + sections * 0.8f);
-        final float size = Math.max(floor,
-                Math.min(Math.max(wanted * 0.8f, floor), c.height * 0.14f));
+        // and sized by the width as well: on a panel that is tall for its width a row sized
+        // off the height alone came out seventy pixels high on a panel 152 wide, where the
+        // value then grew back over the pictogram in front of it
+        final float size = Math.max(floor, Math.min(Math.max(wanted * 0.8f, floor),
+                Math.min(c.height * 0.14f, c.width * 0.15f)));
         final float rowHeight = c.lineHeight(size) * 1.12f;
         final float headingSize = Math.max(8f, size * 0.82f);
         final float headingHeight = c.lineHeight(headingSize) * 1.25f;
@@ -116,17 +119,22 @@ public class OeplListCard extends OeplCard {
         // is as long as a sentence, and right aligned text that is not clipped grows to the
         // left, straight over the name beside it and out of the panel.
         final String value = reading.display(fahrenheit);
-        final float valueRoom = Math.max(size * 2f, (x1 - left) * 0.5f);
+        // never wider than what is actually left beside the pictogram: a room measured from
+        // the type size alone reached back over the icon rather than being cut
+        final float valueRoom = Math.min(x1 - left,
+                Math.max(size * 2f, (x1 - left) * 0.5f));
         c.textClipped(value, x1, y, size, OeplCanvas.RIGHT, color, valueRoom);
         final float valueWidth = Math.min(c.measure(value, size), valueRoom);
         float right = x1 - valueWidth - size * 0.4f;
 
         // A bar where there is a percentage and room for it, which says more at a distance
-        // than the number beside it does - but the name comes first. A row reduced to two
-        // letters and a bar says less than one without the bar, and the percentage is in the
-        // value column anyway.
+        // than the number beside it does - but the name comes first. The bar is therefore only
+        // drawn while the whole name still fits beside it at the smallest size it may be set
+        // in: a row reduced to two letters and a bar says less than one without the bar, and
+        // the percentage stands in the value column either way.
         final float barRoom = Math.min(c.width * 0.26f, (right - left) * 0.45f);
-        if (reading.percent >= 0 && right - left - barRoom > size * 4f) {
+        final float nameRoom = c.measure(reading.label, Math.max(7f, size * 0.5f));
+        if (reading.percent >= 0 && right - left - barRoom > Math.max(size * 4f, nameRoom)) {
             final float barW = barRoom;
             final float barH = Math.max(2f, size * 0.52f);
             final float barX = right - barW;

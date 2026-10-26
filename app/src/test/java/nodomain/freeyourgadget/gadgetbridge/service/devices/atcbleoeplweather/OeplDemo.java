@@ -142,6 +142,16 @@ public final class OeplDemo {
     }
 
     /**
+     * Whether the shared data comes out in its awkward form from here on - the long place name,
+     * the appointment titles no panel holds, the entity named after where it hangs. {@link #card}
+     * sets it from the ":long" suffix of an id; {@link OeplSettings} sets it around building a
+     * card of its own, since there the data is one axis of the sweep rather than part of an id.
+     */
+    public static void stress(final boolean on) {
+        stress = on;
+    }
+
+    /**
      * Robolectric runs without the app's resources, so the two bundled faces are loaded straight
      * off disk. Without them every pictogram would silently be skipped and the previews would not
      * show what reaches the display.
@@ -442,8 +452,15 @@ public final class OeplDemo {
      * colours would say nothing about dithering, which is the whole point of the picture cards.
      */
     public static Bitmap picture() {
-        final int w = 240;
-        final int h = 160;
+        return picture(240, 160);
+    }
+
+    /**
+     * The same stand in at any shape. What a picture card does with one depends on how the
+     * picture's shape compares with the panel's - a portrait on a letterbox panel is the case
+     * that shows whether fitting, filling and stretching really differ.
+     */
+    public static Bitmap picture(final int w, final int h) {
         final Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         final Canvas canvas = new Canvas(bitmap);
         for (int y = 0; y < h; y++) {
@@ -453,7 +470,7 @@ public final class OeplDemo {
         }
         final Paint disc = new Paint(Paint.ANTI_ALIAS_FLAG);
         disc.setColor(0xffc02020);
-        canvas.drawCircle(w * 0.35f, h * 0.45f, h * 0.3f, disc);
+        canvas.drawCircle(w * 0.35f, h * 0.45f, Math.min(w, h) * 0.3f, disc);
         final Paint bar = new Paint();
         bar.setColor(0xffffffff);
         canvas.drawRect(w * 0.6f, h * 0.15f, w * 0.92f, h * 0.85f, bar);
@@ -578,8 +595,7 @@ public final class OeplDemo {
             events.add(event(base + 86400_000L + 10 * 3600_000L,
                     base + 86400_000L + 12 * 3600_000L, 3,
                     "Werkstatttermin: Inspektion, Reifen und Klimaanlage", false));
-            events.add(event(base + 86400_000L, base + 3 * 86400_000L, 4,
-                    "Betriebsausflug in den Harz mit Uebernachtung", true));
+            events.add(allDayEvent(1, 2, 4, "Betriebsausflug in den Harz mit Uebernachtung"));
             return events;
         }
         events.add(event(now - 600_000L, now + 1800_000L, 0, "Standup", false));
@@ -588,10 +604,33 @@ public final class OeplDemo {
                 "Einkaufen mit der ganzen Familie im Baumarkt", false));
         events.add(event(base + 86400_000L + 10 * 3600_000L,
                 base + 86400_000L + 11 * 3600_000L, 3, "Werkstatt", false));
-        events.add(event(base + 86400_000L, base + 2 * 86400_000L, 4, "Urlaub", true));
+        events.add(allDayEvent(1, 1, 4, "Urlaub"));
         events.add(event(base + 2 * 86400_000L + 9 * 3600_000L,
                 base + 2 * 86400_000L + 10 * 3600_000L, 5, "Elternabend", false));
         return events;
+    }
+
+    /**
+     * An all day entry the way the calendar provider hands one over: not a moment but a date,
+     * and that date as midnight in UTC rather than in the time zone one is standing in. Built
+     * from local midnights instead, the demo was the only place in this project where an all
+     * day entry looked straightforward - which is why reading it as a moment went unnoticed
+     * until a holiday was drawn across the day after it.
+     *
+     * @param from   the first day, counted from today
+     * @param length how many days it covers
+     */
+    private static CalendarEvent allDayEvent(final int from, final int length, final int id,
+                                             final String title) {
+        final Calendar local = Calendar.getInstance();
+        local.add(Calendar.DAY_OF_MONTH, from);
+        final Calendar utc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        utc.clear();
+        utc.set(local.get(Calendar.YEAR), local.get(Calendar.MONTH),
+                local.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+        final long begin = utc.getTimeInMillis();
+        utc.add(Calendar.DAY_OF_MONTH, length);
+        return event(begin, utc.getTimeInMillis(), id, title, true);
     }
 
     private static CalendarEvent event(final long begin, final long end, final int id,

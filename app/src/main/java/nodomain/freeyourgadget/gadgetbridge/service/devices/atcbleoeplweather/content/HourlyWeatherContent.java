@@ -92,12 +92,21 @@ public class HourlyWeatherContent implements CardContent {
 
         final float pad = Math.max(2f, area.width() * 0.03f);
         final float labelH = Math.max(10f, Math.min(area.height() * 0.17f, area.width() * 0.09f));
-        final float iconH = area.height() > 90 ? Math.max(12f, area.height() * 0.22f) : 0f;
+        // the sky pictograms are as wide as they are tall and then some, so their height
+        // comes from the width as well: a fifth of a tall panel is wider than a narrow one is
+        final float iconH = area.height() > 90
+                ? Math.max(12f, Math.min(area.height() * 0.22f, area.width() * 0.38f)) : 0f;
         // the curve is drawn with a thick round stroke, so the plot has to keep half of it
         // clear of the edges or the first and last point bleed over the panel border
-        final float stroke = Math.max(1.5f, area.height() * 0.022f);
+        // sized by the width as well as by the height: on a panel that is tall for its
+        // width the height alone asks for a fourteen pixel stroke, and the dots on it then
+        // cover the hour written underneath them
+        final float stroke = Math.max(1.5f, Math.min(area.height() * 0.022f,
+                area.width() * 0.03f));
+        // and the row of hours stays clear of the dots, not merely of the curve
         final RectF plot = new RectF(area.left + pad + stroke, area.top + labelH * 1.3f + iconH,
-                area.right - pad - stroke, area.bottom - labelH * 1.1f);
+                area.right - pad - stroke,
+                area.bottom - labelH * 1.1f - stroke * 0.9f);
 
         final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
         line.setStyle(Paint.Style.STROKE);

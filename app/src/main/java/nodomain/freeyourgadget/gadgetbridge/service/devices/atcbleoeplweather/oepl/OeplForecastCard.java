@@ -84,11 +84,33 @@ public class OeplForecastCard extends OeplCard {
         // on a 800x480 poster it asked 172 pixels per column and so drew four days where
         // seven would have been readable, which is most of the reason to hang a large panel.
         final float smallest = 9f;
-        final float minColumn = Math.max(c.measure("-9 99", smallest) + 6f, smallest / 0.28f);
+        // What a column has to hold, measured from the figures themselves rather than from a
+        // sample of them. In Fahrenheit a day reads "100 111" where in Celsius it reads
+        // "-9 44", and a column sized around the Celsius shape had one day's pair written
+        // into the next day's.
+        String widest = "-9 99";
+        for (final OeplWeather.Day day : forecast) {
+            final String pair = temp(day.minTemperature) + " " + temp(day.maxTemperature);
+            if (c.measure(pair, smallest) > c.measure(widest, smallest)) {
+                widest = pair;
+            }
+        }
+        final float minColumn = Math.max(c.measure(widest, smallest) + 6f, smallest / 0.28f);
         int days = Math.min(requestedDays, forecast.size());
         days = Math.max(1, Math.min(days, (int) (w / Math.max(24f, minColumn))));
         final float column = w / days;
-        final float top = h * 0.16f;
+        // under the headline rather than at a fixed fraction of the card: a place name set in
+        // a script that stacks its marks takes a taller line than the metrics promise
+        final float top = Math.max(h * 0.16f, h * 0.005f + c.lineHeight(headSize));
+
+        // and the size the pair is set in is the one at which it fits that column
+        float tempSize = Math.min(h * 0.15f, column * 0.28f);
+        int tempGuard = 0;
+        while (tempSize > smallest && tempGuard++ < 64
+                && c.measure(widest, tempSize) > column - 4f) {
+            tempSize = Math.max(smallest, tempSize * 0.95f);
+        }
+        final float tempTop = h - c.lineHeight(tempSize);
 
         // read in the place's own time: a forecast for somewhere two time zones away is
         // about that place's days, not about the phone's
@@ -108,7 +130,10 @@ public class OeplForecastCard extends OeplCard {
             c.textClipped(dayLabel(c, weather, day, weekday, labelSize, column - 2), centre, top,
                     labelSize, OeplCanvas.CENTER, today ? c.accent : c.ink, column - 2);
 
-            final float windY = top + h * 0.175f;
+            // below the weekday rather than at a fixed fraction of the panel: a script that
+            // stacks its marks - Burmese, Malayalam - writes a line half as tall again as a
+            // Latin one, and the wind was then written through the name of the day
+            final float windY = Math.max(top + h * 0.175f, top + c.lineHeight(labelSize));
             final String windValue = wind(day.windSpeed);
             // Arrow and number are placed from their measured widths. The arrow is an icon
             // glyph, and those are nowhere near square, so the space it needs has to be asked
@@ -130,11 +155,12 @@ public class OeplForecastCard extends OeplCard {
             // the sky pictogram takes whatever is left between the wind and that. Fixed
             // fractions of the height had the rain written through the temperatures on every
             // panel just short of the next size up.
-            final float tempSize = Math.min(h * 0.15f, column * 0.28f);
-            final float tempTop = h - c.lineHeight(tempSize);
             final float rainSize = Math.min(h * 0.105f, column * 0.2f);
             final float windBottom = windY + c.lineHeight(windSize);
-            final boolean rain = day.precipitation > 0.05f
+            // seven pixels or no rain figure at all: under that the panel's quantiser
+            // leaves a grey mark where the millimetres were, and the column reads as dirty
+            // rather than as wet
+            final boolean rain = day.precipitation > 0.05f && rainSize >= 7f
                     && tempTop - c.lineHeight(rainSize) - windBottom > h * 0.18f;
             final float rainTop = tempTop - c.lineHeight(rainSize);
             if (rain) {
@@ -193,7 +219,11 @@ public class OeplForecastCard extends OeplCard {
             final float y = top + i * row;
             final float middle = y + row / 2f;
 
-            final boolean withRain = day.precipitation > 0.05f && row > textSize * 1.9f;
+            // the millimetres go under the weekday at two thirds its size, and are left out
+            // rather than set under seven pixels, where the panel shows a smudge
+            final float rainSize = Math.max(7f, textSize * 0.62f);
+            final boolean withRain = day.precipitation > 0.05f && row > textSize * 1.9f
+                    && textSize * 0.62f >= 7f;
             final float firstLine = middle - textSize * (withRain ? 0.95f : 0.55f);
             // The room left of the pictogram, measured rather than assumed. An icon glyph is
             // nowhere near square - the same reason the wind arrow above is placed from its
@@ -216,7 +246,7 @@ public class OeplForecastCard extends OeplCard {
 
             if (withRain) {
                 c.textFitted(Math.round(day.precipitation) + "mm", pad,
-                        middle + textSize * 0.2f, textSize * 0.62f, OeplCanvas.LEFT,
+                        middle + textSize * 0.2f, rainSize, OeplCanvas.LEFT,
                         inkOrAccent(c, day.precipitation > 10f), labelRoom);
             }
             if (i > 0) {

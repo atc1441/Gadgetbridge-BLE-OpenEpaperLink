@@ -42,9 +42,7 @@ public class DateContent implements CardContent {
     @Override
     public void draw(final Canvas canvas, final CardStyle style, final RectF area) {
         final Date now = new Date();
-        final String weekday = new SimpleDateFormat("EEEE", Locale.getDefault()).format(now);
         final String day = new SimpleDateFormat("d", Locale.getDefault()).format(now);
-        final String month = new SimpleDateFormat("MMMM", Locale.getDefault()).format(now);
 
         final float pad = area.width() * 0.04f;
         final Paint number = style.paint(style.ink, true, area.height() * 0.68f);
@@ -56,9 +54,15 @@ public class DateContent implements CardContent {
         final float column = area.width() - numberW - pad * 3;
         final Paint word = style.paint(style.accent, true,
                 Math.min(area.height() * 0.22f, Math.max(9f, column * 0.26f)));
-        style.fitNoSmallerThan(word, weekday, column, 9f);
         final Paint sub = style.paint(style.ink, false,
                 Math.min(area.height() * 0.17f, Math.max(8f, column * 0.22f)));
+        // A quarter of a price tag leaves this card a column some forty pixels wide, which no
+        // size of "Wednesday" fits into. The locale has a short form of its own for exactly
+        // that, and "Wed" is read where "Wedn…" is only puzzled over - so the abbreviation
+        // goes in rather than a cut, and the full word stays wherever it still fits.
+        final String weekday = shortest(style, word, column, now, "EEEE", "EEE", "EE");
+        final String month = shortest(style, sub, column, now, "MMMM", "MMM", "MMMMM");
+        style.fitNoSmallerThan(word, weekday, column, 9f);
         style.fitNoSmallerThan(sub, month, column, 8f);
 
         final float groupW = numberW + pad
@@ -67,9 +71,31 @@ public class DateContent implements CardContent {
         final float textLeft = left + numberW + pad;
 
         canvas.drawText(day, left, area.top + area.height() * 0.78f, number);
-        style.drawEllipsised(canvas, weekday, textLeft, area.top + area.height() * 0.48f,
+        final float weekdayBase = area.top + area.height() * 0.48f;
+        // the month goes under the weekday, not at a fixed fraction of the card: a line of a
+        // script that stacks its marks is taller than the one the metrics promise
+        final float monthBase = Math.max(area.top + area.height() * 0.72f,
+                weekdayBase + style.lineHeight(word) * 0.8f);
+        style.drawEllipsised(canvas, weekday, textLeft, weekdayBase,
                 area.right - textLeft - pad, word);
-        style.drawEllipsised(canvas, month, textLeft, area.top + area.height() * 0.72f,
+        style.drawEllipsised(canvas, month, textLeft, monthBase,
                 area.right - textLeft - pad, sub);
+    }
+
+    /**
+     * The first of these date formats whose text fits the column at the size the paint is
+     * already at, or the shortest of them when none does. The paint is left as it was: how far
+     * it may then be shrunk is the caller's business.
+     */
+    private String shortest(final CardStyle style, final Paint paint, final float column,
+                            final Date now, final String... patterns) {
+        String text = "";
+        for (final String pattern : patterns) {
+            text = new SimpleDateFormat(pattern, Locale.getDefault()).format(now);
+            if (paint.measureText(text) <= column) {
+                return text;
+            }
+        }
+        return text;
     }
 }

@@ -68,8 +68,29 @@ public class StatusContent implements CardContent {
         final float textSize = Math.min(rowH * 0.42f, area.width() * 0.13f);
         final Paint name = style.paint(style.ink, false, textSize);
         final Paint value = style.paint(style.ink, true, textSize);
-        final float barW = area.width() * 0.34f;
         final float barH = Math.max(4f, rowH * 0.26f);
+
+        // The bar gives way before a name is cut. A battery is read from how far its bar is
+        // filled, and a bar two thirds as wide still says that; a device called "Mi B…" says
+        // nothing. So the names are measured at the smallest size they may be set in, and the
+        // bar keeps whatever is left over - down to a fifth of the row, which is as narrow as
+        // a bar can be and still be read as one.
+        final Paint smallest = style.paint(style.ink, false, Math.max(7f, textSize * 0.5f));
+        float widestName = 0f;
+        float widestValue = 0f;
+        for (int i = 0; i < count; i++) {
+            widestName = Math.max(widestName, smallest.measureText(entries.get(i).name));
+            if (entries.get(i).percent >= 0) {
+                widestValue = Math.max(widestValue,
+                        value.measureText(entries.get(i).percent + "%") + pad * 2);
+            }
+        }
+        float barW = area.width() * 0.34f;
+        int barGuard = 0;
+        while (barW > area.width() * 0.2f && barGuard++ < 64
+                && area.width() - barW - widestValue - pad * 3 < widestName) {
+            barW *= 0.96f;
+        }
 
         for (int i = 0; i < count; i++) {
             final Entry e = entries.get(i);
@@ -85,10 +106,15 @@ public class StatusContent implements CardContent {
 
             final float barTop = base - barH * 1.4f;
             final Paint frame = new Paint(Paint.ANTI_ALIAS_FLAG);
+            final float edge = Math.max(1f, barH * 0.18f);
             frame.setStyle(Paint.Style.STROKE);
-            frame.setStrokeWidth(Math.max(1f, barH * 0.18f));
+            frame.setStrokeWidth(edge);
             frame.setColor(style.ink);
-            canvas.drawRect(barLeft, barTop, barLeft + barW, barTop + barH, frame);
+            // drawn inside its own box: a stroke straddles the line it is drawn on, and on a
+            // tall panel the outline of a battery is thick enough for that half to reach past
+            // the right hand edge of the card
+            canvas.drawRect(barLeft + edge / 2f, barTop + edge / 2f,
+                    barLeft + barW - edge / 2f, barTop + barH - edge / 2f, frame);
 
             if (e.percent >= 0) {
                 final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);

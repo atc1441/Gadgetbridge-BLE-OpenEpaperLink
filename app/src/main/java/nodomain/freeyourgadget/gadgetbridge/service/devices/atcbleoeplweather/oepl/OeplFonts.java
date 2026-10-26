@@ -17,7 +17,13 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl;
 
 import android.content.Context;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.Typeface;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import androidx.core.content.res.ResourcesCompat;
 
@@ -91,5 +97,54 @@ public final class OeplFonts {
         text = textFace;
         icons = iconFace;
         loaded = true;
+        factorLocale = null;
+    }
+
+    private static Locale factorLocale;
+    private static float factor = 1f;
+
+    /**
+     * How much taller a line of the reader's language is than the bundled face asks for.
+     * <p>
+     * The face carries Latin, Greek and Cyrillic; everything else is drawn by whatever font
+     * Android falls back to. The paint still reports the metrics of the face it was handed
+     * though, so a layout that stacks its rows by those metrics stacks Burmese, Malayalam or
+     * Tamil too tightly - their marks sit above the Latin ascender and below its descender,
+     * and the top row of a card then writes over the edge of the panel.
+     * <p>
+     * So a sample of the language is measured once and kept: one for the scripts the face
+     * covers, and up to about a half more for the ones that stack.
+     */
+    public static synchronized float lineFactor() {
+        final Locale locale = Locale.getDefault();
+        if (locale.equals(factorLocale)) {
+            return factor;
+        }
+        factorLocale = locale;
+        factor = measureFactor(locale);
+        return factor;
+    }
+
+    private static float measureFactor(final Locale locale) {
+        try {
+            final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setTypeface(text());
+            paint.setTextSize(100f);
+            final Paint.FontMetrics fm = paint.getFontMetrics();
+            final float line = fm.descent - fm.ascent;
+            if (line <= 0f) {
+                return 1f;
+            }
+            final Date now = new Date();
+            final String sample = new SimpleDateFormat("EEEE MMMM", locale).format(now)
+                    + " " + new SimpleDateFormat("EE d.M. HH:mm", locale).format(now);
+            final Rect ink = new Rect();
+            paint.getTextBounds(sample, 0, sample.length(), ink);
+            // a tenth of slack on top of what the sample needs: the sample is dates, and a
+            // title in the same language may stack one mark higher still
+            return Math.max(1f, Math.min(2f, ink.height() * 1.15f / line));
+        } catch (final Throwable ignored) {
+            return 1f; // no font stack around, which happens in plain unit tests
+        }
     }
 }

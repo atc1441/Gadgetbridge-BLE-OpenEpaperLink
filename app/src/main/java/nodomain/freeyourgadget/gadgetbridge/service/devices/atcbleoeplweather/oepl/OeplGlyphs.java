@@ -239,10 +239,14 @@ public final class OeplGlyphs {
                 break;
             }
             case HOUSE: {
+                // the eaves are inset by half the stroke, like every other shape here: drawn
+                // to the full half width the stroke straddles the edge and the roof hangs a
+                // pixel or two outside the square the glyph was given
                 final Path roof = new Path();
-                roof.moveTo(cx - half, cy);
+                final float eave = half - stroke;
+                roof.moveTo(cx - eave, cy);
                 roof.lineTo(cx, top + size * 0.08f);
-                roof.lineTo(cx + half, cy);
+                roof.lineTo(cx + eave, cy);
                 canvas.drawPath(roof, line);
                 canvas.drawRect(new RectF(cx - size * 0.32f, cy, cx + size * 0.32f,
                         top + size - stroke * 0.5f), line);

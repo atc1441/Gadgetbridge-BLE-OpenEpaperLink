@@ -94,15 +94,22 @@ public class OeplMonthCard extends OeplCard {
         if (headSize > 0f) {
             final String month = new SimpleDateFormat("MMMM yyyy", Locale.getDefault())
                     .format(today.getTime());
-            c.rowEnds(month, String.valueOf(today.get(Calendar.DAY_OF_MONTH)), pad, headSize,
+            c.rowEnds(month, OeplCanvas.number(today.get(Calendar.DAY_OF_MONTH)), pad, headSize,
                     c.ink, c.accent, pad, w - pad, pad * 2f);
         }
 
         // The weekday names in the order this phone counts them: a calendar that starts on
         // Sunday where the reader's week starts on Monday is read wrong at a glance.
-        if (nameSize > 0f) {
-            final SimpleDateFormat weekday = new SimpleDateFormat("EE", Locale.getDefault());
+        // The short form of a weekday is short in German and a word in Malayalam, and a cell
+        // of a month sheet is a seventh of the panel. Every language has a narrower form
+        // still - one letter, or one syllable - and that goes in rather than a cut. Where not
+        // even the narrowest fits, the sheet goes without its headings: seven cut words say
+        // less than nothing, and the room goes to the days instead.
+        final String pattern = nameSize > 0f
+                ? namePattern(c, today, firstDay, nameSize, cell - 2f) : null;
+        if (pattern != null) {
             final Calendar naming = (Calendar) today.clone();
+            final SimpleDateFormat weekday = new SimpleDateFormat(pattern, Locale.getDefault());
             for (int i = 0; i < 7; i++) {
                 naming.set(Calendar.DAY_OF_WEEK, ((firstDay - 1 + i) % 7) + 1);
                 c.textClipped(weekday.format(naming.getTime()), pad + cell * i + cell / 2f,
@@ -114,8 +121,7 @@ public class OeplMonthCard extends OeplCard {
 
         final float numberSize = c.sizeForHeight(Math.min(rowHeight * 0.52f, cell * 0.5f),
                 rowHeight * 0.6f, 7f);
-        final int thisMonth = first.get(Calendar.MONTH);
-        final int thisYear = first.get(Calendar.YEAR);
+        final int[] counts = counts(first, days);
 
         for (int day = 1; day <= days; day++) {
             final int index = lead + day - 1;
@@ -129,12 +135,41 @@ public class OeplMonthCard extends OeplCard {
                 c.fillRect(left + 1f, cellTop + 1f, cell - 2f, rowHeight - 2f, c.accent);
             }
             if (numberSize > 0f) {
-                c.text(String.valueOf(day), left + cell / 2f, cellTop + rowHeight * 0.08f,
+                c.text(OeplCanvas.number(day), left + cell / 2f, cellTop + rowHeight * 0.08f,
                         numberSize, OeplCanvas.CENTER, isToday ? c.paper : c.ink);
             }
-            dots(c, countOn(thisYear, thisMonth, day), left, cellTop, cell, rowHeight,
-                    numberSize, isToday ? c.paper : c.ink);
+            dots(c, counts[day], left, cellTop, cell, rowHeight, numberSize,
+                    isToday ? c.paper : c.ink);
         }
+    }
+
+    /**
+     * The widest weekday format whose names all fit a cell - the short one where it fits, the
+     * narrow one otherwise - or null when not even the narrowest does at the smallest size
+     * the panel can still show.
+     */
+    private String namePattern(final OeplCanvas c, final Calendar today, final int firstDay,
+                               final float nameSize, final float room) {
+        final Calendar naming = (Calendar) today.clone();
+        String narrowest = null;
+        for (final String pattern : new String[]{"EE", "EEEEE"}) {
+            final SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
+            float widest = 0f;
+            float smallest = 0f;
+            for (int i = 0; i < 7; i++) {
+                naming.set(Calendar.DAY_OF_WEEK, ((firstDay - 1 + i) % 7) + 1);
+                final String name = format.format(naming.getTime());
+                widest = Math.max(widest, c.measure(name, nameSize));
+                smallest = Math.max(smallest, c.measure(name, OeplCanvas.floorFor(nameSize)));
+            }
+            if (widest <= room) {
+                return pattern;
+            }
+            if (smallest <= room) {
+                narrowest = pattern; // it fits once it is set smaller, which textClipped does
+            }
+        }
+        return narrowest;
     }
 
     /** A dot per appointment, along the bottom of the cell, capped at what fits. */
@@ -159,17 +194,27 @@ public class OeplMonthCard extends OeplCard {
         }
     }
 
-    /** How many appointments fall on a given day of this month. */
-    private int countOn(final int year, final int month, final int day) {
-        int count = 0;
-        final Calendar when = Calendar.getInstance();
-        for (final CalendarEvent event : events) {
-            when.setTimeInMillis(event.getBegin());
-            if (when.get(Calendar.YEAR) == year && when.get(Calendar.MONTH) == month
-                    && when.get(Calendar.DAY_OF_MONTH) == day) {
-                count++;
-            }
+    /**
+     * How many appointments fall on each day of this month, counted by the days an entry
+     * covers rather than by the moment it begins at.
+     * <p>
+     * So a holiday over three days puts a dot on all three - which is what somebody looking
+     * for a free weekend is looking at the sheet for - and an all day entry lands on the day
+     * it is written on rather than on whatever day its midnight in UTC falls on here. See
+     * {@link OeplDays}.
+     */
+    private int[] counts(final Calendar first, final int days) {
+        final Calendar cell = (Calendar) first.clone();
+        cell.set(Calendar.DAY_OF_MONTH, 1);
+        cell.set(Calendar.HOUR_OF_DAY, 0);
+        cell.set(Calendar.MINUTE, 0);
+        cell.set(Calendar.SECOND, 0);
+        cell.set(Calendar.MILLISECOND, 0);
+        final int[] counts = new int[days + 1];
+        for (int day = 1; day <= days; day++) {
+            counts[day] = OeplDays.countOnDay(events, cell.getTimeInMillis());
+            cell.add(Calendar.DAY_OF_MONTH, 1);
         }
-        return count;
+        return counts;
     }
 }

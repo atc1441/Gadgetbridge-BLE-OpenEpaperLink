@@ -62,14 +62,16 @@ public class OeplWeatherCard extends OeplCard {
         final float pad = Math.max(2f, w * 0.017f);
         final OeplWeather.Current now = weather.current;
 
-        final float headSize = h * 0.20f;
+        // never under what the panel can show: on the smallest tags a fifth of the height is
+        // five pixels, and a place name set in five pixels is a smudge in the corner
+        final float headSize = Math.max(7f, h * 0.20f);
         final String windValue = wind(now.windSpeed);
         final float windWidth = c.measure(windValue, headSize);
         final float arrowSize = headSize * 0.9f;
         final boolean wet = OeplIcons.isWet(now.wmoCode);
         final float headRoom = windWidth + arrowSize * (wet ? 3.2f : 1.8f);
 
-        // set smaller rather than cut: the place is the one word that says which display
+        // set smaller before it is cut: the place is the one word that says which display
         // this is, and "Hamb…" says nothing at all
         c.textFitted(weather.location, pad, h * 0.02f, headSize, OeplCanvas.LEFT, c.ink,
                 w - headRoom - pad * 2);

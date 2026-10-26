@@ -24,11 +24,11 @@ import android.graphics.RectF;
 import androidx.annotation.Nullable;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplDays;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
 
 /** The next few appointments, with today's ones marked in the accent colour. */
@@ -121,18 +121,19 @@ public class CalendarContent implements CardContent {
         return widest;
     }
 
-    /** Today's events show the time, later ones the weekday so the day is obvious. */
+    /**
+     * Today's events show the time, later ones the weekday so the day is obvious. An all day
+     * entry is read by the days it is written on rather than by the instants it carries, which
+     * are midnights in UTC - see {@link OeplDays}.
+     */
     private String label(final CalendarEvent event) {
-        final Calendar start = Calendar.getInstance();
-        start.setTimeInMillis(event.getBegin());
-        final Calendar today = Calendar.getInstance();
-        final boolean sameDay = start.get(Calendar.YEAR) == today.get(Calendar.YEAR)
-                && start.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
         if (event.isAllDay()) {
-            return sameDay ? "—"
-                    : new SimpleDateFormat("EE", Locale.getDefault()).format(start.getTime());
+            return OeplDays.coversToday(event) ? "—"
+                    : new SimpleDateFormat("EE", Locale.getDefault())
+                    .format(OeplDays.dayOf(event));
         }
-        final String pattern = sameDay ? "HH:mm" : "EE HH:mm";
-        return new SimpleDateFormat(pattern, Locale.getDefault()).format(start.getTime());
+        final String pattern = OeplDays.beginsToday(event) ? "HH:mm" : "EE HH:mm";
+        return new SimpleDateFormat(pattern, Locale.getDefault())
+                .format(new Date(event.getBegin()));
     }
 }

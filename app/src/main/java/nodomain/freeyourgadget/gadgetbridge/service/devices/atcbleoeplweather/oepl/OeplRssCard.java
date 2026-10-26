@@ -54,7 +54,9 @@ public class OeplRssCard extends OeplCard {
         c.line(0, ruleY, w, ruleY, c.ink, Math.max(1f, h * 0.008f));
 
         final float titleSize = Math.max(7f, Math.min(h * 0.105f, w * 0.075f));
-        final float summarySize = titleSize * 0.85f;
+        // the summary is set smaller than its headline, but not thinner than the panel can
+        // show: six pixels of grey under a headline is a smudge, not a sentence
+        final float summarySize = Math.max(7f, titleSize * 0.85f);
         final float foot = Math.max(1f, h * 0.01f);
         float y = ruleY + Math.max(2f, h * 0.025f);
 

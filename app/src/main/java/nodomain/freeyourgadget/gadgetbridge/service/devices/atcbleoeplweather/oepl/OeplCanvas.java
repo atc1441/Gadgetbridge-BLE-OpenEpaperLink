@@ -93,6 +93,18 @@ public class OeplCanvas {
         }
     }
 
+    /**
+     * A number in the reader's own digits.
+     * <p>
+     * Dates and times are formatted by the language, and Arabic, Persian and Burmese write
+     * them in their own numerals. A day of the month put beside them with {@code valueOf} is
+     * then the one number on the card in Latin figures, which reads as a mistake - so every
+     * number a card writes goes through here.
+     */
+    public static String number(final long value) {
+        return String.format(java.util.Locale.getDefault(), "%d", value);
+    }
+
     public float measure(final String text, final float size) {
         return textPaint(size, ink).measureText(text == null ? "" : text);
     }
@@ -107,37 +119,95 @@ public class OeplCanvas {
         draw(text, x, y, align, textPaint(size, color));
     }
 
-    /** As {@link #text}, but cut with an ellipsis once it would run past maxWidth. */
+    /**
+     * As {@link #text}, but made to fit a width: set smaller first, and cut with an ellipsis
+     * only once even the smallest size this allows is too wide.
+     * <p>
+     * Cutting is the last resort, not the first. A word set a third smaller is still read from
+     * across a room, while the same word cut to its first letters is a guess - and a panel full
+     * of guesses was what this project kept producing, one ellipsis per column. The floor is
+     * where the panel itself stops cooperating: a two or three colour tag quantises every grey
+     * stroke away, so under about seven pixels there is nothing left to read either way.
+     */
     public void textClipped(String text, final float x, final float y, final float size,
                             final int align, final int color, final float maxWidth) {
         if (text == null) {
             return;
         }
+        if (maxWidth <= 0f) {
+            // no room at all. Drawing the line anyway is how a label left its column on a
+            // panel whose margins had eaten the column entirely.
+            return;
+        }
         final Paint paint = textPaint(size, color);
-        if (maxWidth > 0 && paint.measureText(text) > maxWidth) {
+        fitNoSmallerThan(paint, text, maxWidth, floorFor(size));
+        if (paint.measureText(text) > maxWidth) {
             while (text.length() > 1 && paint.measureText(text + "…") > maxWidth) {
                 text = text.substring(0, text.length() - 1);
             }
             text = text + "…";
             if (paint.measureText(text) > maxWidth) {
-                // not even one letter and an ellipsis fit into the space. Drawing it anyway is
-                // what pushed labels out of their column and over the edge of the panel, so
-                // the mark alone goes in, and nothing at all when even that is too wide.
-                text = "…";
-                if (paint.measureText(text) > maxWidth) {
-                    return;
-                }
+                // Not even one letter and an ellipsis fit. The mark used to go in on its own
+                // here, which is ink that says nothing at all - a row of them down the side of
+                // a card reads as a fault, and it was reported as one. Nothing is drawn
+                // instead, and the room is left to whatever else the row holds.
+                return;
             }
         }
         draw(text, x, y, align, paint);
     }
 
-    /** Draws text shrunk until it fits, rather than cut. */
+    /**
+     * How small a label may be set before it is cut instead. Two thirds of the size it was
+     * asked for keeps a layout recognisable - a caption does not turn into a footnote - and
+     * seven pixels is where the panel's own quantiser takes over.
+     */
+    public static float floorFor(final float size) {
+        return Math.max(7f, size * 0.5f);
+    }
+
+    /**
+     * Draws a label as large as it was asked for, shrunk as far as a floor allows to make it
+     * fit, and cut only once even that is too wide. A name set a size smaller is still read;
+     * the same name cut to two letters and an ellipsis is not, which is the difference between
+     * a column headed "Mo" and one headed "M…".
+     * <p>
+     * {@link #textClipped} now does the same with a floor of its own; this stays for the
+     * layouts that want to say how far their label may be shrunk.
+     */
+    public void textSqueezed(final String text, final float x, final float y, final float size,
+                             final int align, final int color, final float maxWidth,
+                             final float floor) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        final Paint paint = textPaint(size, color);
+        fitNoSmallerThan(paint, text, maxWidth, floor);
+        if (paint.measureText(text) <= maxWidth) {
+            draw(text, x, y, align, paint);
+        } else {
+            textClipped(text, x, y, paint.getTextSize(), align, color, maxWidth);
+        }
+    }
+
+    /**
+     * Draws text shrunk until it fits, down to the size the panel can still show, and cut
+     * from there.
+     * <p>
+     * Shrinking without a floor is what this used to do, and on the smallest tags it ended in
+     * five pixel type - which a two or three colour panel quantises into a grey smudge. A word
+     * nobody can read is not better than a word that was cut short; it is worse, because it
+     * also takes the room.
+     */
     public void textFitted(final String text, final float x, final float y, final float size,
                            final int align, final int color, final float maxWidth) {
         final Paint paint = textPaint(size, color);
-        fit(paint, text, maxWidth);
-        draw(text, x, y, align, paint);
+        fitNoSmallerThan(paint, text, maxWidth, floorFor(size));
+        if (paint.measureText(text == null ? "" : text) <= maxWidth) {
+            draw(text, x, y, align, paint);
+        } else {
+            textClipped(text, x, y, paint.getTextSize(), align, color, maxWidth);
+        }
     }
 
     /**
@@ -167,7 +237,9 @@ public class OeplCanvas {
      */
     public void textFilling(final String text, final float cx, final float cy,
                             final float maxWidth, final float maxHeight, final int color) {
-        textFillingAt(text, cx, cy, fillingSize(text, maxWidth, maxHeight), color);
+        // through the clipped form: filling a box with a place name that does not fit used to
+        // mean setting it in five pixels, and five pixels of a three colour panel is a smudge
+        textFillingClipped(text, cx, cy, maxWidth, maxHeight, color);
     }
 
     /**
@@ -200,8 +272,14 @@ public class OeplCanvas {
     public void textFillingClipped(final String text, final float cx, final float cy,
                                    final float maxWidth, final float maxHeight,
                                    final int color) {
-        textFillingAtClipped(text, cx, cy, fillingSize(text, maxWidth, maxHeight), color,
-                maxWidth);
+        // A value that is a sentence rather than a figure - "weit offen seit 12:40" - has no
+        // size at which it fits the width, so filling the box with it means shrinking it into
+        // dust: on a two or three colour panel a line under about eight pixels is quantised
+        // away altogether. It is set at the smallest size the panel still shows and cut to the
+        // box instead, which costs the end of a sentence rather than the whole of it.
+        final float size = fillingSize(text, maxWidth, maxHeight);
+        textFillingAtClipped(text, cx, cy,
+                Math.max(size, Math.min(9f, Math.max(7f, maxHeight * 0.4f))), color, maxWidth);
     }
 
     /** As {@link #textFillingClipped}, at a size that was worked out for several lines at once. */
@@ -354,7 +432,10 @@ public class OeplCanvas {
             return;
         }
         final Paint.FontMetrics fm = paint.getFontMetrics();
-        final float baseline = y - fm.ascent;
+        // the baseline sits as far below the top of the line as the script actually reaches
+        // above it, which for the scripts the bundled face does not carry is more than the
+        // face's own ascender - see OeplFonts.lineFactor
+        final float baseline = y - fm.ascent * OeplFonts.lineFactor();
         float left = x;
         if (align == CENTER) {
             left = x - paint.measureText(text) / 2f;
@@ -515,6 +596,24 @@ public class OeplCanvas {
         }
     }
 
+    /**
+     * A horizontal rule made of single dots, the way an hour is carried across a week grid. A
+     * solid rule would compete with the appointments standing on it; a dotted one stays behind
+     * them and still carries the eye from the hour in the gutter to the far side of the panel.
+     */
+    public void dottedRow(final float y, final float from, final float to, final int color,
+                          final float step) {
+        final Paint p = new Paint();
+        p.setColor(color);
+        final float gap = Math.max(2f, step);
+        // on whole pixels, for the same reason the dotted column is: a dot landing between two
+        // of them comes out as a grey the quantiser throws away
+        final float row = Math.round(y);
+        for (float x = from; x < to; x += gap) {
+            canvas.drawRect(Math.round(x), row, Math.round(x) + 1f, row + 1f, p);
+        }
+    }
+
     public void strokeRect(final float x, final float y, final float w, final float h,
                            final int color, final float thickness) {
         final Paint p = new Paint();
@@ -527,7 +626,7 @@ public class OeplCanvas {
     /** The line height a given text size occupies, for layouts that stack rows. */
     public float lineHeight(final float size) {
         final Paint.FontMetrics fm = textPaint(size, ink).getFontMetrics();
-        return fm.descent - fm.ascent;
+        return (fm.descent - fm.ascent) * OeplFonts.lineFactor();
     }
 
     /** Lets a caller use a different face for one piece of text, e.g. a condensed one. */

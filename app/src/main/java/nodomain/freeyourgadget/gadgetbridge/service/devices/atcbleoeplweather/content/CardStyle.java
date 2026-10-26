@@ -22,6 +22,8 @@ import android.graphics.Typeface;
 
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
+
 /**
  * The drawing vocabulary every card content shares: the three panel colours, text that scales
  * with the panel rather than with pixels, and unit handling. Keeping this in one place is what
@@ -62,24 +64,41 @@ public class CardStyle {
         }
     }
 
-    /** Draws text clipped to a width, cutting it with an ellipsis rather than overflowing. */
+    /**
+     * Draws text to fit a width: set smaller first, and cut with an ellipsis only once even
+     * the smallest size this allows is still too wide.
+     * <p>
+     * A word set a third smaller is still read; the same word cut to its first letters is a
+     * guess. Seven pixels is the floor, because a two or three colour panel quantises anything
+     * thinner away. The paint is handed back at the size it came in at, since the caller
+     * usually draws a whole column of rows with it.
+     */
     public void drawEllipsised(final Canvas canvas, String text, final float x, final float y,
                                final float maxWidth, final Paint paint) {
         if (text == null) {
             return;
         }
+        final float asked = paint.getTextSize();
+        fitNoSmallerThan(paint, text, maxWidth, Math.max(7f, asked * 0.5f));
+        try {
+            draw(canvas, text, x, y, maxWidth, paint);
+        } finally {
+            paint.setTextSize(asked);
+        }
+    }
+
+    private void draw(final Canvas canvas, String text, final float x, final float y,
+                      final float maxWidth, final Paint paint) {
         if (paint.measureText(text) > maxWidth) {
             while (text.length() > 1 && paint.measureText(text + "…") > maxWidth) {
                 text = text.substring(0, text.length() - 1);
             }
             text = text + "…";
             if (paint.measureText(text) > maxWidth) {
-                // one letter and an ellipsis are wider than the space: the mark alone, or
-                // nothing. Drawing it regardless is how a label left its own column.
-                text = "…";
-                if (paint.measureText(text) > maxWidth) {
-                    return;
-                }
+                // One letter and an ellipsis are wider than the space. Neither goes in: a
+                // label that is nothing but the mark carries no information, and drawing it
+                // regardless is how a label left its own column.
+                return;
             }
         }
         canvas.drawText(text, x, y, paint);
@@ -88,7 +107,7 @@ public class CardStyle {
     /** How tall one line of this paint is, from the top of its line to the bottom. */
     public float lineHeight(final Paint paint) {
         final Paint.FontMetrics fm = paint.getFontMetrics();
-        return fm.descent - fm.ascent;
+        return (fm.descent - fm.ascent) * OeplFonts.lineFactor();
     }
 
     /**
@@ -102,7 +121,8 @@ public class CardStyle {
         if (text == null || text.isEmpty()) {
             return;
         }
-        canvas.drawText(text, x, top - paint.getFontMetrics().ascent, paint);
+        canvas.drawText(text, x, top - paint.getFontMetrics().ascent * OeplFonts.lineFactor(),
+                paint);
     }
 
     /** As {@link #drawTop}, cut with an ellipsis once it would run past maxWidth. */
@@ -111,7 +131,8 @@ public class CardStyle {
         if (text == null || text.isEmpty()) {
             return;
         }
-        drawEllipsised(canvas, text, x, top - paint.getFontMetrics().ascent, maxWidth, paint);
+        drawEllipsised(canvas, text, x,
+                top - paint.getFontMetrics().ascent * OeplFonts.lineFactor(), maxWidth, paint);
     }
 
     /**
@@ -144,7 +165,7 @@ public class CardStyle {
      * cut the bottom row of half the cards through the middle of its letters.
      */
     public float baselineAbove(final float bottom, final Paint paint) {
-        return bottom - paint.getFontMetrics().descent;
+        return bottom - paint.getFontMetrics().descent * OeplFonts.lineFactor();
     }
 
     /**
