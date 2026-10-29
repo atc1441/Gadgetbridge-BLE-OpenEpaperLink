@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -43,6 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplHeroCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplListCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReading;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReadings;
 
 /**
  * The dashboard designs and the Home Assistant feed behind them.
@@ -356,6 +358,58 @@ public class OeplDashboardTest {
         final float width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
         final float height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
         return width <= 0 || height <= 0 ? 0f : width * height;
+    }
+
+    // ------------------------------------------------------------------ the agenda, once
+
+    /**
+     * The big value card has the agenda beside the figure, and the badges above it come out of
+     * the same list of readings - which ends with the next few appointments in it, because on
+     * the three cards that have nothing else that is exactly what a panel with room should
+     * show. Here it was the agenda said twice, side by side, in two different forms.
+     */
+    @Test
+    public void theBigValueCardDoesNotPutTheAgendaInItsBadgesAsWell() {
+        for (final int[] shape : new int[][]{{960, 672}, {672, 960}, {800, 480}, {400, 300}}) {
+            final List<String> lines = new ArrayList<>();
+            for (final OeplInkRecorder.Run run : draw("panel_hero", shape[0], shape[1])
+                    .textRuns()) {
+                if (run.what != null && run.what.contains("Standup")) {
+                    lines.add(run.what);
+                }
+            }
+            assertEquals(String.format("%dx%d said the first appointment %d times: %s",
+                            shape[0], shape[1], lines.size(), lines), 1, lines.size());
+        }
+    }
+
+    /**
+     * And it keeps them where it has no room for the agenda. A tag that cannot hold the
+     * figure and a column beside it drops the column - and then the appointments in the
+     * badges are the only thing on the panel that mentions them at all.
+     */
+    @Test
+    public void aTagTooSmallForTheAgendaStillSaysWhatIsComingUp() {
+        boolean mentioned = false;
+        for (final OeplInkRecorder.Run run : draw("panel_hero", 152, 152).textRuns()) {
+            mentioned |= run.what != null && run.what.contains("Standup");
+        }
+        assertTrue("a small tag dropped the appointments altogether", mentioned);
+    }
+
+    /** What a card is handed when another part of the panel already shows that group. */
+    @Test
+    public void aGroupCanBeTakenOutOfTheListByTheNameTheSettingUsesForIt() {
+        final List<OeplReading> all = OeplDemo.readings(true, true);
+        final List<OeplReading> rest = OeplReadings.without(all, OeplReadings.GROUP_EVENTS);
+        assertTrue("the demo should carry an agenda to take out", all.size() > rest.size());
+        for (final OeplReading reading : rest) {
+            assertNotEquals("an appointment survived the filter: " + reading.label,
+                    OeplReadings.GROUP_EVENTS, reading.group);
+        }
+        // and the weather is the other half of the same rule, for the wall sheet
+        assertTrue(OeplReadings.without(all, OeplReadings.GROUP_WEATHER,
+                OeplReadings.GROUP_EVENTS).size() < rest.size());
     }
 
     // ------------------------------------------------------------------ helpers

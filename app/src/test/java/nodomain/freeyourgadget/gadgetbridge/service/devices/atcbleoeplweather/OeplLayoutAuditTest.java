@@ -229,6 +229,87 @@ public class OeplLayoutAuditTest {
         assertEquals(summary("content outside its body", problems), 0, problems.size());
     }
 
+    /**
+     * And the third fault, which no amount of looking at a contact sheet reliably catches: a
+     * design that says the same appointment twice.
+     * <p>
+     * It is a fault of the large panels in particular, because it needs room for two views of
+     * the same thing - a week grid and a list of what is coming up, or the agenda beside a
+     * column of values that ends with the agenda in it. Both halves look right on their own,
+     * both are drawn by cards that are right everywhere else, and what is wrong only shows
+     * when the panel is big enough to hold both. So it is checked by what reached the panel:
+     * an appointment's name, drawn twice, is an appointment said twice.
+     */
+    @Test
+    public void noDesignSaysTheSameAppointmentTwice() throws Exception {
+        final List<String> doubled = new ArrayList<>();
+        int drawn = 0;
+
+        for (final int[] shape : shapes()) {
+            for (final String id : designs()) {
+                final CardContent content = OeplDemo.card(id);
+                if (!content.hasData()) {
+                    continue;
+                }
+                // after the card, because which calendar the demo hands out depends on the
+                // variant - and a multi day entry is drawn on each of the days it covers,
+                // which is the one case where twice is right
+                final List<String> titles = new ArrayList<>();
+                for (final nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent
+                        event : OeplDemo.events()) {
+                    final String title = event.getTitle();
+                    if (!event.isAllDay() && title != null && title.length() >= NAME) {
+                        titles.add(title.substring(0, NAME));
+                    }
+                }
+
+                final Bitmap sheet = Bitmap.createBitmap(shape[0], shape[1],
+                        Bitmap.Config.ARGB_8888);
+                final OeplInkRecorder recorder = new OeplInkRecorder(sheet);
+                recorder.drawColor(0xffffffff);
+                content.draw(recorder, new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE,
+                                OEPLImageCodec.RED, false),
+                        new RectF(0f, 0f, shape[0], shape[1]));
+                drawn++;
+
+                for (final String title : titles) {
+                    int times = 0;
+                    for (final OeplInkRecorder.Run run : recorder.textRuns()) {
+                        if (run.what != null && run.what.contains(title)) {
+                            times++;
+                        }
+                    }
+                    if (times > 1) {
+                        doubled.add(String.format("%-18s %4dx%-4d  \"%s\" %d times", id,
+                                shape[0], shape[1], title, times));
+                    }
+                }
+                sheet.recycle();
+            }
+        }
+
+        final File dir = new File("build/oepl-gallery");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        try (PrintWriter out = new PrintWriter(new File(dir, "appointment-audit.txt"), "UTF-8")) {
+            out.printf("%d cards drawn, %d of them said an appointment twice%n",
+                    drawn, doubled.size());
+            for (final String line : doubled) {
+                out.println("  " + line);
+            }
+        }
+        assertTrue("nothing was drawn, so nothing was checked", drawn > 100);
+        assertEquals(summary("appointments said twice on one panel", doubled),
+                0, doubled.size());
+    }
+
+    /**
+     * How much of an appointment's name is matched. A name is ellipsised where it does not
+     * fit, so the start of it is what survives everywhere - and long enough that no other
+     * line on the panel happens to contain it.
+     */
+    private static final int NAME = 7;
+
     /** Which edge a box crosses, or null when it stays inside. */
     private static String outside(final RectF box, final RectF area) {
         final StringBuilder sb = new StringBuilder();

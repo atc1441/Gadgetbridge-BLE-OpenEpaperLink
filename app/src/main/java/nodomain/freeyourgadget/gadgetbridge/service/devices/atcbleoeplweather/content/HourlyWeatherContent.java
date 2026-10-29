@@ -176,7 +176,9 @@ public class HourlyWeatherContent implements CardContent {
             final float hw = label.measureText(hour);
             final float hx = clamp(x - hw / 2f, area.left, area.right - hw);
             if (hx >= lastHour + breath) {
-                canvas.drawText(hour, hx, style.baselineAbove(area.bottom, label), label);
+                // the day's name goes as deep as the script it is written in, which is not
+                // what the bundled face's metrics say; see the note on baselineAbove
+                canvas.drawText(hour, hx, style.baselineAbove(area.bottom, label, hour), label);
                 lastHour = hx + hw;
             }
 

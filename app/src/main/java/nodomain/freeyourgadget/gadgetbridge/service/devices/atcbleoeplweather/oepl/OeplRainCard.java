@@ -88,7 +88,11 @@ public class OeplRainCard extends OeplCard {
 
         final float labelSize = Math.max(OeplCanvas.READABLE, Math.min(h * 0.12f, w * 0.07f));
         final float top = c.lineHeight(headSize) * 1.02f;
-        final float bottom = h - c.lineHeight(labelSize);
+        // The axis, with the hour row under it - and a pixel or two more than the row asks
+        // for. What a line of the reader's language is worth is measured from a sample of it,
+        // which a Devanagari conjunct hanging below the baseline goes past, and the gap
+        // between the axis and its labels was all the room there was.
+        final float bottom = h - c.lineHeight(labelSize) - 2f;
 
         // the dotted guides at a quarter, a half and three quarters of the scale
         for (int i = 1; i <= 4; i++) {
@@ -108,6 +112,7 @@ public class OeplRainCard extends OeplCard {
         final java.util.Calendar when = java.util.Calendar.getInstance(weather.zone());
         final int labelEvery = Math.max(1, (int) Math.ceil(c.measure("00", labelSize) * 2f / column));
 
+        float lastLabelRight = Float.NEGATIVE_INFINITY;
         for (int i = 0; i < slots.size(); i++) {
             final OeplWeather.Hour hour = slots.get(i);
             final float centre = column * i + column / 2f;
@@ -118,14 +123,27 @@ public class OeplRainCard extends OeplCard {
                         fraction > 0.5f ? c.accent : c.ink);
             }
             if (i % labelEvery == 0) {
-                // the first and the last label would hang over the panel edge if they were
-                // simply centred under their column
                 final Date at = new Date(hour.epochSeconds * 1000L);
                 when.setTime(at);
-                final String stamp = when.get(java.util.Calendar.HOUR_OF_DAY) < labelEvery
-                        ? weekday.format(at) : clock.format(at);
-                c.text(stamp, c.clampCentre(centre, stamp, labelSize), bottom + 1f, labelSize,
-                        OeplCanvas.CENTER, c.ink);
+                final boolean dayStarts = when.get(java.util.Calendar.HOUR_OF_DAY) < labelEvery;
+                final String stamp = dayStarts ? weekday.format(at) : clock.format(at);
+                // The day's name is the one label in this row that is not two digits wide. A
+                // script that writes a weekday in five letters with marks above and below
+                // them makes it wider than the two hours either side of it put together, and
+                // it was drawn over both. So it starts where the day starts rather than being
+                // centred on it, and whatever would land on top of it is left out: a missing
+                // hour mark says less than two labels written through each other.
+                final float width = c.measure(stamp, labelSize);
+                final float wanted = dayStarts
+                        ? centre - column / 2f
+                        : c.clampCentre(centre, stamp, labelSize) - width / 2f;
+                // the first and the last label would hang over the panel edge if they were
+                // simply placed under their column
+                final float left = Math.max(0f, Math.min(wanted, w - width));
+                if (left >= lastLabelRight) {
+                    c.text(stamp, left, bottom + 1f, labelSize, OeplCanvas.LEFT, c.ink);
+                    lastLabelRight = left + width + pad;
+                }
             }
         }
     }

@@ -95,18 +95,61 @@ public final class OeplReadings {
         final Set<String> groups = OEPLPrefs.readingGroups(prefs);
         final List<OeplReading> readings = new ArrayList<>();
         if (groups.contains(GROUP_WEATHER)) {
+            final int from = readings.size();
             weather(context, prefs, weather, readings, room);
+            tag(readings, from, GROUP_WEATHER);
         }
         if (groups.contains(GROUP_HOUSE)) {
+            final int from = readings.size();
             house(context, readings);
+            tag(readings, from, GROUP_HOUSE);
         }
         if (groups.contains(GROUP_EVENTS)) {
+            final int from = readings.size();
             events(context, events, readings, room);
+            tag(readings, from, GROUP_EVENTS);
         }
         if (groups.contains(GROUP_DEVICES)) {
+            final int from = readings.size();
             devices(context, device, prefs, readings);
+            tag(readings, from, GROUP_DEVICES);
         }
         return readings;
+    }
+
+    /** Marks whatever a group just added as that group's, here rather than in four places. */
+    private static void tag(final List<OeplReading> readings, final int from,
+                            final String group) {
+        for (int i = from; i < readings.size(); i++) {
+            readings.get(i).inGroup(group);
+        }
+    }
+
+    /**
+     * The same list without one or two of the groups, for a card that already shows them.
+     * <p>
+     * A card made of regions draws some of these groups properly: the wall sheet has a week
+     * grid and an appointment list on it, the big value card has the agenda beside the figure.
+     * A column of values that then repeats one of those groups is the panel saying the same
+     * thing twice - and it is worst on the largest panels, because that is where there is room
+     * for both. The agenda is a list rather than a value, so the collector hands over as many
+     * of the next appointments as the panel can hold: on a 9.7 inch sheet the values column
+     * repeated the agenda beside it line for line, while a 2.9 inch tag, which has no values
+     * column at all, looked right.
+     */
+    public static List<OeplReading> without(final List<OeplReading> readings,
+                                            final String... groups) {
+        final List<OeplReading> rest = new ArrayList<>(readings.size());
+        for (final OeplReading reading : readings) {
+            boolean drop = false;
+            for (final String group : groups) {
+                drop |= group.equals(reading.group);
+            }
+            if (!drop) {
+                rest.add(reading);
+            }
+        }
+        return rest;
     }
 
     // ------------------------------------------------------------------ the sky

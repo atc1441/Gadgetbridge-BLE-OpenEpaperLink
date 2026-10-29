@@ -27,6 +27,7 @@ import org.robolectric.annotation.Config;
 import org.robolectric.annotation.GraphicsMode;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,23 +56,55 @@ public class OeplWallSheetTest {
     @Test
     public void theSheetNeverShowsTheSameThingTwice() {
         final List<String> doubled = new ArrayList<>();
-        for (final int[] shape : new int[][]{{960, 672}, {672, 960}, {800, 480}, {480, 800},
-                {400, 300}, {300, 400}, {384, 184}, {184, 384}, {296, 128}, {152, 152},
-                {250, 128}, {640, 384}, {1360, 480}, {480, 1360}}) {
+        for (final int[] shape : SHAPES) {
             for (final int days : new int[]{1, 2, 3, 4, 5, 7}) {
-                final List<String> kinds = sheet(days).kinds(shape[0], shape[1]);
-                final Set<String> seen = new HashSet<>();
-                for (final String kind : kinds) {
-                    if (!seen.add(kind)) {
-                        doubled.add(String.format("%dx%d with %d days: %s", shape[0], shape[1],
-                                days, kinds));
-                        break;
-                    }
-                }
+                doubled.addAll(doublesIn(sheet(days), shape, days));
             }
         }
         assertEquals("sheets that say something twice:\n" + String.join("\n", doubled),
                 0, doubled.size());
+    }
+
+    /**
+     * The same rule when the sheet has less to work with.
+     * <p>
+     * A display with no forecast puts something else where the weather would be, and what it
+     * reaches for - the values, and failing those the appointments - is exactly what the
+     * regions below it hold. So the three thin sheets are checked as well as the full one: no
+     * weather, nothing from the house, and neither.
+     */
+    @Test
+    public void aThinSheetStillSaysNothingTwice() {
+        final List<String> doubled = new ArrayList<>();
+        for (final int[] shape : SHAPES) {
+            for (final int days : new int[]{1, 3, 5, 7}) {
+                doubled.addAll(doublesIn(new OeplWallCard(null, OeplDemo.events(),
+                        OeplDemo.sheetReadings(), days, 5, true), shape, days));
+                doubled.addAll(doublesIn(new OeplWallCard(null, OeplDemo.events(),
+                        Collections.emptyList(), days, 5, true), shape, days));
+                doubled.addAll(doublesIn(new OeplWallCard(OeplDemo.weather(), OeplDemo.events(),
+                        Collections.emptyList(), days, 5, true), shape, days));
+            }
+        }
+        assertEquals("thin sheets that say something twice:\n" + String.join("\n", doubled),
+                0, doubled.size());
+    }
+
+    private static final int[][] SHAPES = {{960, 672}, {672, 960}, {800, 480}, {480, 800},
+            {400, 300}, {300, 400}, {384, 184}, {184, 384}, {296, 128}, {152, 152},
+            {250, 128}, {640, 384}, {1360, 480}, {480, 1360}};
+
+    /** Whatever this sheet puts on this panel more than once, in the reader's own terms. */
+    private List<String> doublesIn(final OeplWallCard card, final int[] shape, final int days) {
+        final List<String> kinds = card.kinds(shape[0], shape[1]);
+        final Set<String> seen = new HashSet<>();
+        for (final String kind : kinds) {
+            if (!seen.add(kind)) {
+                return java.util.Collections.singletonList(String.format(
+                        "%dx%d with %d days: %s", shape[0], shape[1], days, kinds));
+            }
+        }
+        return Collections.emptyList();
     }
 
     /** And it is worth the name: on a panel with room, it is several things rather than one. */
@@ -91,6 +124,6 @@ public class OeplWallSheetTest {
 
     private OeplWallCard sheet(final int days) {
         return new OeplWallCard(OeplDemo.weather(), OeplDemo.events(),
-                OeplDemo.beyondTheWeather(), days, 6, 5, true, "Kalender");
+                OeplDemo.sheetReadings(), days, 5, true);
     }
 }

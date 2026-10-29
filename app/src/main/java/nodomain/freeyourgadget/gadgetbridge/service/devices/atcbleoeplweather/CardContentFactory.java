@@ -84,6 +84,25 @@ public final class CardContentFactory {
     }
 
     /**
+     * True for a design whose subject is the appointments, by either family's name for it.
+     * <p>
+     * It lives here because this is the file that knows both families. The quartered panel is
+     * what asks: a quarter showing the calendar and a quarter showing the dashboard list are
+     * one choice rather than two, since the list carries the next few appointments in it as
+     * well - and a drawn calendar beside a list of the same appointments is the same thing
+     * twice, whichever of them is called what.
+     */
+    public static boolean drawsTheCalendar(final String id) {
+        return CALENDAR.equals(id) || WEATHER_CALENDAR.equals(id) || DATE_CALENDAR.equals(id)
+                || CALENDAR_NOTIFICATIONS.equals(id) || DASHBOARD.equals(id)
+                || OeplCardFactory.CALENDAR.equals(id)
+                || OeplCardFactory.CALENDAR_WEEK.equals(id)
+                || OeplCardFactory.BOARD.equals(id)
+                || OeplCardFactory.MONTH.equals(id)
+                || OeplCardFactory.WALL.equals(id);
+    }
+
+    /**
      * What the chosen card is still waiting for before there is anything worth sending, or
      * null when it can be drawn.
      * <p>

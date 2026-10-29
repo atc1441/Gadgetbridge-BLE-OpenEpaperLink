@@ -203,9 +203,8 @@ public final class OeplCardFactory {
                 return new OeplMonthCard(monthEvents(context, device), caption(context, prefs));
             case WALL:
                 return new OeplWallCard(weather(prefs), events(context, device),
-                        beyondTheWeather(context, readings(context, device, prefs)),
-                        OEPLPrefs.calendarDays(prefs), OEPLPrefs.calendarEvents(prefs),
-                        OEPLPrefs.forecastDays(prefs), beaufort, caption(context, prefs));
+                        forTheSheet(context, device, prefs), OEPLPrefs.calendarDays(prefs),
+                        OEPLPrefs.forecastDays(prefs), beaufort);
             case WEATHER:
             default:
                 return new OeplWeatherCard(weather(prefs), beaufort);
@@ -300,20 +299,18 @@ public final class OeplCardFactory {
     }
 
     /**
-     * The readings a sheet that draws the weather itself should still be given: everything
-     * except the weather. A column with the place and the day's range written across the top
-     * of it, and the same two numbers in a list underneath, says them twice.
+     * The readings the wall sheet should still be given: everything it does not already draw
+     * properly somewhere else on the panel.
+     * <p>
+     * The sheet writes the place and the day's range large across the top, and has the week
+     * and the next appointments in regions of their own, so the weather and the agenda are
+     * both out. A column repeating either of them is the sheet saying one thing twice, which
+     * is the one rule it has.
      */
-    private static List<OeplReading> beyondTheWeather(final Context context,
-                                                      final List<OeplReading> readings) {
-        final String weather = context.getString(R.string.oepl_section_weather);
-        final List<OeplReading> rest = new ArrayList<>();
-        for (final OeplReading reading : readings) {
-            if (!weather.equals(reading.section)) {
-                rest.add(reading);
-            }
-        }
-        return rest;
+    private static List<OeplReading> forTheSheet(final Context context, final GBDevice device,
+                                                 final SharedPreferences prefs) {
+        return OeplReadings.without(readings(context, device, prefs),
+                OeplReadings.GROUP_WEATHER, OeplReadings.GROUP_EVENTS);
     }
 
     /**
@@ -350,20 +347,67 @@ public final class OeplCardFactory {
      */
     private static CardContent quarters(final Context context, final GBDevice device,
                                         final SharedPreferences prefs) {
-        final List<CardContent> parts = new ArrayList<>(OEPLPrefs.PREF_QUAD.length);
+        final List<String> slots = new ArrayList<>(OEPLPrefs.PREF_QUAD.length);
         for (int i = 0; i < OEPLPrefs.PREF_QUAD.length; i++) {
             final String id = OEPLPrefs.quadSlot(prefs, i);
-            if (id.isEmpty() || QUAD.equals(id)) {
-                continue;
+            if (!id.isEmpty() && !QUAD.equals(id)) {
+                slots.add(id);
             }
-            try {
-                parts.add(nodomain.freeyourgadget.gadgetbridge.service.devices
-                        .atcbleoeplweather.CardContentFactory.create(context, device, prefs, id));
-            } catch (final Exception e) {
-                LOG.warn("could not build {} for a quarter of the panel", id, e);
+        }
+        // Whether one of the quarters is the calendar, which decides what the dashboard
+        // quarters put in their lists. Choosing the calendar for one quarter and the values
+        // for another is one decision and not two: the values are a list this project fills,
+        // and what it puts at the end of it is the next few appointments.
+        boolean calendar = false;
+        for (final String id : slots) {
+            calendar |= nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather
+                    .CardContentFactory.drawsTheCalendar(id);
+        }
+        final List<CardContent> parts = new ArrayList<>(slots.size());
+        for (final String id : slots) {
+            final CardContent part = quarter(context, device, prefs, id,
+                    calendar && isDashboard(id));
+            if (part != null) {
+                parts.add(part);
             }
         }
         return new QuadContent(parts);
+    }
+
+    /** The three cards that are nothing but a list of readings, in one shape or another. */
+    private static boolean isDashboard(final String id) {
+        return GRID.equals(id) || HERO.equals(id) || LIST.equals(id);
+    }
+
+    /**
+     * One quarter, or null when it could not be built - which must not take the other three
+     * down with it.
+     *
+     * @param withoutAppointments true to leave the agenda out of a dashboard quarter, because
+     *                            another quarter is the calendar
+     */
+    @Nullable
+    private static CardContent quarter(final Context context, final GBDevice device,
+                                       final SharedPreferences prefs, final String id,
+                                       final boolean withoutAppointments) {
+        try {
+            if (withoutAppointments) {
+                final List<OeplReading> rest = OeplReadings.without(
+                        readings(context, device, prefs), OeplReadings.GROUP_EVENTS);
+                if (HERO.equals(id)) {
+                    return new OeplHeroCard(rest, upcoming(context, device, prefs));
+                }
+                if (LIST.equals(id)) {
+                    return new OeplListCard(rest);
+                }
+                return new OeplGridCard(rest, device.getAliasOrName());
+            }
+            return nodomain.freeyourgadget.gadgetbridge.service.devices
+                    .atcbleoeplweather.CardContentFactory.create(context, device, prefs, id);
+        } catch (final Exception e) {
+            LOG.warn("could not build {} for a quarter of the panel", id, e);
+            return null;
+        }
     }
 
     /** What the display itself and the phone have to report. */

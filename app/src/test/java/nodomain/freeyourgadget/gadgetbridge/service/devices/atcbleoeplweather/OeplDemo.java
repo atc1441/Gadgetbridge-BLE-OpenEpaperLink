@@ -61,6 +61,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplListCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplMonthCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReading;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReadings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplInfoCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplPosterCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplQrCard;
@@ -198,7 +199,7 @@ public final class OeplDemo {
                 return new OeplClockCard();
             case OeplCardFactory.CALENDAR:
                 return new OeplCalendarListCard(events(), stress ? 10 : 4,
-                        stress ? "Familienkalender, Schule und Werkstatttermine" : "Kalender");
+                        stress ? "Familienkalender, Schule und Vereinstermine" : "Kalender");
             case OeplCardFactory.CALENDAR_WEEK:
                 return new OeplCalendarWeekCard(events(), 3);
             case OeplCardFactory.RSS:
@@ -233,8 +234,7 @@ public final class OeplDemo {
             case OeplCardFactory.MONTH:
                 return new OeplMonthCard(events(), stress ? "Familienkalender" : "Kalender");
             case OeplCardFactory.WALL:
-                return new OeplWallCard(weather(), events(), beyondTheWeather(), 7, 6, 5,
-                        true, stress ? "Familienkalender" : "Kalender");
+                return new OeplWallCard(weather(), events(), sheetReadings(), 7, 5, true);
             case OeplCardFactory.BOARD:
                 return new OeplBoardCard(events(), 6,
                         stress ? "Termine der ganzen Familie" : "Termine");
@@ -278,7 +278,10 @@ public final class OeplDemo {
                     parts.add(new OeplRssCard(feed(), "Nachrichten", false));
                 }
                 if (!"two".equals(variant) && !"three".equals(variant)) {
-                    parts.add(new OeplListCard(readings(false, true)));
+                    // without the agenda, because the quarter above is the calendar - which is
+                    // what the factory does with a quartered panel configured this way
+                    parts.add(new OeplListCard(OeplReadings.without(readings(false, true),
+                            OeplReadings.GROUP_EVENTS)));
                 }
                 return new QuadContent(parts);
             }
@@ -430,6 +433,17 @@ public final class OeplDemo {
             readings.add(new OeplReading("Termine", "Termine", "2")
                     .withShape(OeplGlyphs.Glyph.CALENDAR)
                     .accented(true));
+            // And the next ones by name, which is how the collector hands the agenda over on
+            // any panel with room for it: the appointments are the one thing in this list
+            // that is a list rather than a value. The demo had only the count, which is why
+            // the sheets that show the agenda twice looked right in every preview.
+            readings.add(new OeplReading("Termine", "09:50",
+                    stress ? "Jahreshauptversammlung des Kleingartenvereins" : "Standup")
+                    .withShape(OeplGlyphs.Glyph.CLOCK));
+            readings.add(new OeplReading("Termine", "13:00",
+                    stress ? "Zahnarzt Dr. Mueller-Luedenscheidt, Praxis am Hauptbahnhof"
+                            : "Zahnarzt")
+                    .withShape(OeplGlyphs.Glyph.CLOCK));
             readings.add(new OeplReading("Geraete", "Telefon", "64 %")
                     .withShape(OeplGlyphs.Glyph.PHONE)
                     .withPercent(64));
@@ -443,19 +457,41 @@ public final class OeplDemo {
                     .withPercent(stress ? 100 : 15)
                     .accented(true));
         }
+        // the same marks the collector puts on, so that a card dropping a group in a preview
+        // is a card dropping it on a phone
+        for (final OeplReading reading : readings) {
+            reading.inGroup(group(reading.section));
+        }
         return readings;
     }
 
-    /** The colours a three colour tag has, which is what a picture is reduced to. */
-    /** The readings without the weather ones, as the wall sheet is handed them. */
-    public static List<OeplReading> beyondTheWeather() {
-        final List<OeplReading> rest = new ArrayList<>();
-        for (final OeplReading reading : readings(true, true)) {
-            if (reading.section != null && !reading.section.startsWith("Draussen")) {
-                rest.add(reading);
-            }
+    /** Which group a demo section belongs to; the collector knows this without being told. */
+    private static String group(final String section) {
+        if (section == null) {
+            return null;
         }
-        return rest;
+        if (section.startsWith("Draussen")) {
+            return OeplReadings.GROUP_WEATHER;
+        }
+        if (section.equals("Haus")) {
+            return OeplReadings.GROUP_HOUSE;
+        }
+        if (section.equals("Termine")) {
+            return OeplReadings.GROUP_EVENTS;
+        }
+        return OeplReadings.GROUP_DEVICES;
+    }
+
+    /** The colours a three colour tag has, which is what a picture is reduced to. */
+    /**
+     * The readings as the wall sheet is handed them: without the two groups it draws itself.
+     * The sheet writes the weather large across one region and has the week and the next
+     * appointments in regions of their own, so a column repeating either is it saying one
+     * thing twice.
+     */
+    public static List<OeplReading> sheetReadings() {
+        return OeplReadings.without(readings(true, true),
+                OeplReadings.GROUP_WEATHER, OeplReadings.GROUP_EVENTS);
     }
 
     public static int[] palette() {
@@ -673,12 +709,12 @@ public final class OeplDemo {
                 ? new String[][]{
                 {"Signal", "Anna Lindemann-Schmitt", "Bis gleich, ich bringe den Kuchen mit!"},
                 {"Mail", "Ihre Rechnung fuer Oktober liegt bereit", "Bitte bis zum 30. zahlen"},
-                {"Kalender", "Standup in 10 Minuten", ""},
+                {"Kalender", "Teambesprechung in 10 Minuten", ""},
                 {"Messenger", "Tom", "Schaffst du 18 Uhr?"}}
                 : new String[][]{
                 {"Signal", "Anna", "Bis gleich!"},
                 {"Mail", "Rechnung Mai", "Ihre Rechnung liegt bereit"},
-                {"Kalender", "Standup in 10 min", ""},
+                {"Kalender", "Teambesprechung in 10 min", ""},
                 {"Messenger", "Tom", "Schaffst du 18 Uhr?"}};
         // built directly rather than pushed through the store, so one card's demo data cannot
         // leak into the next one's

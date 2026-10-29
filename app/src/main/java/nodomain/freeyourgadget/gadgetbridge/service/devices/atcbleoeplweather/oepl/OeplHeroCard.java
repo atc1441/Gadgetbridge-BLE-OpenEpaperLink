@@ -61,14 +61,31 @@ public class OeplHeroCard extends OeplCard {
             return;
         }
         final float pad = Math.max(2f, Math.min(c.width, c.height) * 0.025f);
-
-        // ------------------------------------------------------------ the badge row
-        float top = pad;
         final float badgeH = Math.min(c.height * 0.17f, Math.max(12f, c.width * 0.075f));
         // nothing under eight pixels: a badge that cannot be read is a row of room taken
         // from the figure underneath it, which is the whole point of this card
         final float badgeText = c.sizeForHeight(badgeH * 0.62f, badgeH, OeplCanvas.READABLE);
-        if (readings.size() > 1 && badgeText > 0f && c.height >= 90f) {
+        final boolean badgeRow = readings.size() > 1 && badgeText > 0f && c.height >= 90f;
+
+        // ------------------------------------------------------------ what this panel holds
+        // How the body will be divided is decided before anything is drawn, because it
+        // decides what there is to draw: whether the agenda gets a half of its own.
+        final float bodyRoom = c.height - (badgeRow ? badgeH + pad : 0f) - pad * 2f;
+        final boolean landscape = c.width >= c.height * 1.2f;
+        final boolean room = bodyRoom > 44f && (landscape ? c.width > 210f : bodyRoom > 120f);
+        final boolean withAgenda = !events.isEmpty() && room;
+
+        // The agenda is this card's own view of the appointments, so the badges must not be a
+        // second one. The collector hands over how many there are today and then the next few
+        // by name, which is right for a card that has nothing else - and on a panel wide
+        // enough for the agenda column those badges were the agenda again, in a worse form,
+        // right beside it.
+        final List<OeplReading> shown = withAgenda
+                ? OeplReadings.without(readings, OeplReadings.GROUP_EVENTS) : readings;
+
+        // ------------------------------------------------------------ the badge row
+        float top = pad;
+        if (badgeRow && shown.size() > 1) {
             final String stamp = new SimpleDateFormat("EE dd. MMM", Locale.getDefault())
                     .format(new Date());
             final float stampSize = c.sizeForHeight(badgeH * 0.6f, badgeH, OeplCanvas.READABLE);
@@ -78,8 +95,8 @@ public class OeplHeroCard extends OeplCard {
 
             float x = pad;
             final float limit = c.width - pad - stampWidth;
-            for (int i = 1; i < readings.size(); i++) {
-                final float used = badge(c, readings.get(i), x, top, badgeH, badgeText, limit);
+            for (int i = 1; i < shown.size(); i++) {
+                final float used = badge(c, shown.get(i), x, top, badgeH, badgeText, limit);
                 if (used <= 0f) {
                     break;
                 }
@@ -91,9 +108,12 @@ public class OeplHeroCard extends OeplCard {
         // ------------------------------------------------------------ the two halves
         final float bodyTop = top;
         final float bodyHeight = c.height - bodyTop - pad;
-        final boolean landscape = c.width >= c.height * 1.2f;
-        final boolean room = bodyHeight > 44f && (landscape ? c.width > 210f : bodyHeight > 120f);
-        final boolean withAgenda = !events.isEmpty() && room;
+        if (shown.isEmpty()) {
+            // the appointments were all this card had: the agenda takes the whole panel
+            // rather than a column beside a figure there is nothing left to put in
+            agenda(c, new RectF(pad, bodyTop, c.width - pad, bodyTop + bodyHeight), pad);
+            return;
+        }
 
         RectF hero = new RectF(pad, bodyTop, c.width - pad, bodyTop + bodyHeight);
         RectF agenda = null;
@@ -111,7 +131,7 @@ public class OeplHeroCard extends OeplCard {
                 c.line(pad, Math.round(split), c.width - pad, Math.round(split), c.ink, 1f);
             }
         }
-        hero(c, readings.get(0), hero);
+        hero(c, shown.get(0), hero);
         if (agenda != null) {
             agenda(c, agenda, pad);
         }

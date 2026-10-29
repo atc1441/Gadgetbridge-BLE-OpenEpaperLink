@@ -52,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oe
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplHeroCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplInfoCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplListCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplReadings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplMonthCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplPosterCard;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplQrCard;
@@ -139,7 +140,7 @@ public final class OeplSettings {
     private static final int[] FORECAST_HOURS = {6, 12, 18, 24};
     private static final int[] NOTIFICATION_COUNT = {2, 3, 4, 6, 8};
 
-    private static final String LONG_CAPTION = "Familienkalender, Schule und Werkstatttermine";
+    private static final String LONG_CAPTION = "Familienkalender, Schule und Vereinstermine";
 
     public static List<Case> all() {
         final List<Case> cases = new ArrayList<>();
@@ -483,11 +484,9 @@ public final class OeplSettings {
                 return new OeplWallCard(
                         s.contains("no weather") ? null : OeplDemo.weather(),
                         s.contains("empty diary") ? Collections.emptyList() : OeplDemo.events(),
-                        OeplDemo.beyondTheWeather(),
+                        OeplDemo.sheetReadings(),
                         s.contains("days=") ? number(s, "days=") : 7,
-                        s.contains("entries=") ? number(s, "entries=") : 4,
-                        s.contains("forecast=") ? number(s, "forecast=") : 5,
-                        true, "Kalender");
+                        s.contains("forecast=") ? number(s, "forecast=") : 5, true);
             case OeplCardFactory.QUAD:
                 return new QuadContent(quarters(s));
 
@@ -724,7 +723,10 @@ public final class OeplSettings {
         if (settings.contains("busiest")) {
             parts.add(new OeplCalendarWeekCard(OeplDemo.events(), 3));
             parts.add(new OeplMonthCard(OeplDemo.events(), "Kalender"));
-            parts.add(new OeplGridCard(OeplDemo.readings(true, true), "Kueche"));
+            // without the agenda: three of these four quarters are the calendar already,
+            // which is what the factory does with a panel configured this way
+            parts.add(new OeplGridCard(OeplReadings.without(OeplDemo.readings(true, true),
+                    OeplReadings.GROUP_EVENTS), "Kueche"));
             parts.add(new OeplBoardCard(OeplDemo.events(), 6, "Termine"));
             return parts;
         }
@@ -736,7 +738,8 @@ public final class OeplSettings {
             parts.add(new OeplRssCard(OeplDemo.feed(), "Nachrichten", false));
         }
         if (settings.contains("four quarters")) {
-            parts.add(new OeplListCard(OeplDemo.readings(false, true)));
+            parts.add(new OeplListCard(OeplReadings.without(OeplDemo.readings(false, true),
+                    OeplReadings.GROUP_EVENTS)));
         }
         return parts;
     }

@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.c
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 
 import java.util.Locale;
@@ -180,6 +181,24 @@ public class CardStyle {
      */
     public float baselineAbove(final float bottom, final Paint paint) {
         return bottom - paint.getFontMetrics().descent * OeplFonts.lineFactor();
+    }
+
+    /**
+     * The same, for a line whose own ink is what has to stay inside: the depth is measured
+     * from the text rather than from the face.
+     * <p>
+     * The factor above is measured once from a sample of the language, which is close enough
+     * for a row of figures and not close enough for a word. A Devanagari conjunct that hangs
+     * below the baseline - the weekday under an hour row is where this showed - goes deeper
+     * than the sample did, and a pixel of it ended up over the bottom edge of the card.
+     */
+    public float baselineAbove(final float bottom, final Paint paint, final String text) {
+        if (text == null || text.isEmpty()) {
+            return baselineAbove(bottom, paint);
+        }
+        final Rect bounds = new Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        return bottom - Math.max(0f, bounds.bottom);
     }
 
     /**

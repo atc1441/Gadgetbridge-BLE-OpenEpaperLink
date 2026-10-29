@@ -101,11 +101,12 @@ public final class OEPLContentOptions {
             case OeplCardFactory.CALENDAR_WEEK:
                 return EnumSet.of(Option.CALENDAR_DAYS);
             case OeplCardFactory.WALL:
-                // the sheet is made of the week, the weather, the days ahead and the
-                // appointments, so it answers to the settings of all four
+                // The sheet is made of the week, the weather, the days ahead and the values,
+                // so it answers to the settings of all four. Not to the length of an
+                // appointment list or its heading: the week region is where the appointments
+                // are on this sheet, and there is no list of them beside it to head.
                 return EnumSet.of(Option.WEATHER, Option.WIND_UNIT, Option.FORECAST_DAYS,
-                        Option.CALENDAR_EVENTS, Option.CALENDAR_DAYS, Option.CALENDAR_TITLE,
-                        Option.READINGS, Option.HOME_ASSISTANT);
+                        Option.CALENDAR_DAYS, Option.READINGS, Option.HOME_ASSISTANT);
             case OeplCardFactory.MONTH:
                 // the month decides its own span, so only the heading is left to configure
                 return EnumSet.of(Option.CALENDAR_TITLE);

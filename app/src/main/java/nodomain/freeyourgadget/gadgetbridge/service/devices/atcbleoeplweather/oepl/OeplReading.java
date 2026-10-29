@@ -37,6 +37,18 @@ public class OeplReading {
     /** The value as it goes onto the panel, unit included. */
     public final String value;
 
+    /**
+     * Which of {@link OeplReadings}' four groups this came from: the key the setting stores,
+     * not the heading drawn above it.
+     * <p>
+     * A card that draws one of those groups itself has to be able to take that group out of
+     * the list it is given - the wall sheet has a week grid on it, the big value card has the
+     * agenda beside it - and the heading cannot answer that question, because the heading is
+     * translated and a card is not the place to compare translated strings.
+     */
+    @Nullable
+    public String group;
+
     /** A glyph from the Weather Icons face, for the things that face has a symbol for. */
     @Nullable
     public String fontGlyph;
@@ -65,6 +77,12 @@ public class OeplReading {
         this.section = section;
         this.label = label == null ? "" : label;
         this.value = value == null ? "" : value;
+    }
+
+    /** Marks which group this was collected as part of; see {@link #group}. */
+    public OeplReading inGroup(@Nullable final String name) {
+        this.group = name;
+        return this;
     }
 
     public OeplReading withFontGlyph(final String glyph) {

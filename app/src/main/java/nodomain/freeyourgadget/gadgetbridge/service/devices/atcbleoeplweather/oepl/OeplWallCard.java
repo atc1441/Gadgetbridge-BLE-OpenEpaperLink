@@ -31,15 +31,21 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.co
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
 
 /**
- * The wall sheet: the week, the weather, the days ahead and what is coming up, all on one
- * panel, each in a region of the size its content deserves.
+ * The wall sheet: the week, the weather, the days ahead and what the house has to say, all on
+ * one panel, each in a region of the size its content deserves.
  * <p>
  * This exists because a large display is not a large price tag. Every other design here shows
  * one thing, which is right for a shelf label and wasteful on a seven inch panel on a kitchen
  * wall: a week grid on 960 by 672 leaves half the sheet to empty hours, and a grid of tiles
  * leaves most of it to the frames around them. What a panel that size is for is reading
- * several things at once - the week, the weather now, the days ahead, the next appointments -
- * the way a newspaper page is read.
+ * several things at once - the week, the weather now, the days ahead, the values from the
+ * house - the way a newspaper page is read.
+ * <p>
+ * Several things, and each of them once. The appointments are what that keeps running into,
+ * because this project has four ways of showing them and they are not four things: a grid of
+ * days, a list of what is coming up, a month as a sheet and a count among the values are all
+ * the same calendar, whichever of them is called what. So the week region is where the
+ * appointments are on this sheet, and nothing else on it mentions them.
  * <p>
  * So the panel is divided into regions and each region is handed to the card that already
  * knows how to draw that thing. Nothing here draws anything itself: it is the division that
@@ -62,23 +68,23 @@ public class OeplWallCard implements CardContent {
     private final List<CalendarEvent> events;
     private final List<OeplReading> readings;
     private final int calendarDays;
-    private final int agendaEntries;
     private final int forecastDays;
     private final boolean beaufort;
-    private final String caption;
 
+    /**
+     * @param calendarDays how many days the week region covers. Neither how many appointments
+     *                     a list would hold nor what its heading would say is asked for: this
+     *                     sheet has no such list - see the note on the class.
+     */
     public OeplWallCard(@Nullable final OeplWeather weather, final List<CalendarEvent> events,
                         final List<OeplReading> readings, final int calendarDays,
-                        final int agendaEntries, final int forecastDays, final boolean beaufort,
-                        final String caption) {
+                        final int forecastDays, final boolean beaufort) {
         this.weather = weather;
         this.events = events == null ? Collections.emptyList() : events;
         this.readings = readings == null ? Collections.emptyList() : readings;
         this.calendarDays = calendarDays;
-        this.agendaEntries = agendaEntries;
         this.forecastDays = forecastDays;
         this.beaufort = beaufort;
-        this.caption = caption;
     }
 
     @Nullable
@@ -117,17 +123,14 @@ public class OeplWallCard implements CardContent {
         }
 
         /**
-         * What this region shows, in the terms a reader would use. The week card is two
-         * different things depending on the room it has - a grid of days, or the list of what
-         * is coming up - and which of them it is decides whether the appointment list beside
-         * it is a second view or the same one twice.
+         * What this region shows, in the terms a reader would use - which is the only terms
+         * in which two regions can be told apart. The week card is a grid of days where it
+         * has the room for one and the list of what is coming up where it has not, and to a
+         * reader both of those are the calendar.
          */
         String kind() {
-            if (content instanceof OeplCalendarWeekCard) {
-                return OeplCalendarWeekCard.fitsAsGrid(area.width(), area.height(),
-                        ((OeplCalendarWeekCard) content).days()) ? "week" : "appointments";
-            }
-            if (content instanceof OeplCalendarListCard) {
+            if (content instanceof OeplCalendarWeekCard
+                    || content instanceof OeplCalendarListCard) {
                 return "appointments";
             }
             if (content instanceof OeplWeatherCard) {
@@ -158,34 +161,39 @@ public class OeplWallCard implements CardContent {
      * <p>
      * The week takes the larger share, because it is the thing that is looked at from across
      * the room and the only one that needs room to be a grid at all. The weather now sits at
-     * the top of the other share, where the eye goes first; the days ahead under it; and the
-     * appointments as a list under that, because a list says what the grid can only mark.
+     * the top of the other share, where the eye goes first; the days ahead under it; and what
+     * the house has to say under that, where somebody steps up to read it.
      */
     private List<Region> regions(final RectF area) {
         final List<Region> regions = new ArrayList<>();
         final float w = area.width();
         final float h = area.height();
 
-        // a panel too small to hold two things reads better holding one
-        if (w < MIN_COMPOSED_WIDTH || h < MIN_COMPOSED_HEIGHT) {
+        // A panel too small to hold two things reads better holding one - and so does a sheet
+        // with only one thing on it. With no forecast and nothing from the house, the
+        // appointments are all this sheet was given, and a sheet is a division of several
+        // things: the calendar gets the whole panel rather than two regions of itself.
+        if (w < MIN_COMPOSED_WIDTH || h < MIN_COMPOSED_HEIGHT || onlyTheCalendar()) {
             regions.add(new Region(week(), new RectF(area)));
             return regions;
         }
 
         final float gap = Math.max(3f, Math.min(w, h) * 0.015f);
         if (w >= h * 1.15f) {
-            // whether the week really comes out as a grid decides what the column beside it
-            // holds: a week that falls back to a list of what is coming up is the appointment
-            // list, and a sheet that then puts the appointment list beside it says it twice
             // Wider than tall: the week down the left, the weather and what follows it in a
             // column on the right. The grid wants width more than the column does - an hour
             // row across seven days is seven columns - so it gets the larger share.
             final float split = Math.round(area.left + w * (w > 700f ? 0.6f : 0.55f));
             final float weekWidth = split - gap / 2f - area.left;
+            // Whether the week really comes out as a grid decides what goes beside it: a week
+            // that falls back to a list of what is coming up is the appointment list, and a
+            // sheet that then puts the appointment list next to it says it twice.
+            final boolean weekIsAGrid =
+                    OeplCalendarWeekCard.fitsAsGrid(weekWidth, h, calendarDays);
             regions.add(new Region(week(),
                     new RectF(area.left, area.top, split - gap / 2f, area.bottom)));
             column(regions, new RectF(split + gap / 2f, area.top, area.right, area.bottom), gap,
-                    OeplCalendarWeekCard.fitsAsGrid(weekWidth, h, calendarDays));
+                    weekIsAGrid);
         } else {
             // Standing up: the weather across the top, where a wide shallow region suits a
             // reading beside a pictogram, then the week, then what is coming up.
@@ -196,11 +204,11 @@ public class OeplWallCard implements CardContent {
             regions.add(new Region(week(),
                     new RectF(area.left, top + gap / 2f, area.right, bottom - gap / 2f)));
             final RectF under = new RectF(area.left, bottom + gap / 2f, area.right, area.bottom);
-            // the same rule standing up: the appointments go under the week only when the
-            // week is a grid, because otherwise the week is the appointments
-            if (fits(under) && OeplCalendarWeekCard.fitsAsGrid(area.width(),
-                    bottom - gap / 2f - (top + gap / 2f), calendarDays)) {
-                regions.add(new Region(agenda(), under));
+            // Under the week, the values - never a second view of the week. They go there only
+            // when the weather really is at the top, because without a forecast the top region
+            // is the values itself.
+            if (fits(under) && !readings.isEmpty() && weatherAtTheTop()) {
+                regions.add(new Region(part(VALUES, under.height()), under));
             } else {
                 regions.get(1).area.bottom = area.bottom;
             }
@@ -209,10 +217,20 @@ public class OeplWallCard implements CardContent {
     }
 
     /**
-     * The right hand column of a wide sheet: the weather now, the days ahead, the appointments
-     * and - where the panel is large enough that they would otherwise be left out - the values
-     * from the house. Each is dropped rather than squeezed once its share stops being readable,
-     * and what is left over goes to the one above it.
+     * True when the appointments are the only thing this sheet was given. The week region
+     * holds them whatever happens, so there is nothing to put beside it.
+     */
+    private boolean onlyTheCalendar() {
+        return !weatherAtTheTop() && readings.isEmpty();
+    }
+
+    /**
+     * The right hand column of a wide sheet: the weather now, the days ahead and - where the
+     * panel is large enough that they would otherwise be left out - the values from the house.
+     * Each is dropped rather than squeezed once its share stops being readable, and what is
+     * left over goes to the one above it. The appointments are not in the list: the week region
+     * beside this column is the calendar, and a list of the same appointments next to it is
+     * that calendar again.
      */
     private void column(final List<Region> regions, final RectF column, final float gap,
                         final boolean weekIsAGrid) {
@@ -221,10 +239,11 @@ public class OeplWallCard implements CardContent {
         if (weather != null && weather.hasData() && !weather.upcomingDays().isEmpty()) {
             parts.add(FORECAST);
         }
-        if (!events.isEmpty() && weekIsAGrid) {
-            parts.add(AGENDA);
-        }
-        if (!readings.isEmpty() && (column.height() > 420f || !weekIsAGrid)) {
+        // The values only where the weather really is at the top of the column: with no
+        // forecast to show, that region falls back to the values itself, and the same list
+        // underneath it again is this sheet's one rule broken.
+        if (!readings.isEmpty() && weatherAtTheTop()
+                && (column.height() > 420f || !weekIsAGrid)) {
             parts.add(VALUES);
         }
 
@@ -245,7 +264,6 @@ public class OeplWallCard implements CardContent {
 
     private static final String NOW = "now";
     private static final String FORECAST = "forecast";
-    private static final String AGENDA = "agenda";
     private static final String VALUES = "values";
 
     /**
@@ -260,8 +278,6 @@ public class OeplWallCard implements CardContent {
                 // without its headline: the place and what it is doing now are written large
                 // in the region directly above this one
                 return new OeplForecastCard(weather, Math.max(3, forecastDays), beaufort, false);
-            case AGENDA:
-                return agenda();
             case VALUES:
                 final int fits = Math.max(1, (int) (height / 26f));
                 return new OeplListCard(readings.size() <= fits ? readings
@@ -279,16 +295,18 @@ public class OeplWallCard implements CardContent {
         return new OeplCalendarWeekCard(events, calendarDays);
     }
 
-    private CardContent agenda() {
-        return new OeplCalendarListCard(events, Math.max(2, agendaEntries), caption);
+    /**
+     * The weather now, or - with no forecast to show - the values instead. There is no third
+     * case: a sheet with neither is never divided, so it never asks.
+     */
+    private CardContent now() {
+        return weatherAtTheTop() ? new OeplWeatherCard(weather, beaufort)
+                : new OeplListCard(readings);
     }
 
-    /** The weather now, or - with no forecast to show - whatever else is worth the room. */
-    private CardContent now() {
-        if (weather != null && weather.hasData()) {
-            return new OeplWeatherCard(weather, beaufort);
-        }
-        return readings.isEmpty() ? agenda() : new OeplListCard(readings);
+    /** Whether the region meant for the weather really has the weather in it. */
+    private boolean weatherAtTheTop() {
+        return weather != null && weather.hasData();
     }
 
     /** Hairlines in the gaps, so the regions read as a sheet and not as one busy picture. */
