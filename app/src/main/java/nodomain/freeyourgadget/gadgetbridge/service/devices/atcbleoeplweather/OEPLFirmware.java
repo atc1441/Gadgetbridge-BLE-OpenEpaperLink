@@ -16,9 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather;
 
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 
 import androidx.annotation.Nullable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 
@@ -36,8 +45,9 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
  * of them is handed the same note, and each is flashed as it comes within reach.
  */
 public final class OEPLFirmware {
+    private static final Logger LOG = LoggerFactory.getLogger(OEPLFirmware.class);
 
-    /** The file to write, as a content URI the chooser handed over. */
+    /** The file to write, as a URI - normally the app's own copy; see {@link #arm}. */
     static final String PENDING_URI = "oepl_weather_firmware_uri";
     /** How often it has been tried, so a file this display will not take is given up on. */
     static final String PENDING_TRIES = "oepl_weather_firmware_tries";
@@ -62,6 +72,71 @@ public final class OEPLFirmware {
                 .putInt(PENDING_TRIES, 0)
                 .remove(RESTARTED_AT)
                 .apply();
+    }
+
+    /**
+     * Notes the file down and keeps a copy of it, which is what makes the note worth anything
+     * once the screen it was chosen on is gone.
+     * <p>
+     * What the chooser hands over is a loan. Some providers grant a content URI for the life of
+     * the activity and not a moment longer, a file picked out of a cloud folder may not sit on
+     * the phone at all, and the display it is meant for answers minutes or hours later - by
+     * which time reading that URI fails, the note is dropped as unusable, and the update simply
+     * never happened with nothing on any screen to say so. So the bytes are put where this app
+     * owns them and the note points at that instead. {@link #done} and {@link #giveUp} clear
+     * the copy away again.
+     *
+     * @param content the file as it was already read to check it, or null to fall back to the
+     *                URI the chooser gave
+     */
+    public static void arm(final Context context, final String address, final Uri source,
+                           @Nullable final byte[] content) {
+        final File copy = copyOf(context, address);
+        if (content != null && write(copy, content)) {
+            arm(address, Uri.fromFile(copy).toString());
+            return;
+        }
+        // better the loan than nothing: a transfer that starts while the grant still holds is
+        // a transfer that may well finish
+        LOG.warn("keeping no copy of the firmware for {}, using {} as handed over",
+                address, source);
+        arm(address, source.toString());
+    }
+
+    /** Where this display's copy of the file lives. One per display, overwritten each time. */
+    private static File copyOf(final Context context, final String address) {
+        return new File(new File(context.getFilesDir(), "oepl-firmware"),
+                address.replace(':', '-') + ".bin");
+    }
+
+    private static boolean write(final File file, final byte[] content) {
+        final File parent = file.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            return false;
+        }
+        try (OutputStream out = new FileOutputStream(file)) {
+            out.write(content);
+            return true;
+        } catch (final Exception e) {
+            LOG.warn("could not keep a copy of the firmware at {}", file, e);
+            return false;
+        }
+    }
+
+    /**
+     * Throws the copy away. Called where the note goes, and only there: the transfer itself
+     * works from the bytes it has already read, so a copy removed under a running one costs
+     * nothing, while a copy left behind is two hundred kilobytes per display for ever.
+     */
+    private static void dropCopy(final String address) {
+        try {
+            final File copy = copyOf(GBApplication.getContext(), address);
+            if (copy.exists() && !copy.delete()) {
+                LOG.debug("could not remove {}", copy);
+            }
+        } catch (final Exception e) {
+            LOG.debug("could not remove the firmware copy of {}", address, e);
+        }
     }
 
     /**
@@ -107,6 +182,7 @@ public final class OEPLFirmware {
                 .remove(PENDING_URI)
                 .remove(PENDING_TRIES)
                 .apply();
+        dropCopy(address);
     }
 
     /** Counts this attempt and says which one it was. */
@@ -151,6 +227,7 @@ public final class OEPLFirmware {
                 .remove(RESTARTED_AT)
                 .putLong(OEPLPrefs.LAST_IMAGE_CRC, 0L)
                 .apply();
+        dropCopy(address);
     }
 
     /**

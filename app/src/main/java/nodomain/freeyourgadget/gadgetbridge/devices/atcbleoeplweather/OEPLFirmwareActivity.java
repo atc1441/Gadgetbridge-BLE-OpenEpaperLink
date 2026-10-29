@@ -92,6 +92,9 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
 
     @Nullable
     private Uri firmware;
+    /** The file itself, so each display gets a copy that outlives the chooser's grant. */
+    @Nullable
+    private byte[] firmwareContent;
     private int firmwareBytes;
 
     /** The addresses still to be done, and which one is being worked on. */
@@ -148,6 +151,12 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
     protected void onPause() {
         super.onPause();
         handler.removeCallbacksAndMessages(null);
+        // The rollout carries on without this screen, so what it was in the middle of has to
+        // carry on too: the display being worked on keeps its note, and is sent for again
+        // rather than left until its own interval comes round.
+        if (at >= 0 && at < queue.size()) {
+            OEPLUpdateScheduler.armNext(this, queue.get(at), true);
+        }
     }
 
     // ------------------------------------------------------------------ the list
@@ -310,6 +319,7 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
             LOG.info("no lasting permission for {}", uri, e);
         }
         firmware = uri;
+        firmwareContent = content;
         firmwareBytes = content.length;
         chosen.setText(getString(R.string.oepl_firmware_chosen, uri.getLastPathSegment(),
                 firmwareBytes / 1024));
@@ -336,7 +346,14 @@ public class OEPLFirmwareActivity extends AbstractGBActivity {
         queue.clear();
         queue.addAll(picked);
         for (final String address : queue) {
-            OEPLFirmware.arm(address, firmware.toString());
+            OEPLFirmware.arm(this, address, firmware, firmwareContent);
+            // Every one of them is sent for, not only the one at the head of the queue. The
+            // queue below works through them one at a time while this screen is open, because
+            // a firmware takes the whole link for minutes - but this screen is the one thing
+            // in the arrangement that can be gone in a second, and a display whose alarm was
+            // left at the end of its own interval would then wait a day for a file it was
+            // handed now. The note is durable; this makes the first attempt at it durable too.
+            OEPLUpdateScheduler.armNext(this, address, true);
         }
         at = 0;
         startedAt = 0L;

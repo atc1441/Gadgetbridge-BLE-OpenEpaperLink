@@ -27,6 +27,7 @@ import java.util.Calendar;
 import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplCanvas;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.oepl.OeplFonts;
 
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.WeatherIcons;
@@ -132,9 +133,15 @@ public class ForecastContent implements CardContent {
             final float cx = area.left + colW * (i + 0.5f);
 
             final String name = dayName(i + 1);
+            // The baseline is a fraction of the card, but never higher than the line itself
+            // needs. A script that stacks its marks above the letter - Burmese here - reaches
+            // further up from its baseline than the metrics of a Latin face would suggest, and
+            // on a wide short panel the weekday then had ink over the top edge of the card.
+            final float base = Math.max(area.top + area.height() * 0.15f,
+                    area.top - day.getFontMetrics().ascent * OeplFonts.lineFactor());
             style.drawEllipsised(canvas, name,
                     Math.max(area.left, cx - Math.min(day.measureText(name), colW * 0.95f) / 2f),
-                    area.top + area.height() * 0.15f, colW * 0.95f, day);
+                    base, colW * 0.95f, day);
 
             WeatherIcons.draw(canvas, WeatherIcons.forConditionCode(d.getConditionCode()), false,
                     cx, area.top + area.height() * 0.33f,

@@ -5428,6 +5428,8 @@
     <string name="oepl_info_action_read_config">Read the hardware again</string>
     <string name="oepl_info_action_reset">Reset the counters</string>
     <string name="oepl_info_queued">Queued: the display is contacted as soon as it answers</string>
+    <string name="oepl_info_queued_behind_firmware">Queued behind the firmware: the display gets that first, the card follows</string>
+    <string name="oepl_info_refreshing_after_firmware">%1$s: the firmware goes out first, the new card follows right after it</string>
     <string name="oepl_info_refreshing">%1$s: refreshing the content, the display follows as soon as it answers</string>
     <string name="oepl_info_not_connected">Only possible while the display is connected</string>
     <string name="oepl_info_ago_seconds">%d s ago</string>
@@ -5494,6 +5496,8 @@
     <string name="oepl_tools_firmware_confirm">%1$d kB of firmware. The display must stay within reach until it is through; a transfer broken off halfway leaves the old firmware in place, but the display will be busy for a while. Carry on?</string>
     <string name="oepl_tools_firmware_go">Write it</string>
     <string name="oepl_tools_firmware_connecting">Connecting, then the firmware goes out</string>
+    <string name="oepl_tools_firmware_started">The firmware is going out now</string>
+    <string name="oepl_tools_firmware_noted">Noted. The firmware goes out as soon as the display answers – even if you leave this screen.</string>
     <string name="oepl_location_title">Pick the place</string>
     <string name="oepl_location_query">Town or village</string>
     <string name="oepl_location_hint">Search for a place and pick the right one. Names repeat - there is more than one Springfield, and the lookup cannot tell which one was meant.</string>

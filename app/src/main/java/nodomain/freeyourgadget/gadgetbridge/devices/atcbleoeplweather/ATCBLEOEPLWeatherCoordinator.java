@@ -58,6 +58,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.AT
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLActions;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLBlinkPresets;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLContentSync;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLFirmware;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLPrefs;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.atcbleoeplweather.OEPLStatusStore;
@@ -340,9 +341,9 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
     }
 
     /**
-     * The card's title, while the display has no name of its own: the tag's Bluetooth name
-     * followed by the diagonal and the resolution of the panel it carries, as in
-     * {@code ATC_8F3A21 · 2.9" · 384×168}.
+     * The card's title, while the display has no name of its own: the tag's Bluetooth name,
+     * the diagonal and the resolution of the panel it carries, and the firmware it is running,
+     * as in {@code ATC_8F3A21 · 2.9" · 384×168 · v124}.
      * <p>
      * The Bluetooth name of these tags is "ATC_" and four characters of the MAC address, which
      * places nothing at all once there is more than one of them on the wall. What matters about
@@ -381,6 +382,14 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
         }
         if (width > 0 && height > 0) {
             name.append(" · ").append(width).append('×').append(height);
+        }
+        // And what it is running. A firmware is handed to a shelf of these at once and each of
+        // them takes it whenever it next answers, so which of them already has it is the one
+        // thing worth seeing from the list - and until now it was three screens inside each
+        // display. It comes out of the advertisement, so it is known without a connection.
+        final String firmware = OEPLFirmware.version(prefs);
+        if (!firmware.isEmpty()) {
+            name.append(" · ").append(firmware);
         }
         // nothing known yet: the plain name, rather than a title that says only half of it
         return name.length() > device.getName().length() ? name.toString() : null;
@@ -428,8 +437,14 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
                                    @NonNull final GBDevice device) {
         OEPLContentSync.invalidateAll(device.getAddress());
         redrawNow(context, device, OEPLPrefs.PREF_CONTENT);
-        GB.toast(context.getString(R.string.oepl_info_refreshing, device.getAliasOrName()),
-                2000, GB.INFO);
+        // and said so, because a display that has been promised a firmware answers this gesture
+        // minutes later rather than seconds: the firmware has the link first
+        final boolean firmwareFirst = OEPLFirmware.worthTrying(
+                GBApplication.getDeviceSpecificSharedPrefs(device.getAddress()));
+        GB.toast(context.getString(firmwareFirst
+                        ? R.string.oepl_info_refreshing_after_firmware
+                        : R.string.oepl_info_refreshing, device.getAliasOrName()),
+                firmwareFirst ? 4000 : 2000, GB.INFO);
         return true;
     }
 
@@ -642,8 +657,16 @@ public class ATCBLEOEPLWeatherCoordinator extends AbstractDeviceCoordinator {
             @Override
             public void onClick(@NonNull final GBDevice device, @NonNull final Context context) {
                 OEPLUpdateScheduler.requestUpdateNow(context, device);
+                // a display that is owed a firmware gets that first; the refresh is not lost,
+                // it is behind it, and saying so is the difference between waiting and
+                // pressing this again
+                final boolean firmwareFirst = OEPLFirmware.worthTrying(
+                        GBApplication.getDeviceSpecificSharedPrefs(device.getAddress()));
                 nodomain.freeyourgadget.gadgetbridge.util.GB.toast(
-                        context.getString(R.string.oepl_info_queued), 2000,
+                        context.getString(firmwareFirst
+                                ? R.string.oepl_info_queued_behind_firmware
+                                : R.string.oepl_info_queued),
+                        firmwareFirst ? 4000 : 2000,
                         nodomain.freeyourgadget.gadgetbridge.util.GB.INFO);
             }
         });

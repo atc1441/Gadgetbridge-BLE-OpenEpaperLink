@@ -325,6 +325,35 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
     }
 
     /**
+     * Writes a firmware the display has just been handed, over the link that is already up.
+     * <p>
+     * The note is what makes the update happen and it is already written by the time this is
+     * called; this only decides that the open connection is spent on it rather than the next
+     * one. The connection becomes the firmware's own, exactly as it would have been had it
+     * been opened for one: a transfer that takes minutes shares the link with nothing, and a
+     * picture transfer that happens to be running is given up on, because what it is given up
+     * for outlives it and a picture is one connection's worth of work.
+     */
+    private void startArmedFirmwareNow() {
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        if (!firmwareWorthTrying(prefs)) {
+            return;
+        }
+        if (payload != null) {
+            LOG.info("giving up the running transfer to {} for the firmware",
+                    getDevice().getAddress());
+            payload = null;
+            blockData = null;
+            blockCount = -1;
+            clearProgress();
+        }
+        commandSession = true;
+        commandSessionOver = true; // the transfer itself ends this connection
+        startArmedFirmware();
+    }
+
+    /**
      * Writes the firmware this display was handed, if it is still there to be written.
      * <p>
      * The attempt is counted before anything is sent. A display that takes the file and dies
@@ -1277,6 +1306,11 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             return;
         }
 
+        if (OEPLPrefs.PREF_FIRMWARE_START.equals(config)) {
+            startArmedFirmwareNow();
+            return;
+        }
+
         if (OEPLPrefs.PREF_UPDATE_INTERVAL.equals(config)
                 || OEPLPrefs.PREF_CATCH_UP.equals(config)
                 || OEPLPrefs.PREF_QUIET.equals(config)
@@ -1390,6 +1424,19 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if (OEPLPrefs.PREF_RSS_URL.equals(changedKey)) {
             OeplRssClient.invalidate();
         }
+        final String address = getDevice().getAddress();
+        if (OEPLFirmware.worthTrying(prefs)) {
+            // This display has been promised a firmware, which takes the whole link for
+            // minutes. A picture pushed into that is at best refused and at worst breaks the
+            // transfer off halfway - so the refresh is neither forced through nor dropped, it
+            // is put behind the firmware. The picture is already marked stale a few lines up,
+            // which is what makes it go out afterwards: the firmware going through clears the
+            // note and asks for the card to be put back, and the note being given up on does
+            // the same. This is the safety net under both of those.
+            LOG.info("{} is owed a firmware, the new card goes out behind it", address);
+            OEPLUpdateScheduler.requestRestore(getContext(), address, FIRMWARE_SETTLE_MILLIS);
+            return;
+        }
         if (getDevice().isInitialized() && config != null && config.valid) {
             pushUpdateIfNeeded();
         } else {
@@ -1430,10 +1477,14 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                                 Toast.LENGTH_LONG, GB.ERROR);
                         return;
                     }
-                    transferIsFirmware = true;
-                    pendingCrc = 123; // the tag does not check this for firmware
-                    forced = true;
-                    send(firmware, OEPLProtocol.DATATYPE_FIRMWARE, R.string.updating_firmware);
+                    // Noted on the display before a single block goes out. A firmware
+                    // transfer that breaks off is the ordinary case rather than the
+                    // exceptional one - the display is carried away, the cell is weak, the
+                    // link drops, Android recycles the app - and the note is what picks it up
+                    // again instead of losing it. It is cleared when the display confirms the
+                    // new firmware or the attempts run out.
+                    OEPLFirmware.arm(getContext(), getDevice().getAddress(), uri, firmware);
+                    startArmedFirmwareNow();
                 }
                 return;
             }

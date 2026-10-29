@@ -187,8 +187,11 @@ public final class OEPLUpdateScheduler {
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
         final long now = System.currentTimeMillis();
         final long planned = dueAt(prefs, now, when);
-        // and never inside the quiet window: what fell due in the night waits for the morning
-        final long due = OEPLQuietHours.shift(prefs, planned);
+        // ...and never inside the quiet window: what fell due in the night waits for the
+        // morning. Unless this display is still owed a command or a firmware - a run carrying
+        // one of those is not held back by the window either, so arming it for the end of the
+        // window would be a promise nothing keeps.
+        final long due = owesSomething(prefs) ? planned : OEPLQuietHours.shift(prefs, planned);
 
         final AlarmManager alarms =
                 (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -221,12 +224,24 @@ public final class OEPLUpdateScheduler {
      */
     private static long dueAt(final SharedPreferences prefs, final long now, final When when) {
         final long interval = OEPLPrefs.updateIntervalMillis(prefs);
+        // A display that is still owed something is never put off for a whole interval, and
+        // that cap is what keeps a firmware from being buried by something else entirely. The
+        // interval may be a day, and several ordinary turns arm it: a run that found the link
+        // already up, a picture that went out while the note was being written, a display with
+        // nothing to send. Any one of them could push the next attempt at a firmware handed
+        // out a minute ago to tomorrow - and with the alarm that far out the display being
+        // heard in the meantime does not help either, because an advertisement is only acted
+        // on when something is due. So what is owed caps all of it at the catch-up gap, which
+        // is the figure for "this display still has business with us".
+        final long owed = owesSomething(prefs)
+                ? now + Math.max(MIN_DELAY_MILLIS, OEPLPrefs.catchUpMillis(prefs))
+                : Long.MAX_VALUE;
         if (when == When.IDLE) {
-            return now + Math.max(MIN_DELAY_MILLIS, interval);
+            return Math.min(owed, now + Math.max(MIN_DELAY_MILLIS, interval));
         }
         if (when == When.PLANNED) {
             final long lastRun = prefs.getLong(OEPLStatusStore.LAST_RUN_MILLIS, 0L);
-            return Math.max(now + MIN_DELAY_MILLIS, lastRun + interval);
+            return Math.min(owed, Math.max(now + MIN_DELAY_MILLIS, lastRun + interval));
         }
         final long catchUp = OEPLPrefs.catchUpMillis(prefs);
         final int failures = prefs.getInt(OEPLStatusStore.CONSECUTIVE_FAILURES, 1);
@@ -236,7 +251,16 @@ public final class OEPLUpdateScheduler {
         final long ladder = step >= RETRY_SECONDS.length - 1
                 ? catchUp
                 : Math.min(RETRY_SECONDS[step] * 1000L, catchUp);
-        return now + Math.max(MIN_DELAY_MILLIS, Math.min(ladder, interval));
+        return Math.min(owed, now + Math.max(MIN_DELAY_MILLIS, Math.min(ladder, interval)));
+    }
+
+    /**
+     * Whether this display still has business with us: a command it was asked to carry out, or
+     * a firmware it was promised. Both outrank the schedule and neither is held by the quiet
+     * hours, so an alarm armed while one of them is outstanding is kept close.
+     */
+    static boolean owesSomething(final SharedPreferences prefs) {
+        return OEPLActions.pending(prefs) || OEPLFirmware.worthTrying(prefs);
     }
 
     /**
@@ -410,8 +434,15 @@ public final class OEPLUpdateScheduler {
         OEPLStatusStore.recordTrigger(address, reason);
 
         if (device.isConnected()) {
+            // Whatever that link is doing has the display, and cutting in would disconnect
+            // underneath it - a firmware above all, which holds the link for minutes and is
+            // the one transfer here that cannot be picked up from the middle. So this run
+            // steps aside, and is put behind it rather than written off: a refresh asked for
+            // by hand comes back on the ladder, within the minute, instead of at the end of an
+            // interval that may be a day long.
             LOG.debug("{} is already connected, letting that run its course", address);
-            armNext(context, address, false);
+            armNext(context, address, REASON_MANUAL.equals(reason)
+                    || owesSomething(GBApplication.getDeviceSpecificSharedPrefs(address)));
             return;
         }
         if (IN_FLIGHT.contains(address)) {

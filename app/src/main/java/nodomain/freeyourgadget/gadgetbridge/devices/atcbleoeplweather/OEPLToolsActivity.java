@@ -69,10 +69,6 @@ public class OEPLToolsActivity extends AbstractGBActivity {
     private GBDevice device;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    /** Chosen while the display was out of reach, written as soon as it answers. */
-    @Nullable
-    private Uri armedFirmware;
-
     private final ActivityResultLauncher<String[]> pick = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(), this::chosen);
 
@@ -84,11 +80,8 @@ public class OEPLToolsActivity extends AbstractGBActivity {
                 return;
             }
             device = updated;
-            if (armedFirmware != null && device.isInitialized()) {
-                final Uri firmware = armedFirmware;
-                armedFirmware = null;
-                write(firmware);
-            }
+            // what the display is doing may have cleared the note, or taken one on
+            showFirmwareNote();
         }
     };
 
@@ -313,7 +306,8 @@ public class OEPLToolsActivity extends AbstractGBActivity {
                 .setTitle(R.string.oepl_tools_firmware)
                 .setMessage(getString(R.string.oepl_tools_firmware_confirm,
                         firmware.length / 1024))
-                .setPositiveButton(R.string.oepl_tools_firmware_go, (d, w) -> write(uri))
+                .setPositiveButton(R.string.oepl_tools_firmware_go,
+                        (d, w) -> write(uri, firmware))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
@@ -324,17 +318,32 @@ public class OEPLToolsActivity extends AbstractGBActivity {
     }
 
     /**
-     * Hands the file to the transfer, which needs the display on the line for minutes rather
-     * than seconds - so unlike the other three this one opens the connection itself and waits
-     * for it instead of leaving a note for the next time the display happens to answer.
+     * Hands the file over, in a way that outlives this screen.
+     * <p>
+     * It used to be held in this activity until the display answered - and a display answers
+     * when it feels like it, a few seconds at a time, often minutes later. Pressing back in
+     * the meantime threw the chosen file away without a word, and the update that had just
+     * been confirmed never happened. The same went for the screen being recycled, the phone
+     * being locked, or a call arriving.
+     * <p>
+     * So the file is written onto the display's own note first, with a copy of its own so that
+     * the chooser's grant expiring cannot lose it either, and only then is anything started.
+     * From that moment the firmware is the next connection's business whatever becomes of this
+     * screen, and the note is only cleared by the display taking the file or by the attempts
+     * running out. See {@link OEPLFirmware#arm}.
      */
-    private void write(final Uri uri) {
+    private void write(final Uri uri, final byte[] content) {
+        OEPLFirmware.arm(this, device.getAddress(), uri, content);
+        showFirmwareNote();
         if (device.isInitialized()) {
-            GBApplication.deviceService(device).onInstallApp(uri, new Bundle());
+            // the display is on the line right now: spend this connection on it rather than
+            // waiting for the next one
+            GBApplication.deviceService(device)
+                    .onSendConfiguration(OEPLPrefs.PREF_FIRMWARE_START);
+            GB.toast(getString(R.string.oepl_tools_firmware_started), 3000, GB.INFO);
             return;
         }
-        armedFirmware = uri;
-        GB.toast(getString(R.string.oepl_tools_firmware_connecting), 3000, GB.INFO);
-        GBApplication.deviceService(device).connect();
+        OEPLUpdateScheduler.requestUpdateNow(this, device);
+        GB.toast(getString(R.string.oepl_tools_firmware_noted), 4000, GB.INFO);
     }
 }

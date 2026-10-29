@@ -114,6 +114,62 @@ public class OeplScheduleWindowTest {
         assertTrue("without turning into a poll", late >= 10 * 60_000L);
     }
 
+    /**
+     * A firmware somebody handed out cannot be buried by the ordinary schedule.
+     * <p>
+     * This is what made a firmware "never happen" after a pull to refresh on the device list:
+     * the refresh found the link already up, stepped aside as it should - and armed the next
+     * attempt one whole interval away, which on a daily display is tomorrow. With the alarm
+     * that far out the display being heard in the meantime does not help either, because an
+     * advertisement is only acted on when something is due. So while a display is owed a
+     * firmware, nothing arms further out than the catch-up gap.
+     */
+    @Test
+    public void aFirmwareThatIsOwedIsNeverPutOffForAWholeInterval() {
+        store().edit().putString(OEPLPrefs.PREF_UPDATE_INTERVAL, "1440")
+                // a picture went out just now, so the next one is a whole day off
+                .putLong(OEPLStatusStore.LAST_RUN_MILLIS, System.currentTimeMillis()).apply();
+        final long ordinary = armedIn(false);
+        assertTrue("a display with nothing owed keeps its own long interval: " + ordinary,
+                ordinary > 12 * 3600_000L);
+
+        OEPLFirmware.arm(ADDRESS, "content://downloads/ATC_BLE_OEPL.bin");
+        final long owed = armedIn(false);
+
+        assertTrue("a promised firmware may not wait until tomorrow: " + owed / 60_000 + " min",
+                owed <= OEPLPrefs.catchUpMillis(store()) + 1000L);
+        assertTrue("and not turn into a poll either", owed >= 45_000L);
+
+        OEPLFirmware.done(ADDRESS);
+        assertTrue("and the long interval comes back once it is written", armedIn(false)
+                > 12 * 3600_000L);
+    }
+
+    /**
+     * Nor by the night. A run carrying a firmware is not held back by the quiet window - that is
+     * decided elsewhere and deliberately - so arming one for the end of the window would be a
+     * promise nothing keeps: seven in the morning would come, the run would go ahead anyway, and
+     * the hours in between would have been spent waiting for nothing.
+     */
+    @Test
+    public void aFirmwareIsNotArmedForTheEndOfTheQuietHours() {
+        final Calendar now = Calendar.getInstance();
+        final int minuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+        store().edit().putBoolean(OEPLPrefs.PREF_QUIET, true)
+                .putString(OEPLPrefs.PREF_QUIET_START,
+                        OEPLQuietHours.asTime(minuteOfDay - 60))
+                .putString(OEPLPrefs.PREF_QUIET_END, OEPLQuietHours.asTime(minuteOfDay + 240))
+                .apply();
+        assertTrue("the window has to cover now for this to mean anything",
+                OEPLQuietHours.covers(store(), System.currentTimeMillis()));
+        assertTrue("an ordinary update waits for the morning", armedIn(false) > 3600_000L);
+
+        OEPLFirmware.arm(ADDRESS, "content://downloads/ATC_BLE_OEPL.bin");
+
+        assertTrue("a firmware does not wait for the morning: " + armedIn(false),
+                armedIn(false) <= OEPLPrefs.catchUpMillis(store()) + 1000L);
+    }
+
     /** The gap is the user's to set, and a value that makes no sense is brought into range. */
     @Test
     public void theCatchUpGapIsWhateverWasChosen() {

@@ -104,6 +104,11 @@ public final class OEPLPrefs {
      * do something; see {@link OEPLActions}.
      */
     public static final String PREF_ACTION = "pref_oepl_weather_action";
+    /**
+     * Likewise not a setting but the word the service is notified with when a display that is
+     * on the line right now has just been handed a firmware; see {@link OEPLFirmware}.
+     */
+    public static final String PREF_FIRMWARE_START = "pref_oepl_weather_firmware_start";
     /** Which colour this display blinks in, so that two of them can be told apart. */
     public static final String PREF_LED_COLOR = "pref_oepl_weather_led_color";
     /** How the blink is shaped; all three live on the commands screen, not in the list. */

@@ -4619,6 +4619,8 @@
     <string name="oepl_info_preview">Aktuelle Karte</string>
     <string name="oepl_info_preview_note">%1$s Pixel, übergeben %2$s</string>
     <string name="oepl_info_queued">Eingereiht: das Display wird kontaktiert, sobald es antwortet</string>
+    <string name="oepl_info_queued_behind_firmware">Hinter der Firmware eingereiht: das Display bekommt erst die Firmware, die Karte folgt</string>
+    <string name="oepl_info_refreshing_after_firmware">%1$s: erst geht die Firmware raus, die neue Karte folgt direkt danach</string>
     <string name="oepl_info_refreshing">%1$s: Inhalte werden aktualisiert, das Display folgt, sobald es antwortet</string>
     <string name="oepl_info_reported">Gemeldet</string>
     <string name="oepl_info_result">Ergebnis</string>
@@ -4714,6 +4716,8 @@
     <string name="oepl_tools_firmware_confirm">%1$d kB Firmware. Das Display muss in Reichweite bleiben, bis alles durch ist; eine abgebrochene Übertragung lässt die alte Firmware stehen, beschäftigt das Display aber eine Weile. Weiter?</string>
     <string name="oepl_tools_firmware_go">Schreiben</string>
     <string name="oepl_tools_firmware_connecting">Verbinde, danach geht die Firmware raus</string>
+    <string name="oepl_tools_firmware_started">Die Firmware geht jetzt raus</string>
+    <string name="oepl_tools_firmware_noted">Vorgemerkt. Die Firmware geht raus, sobald sich das Display meldet – auch wenn du diese Seite verlässt.</string>
     <string name="oepl_location_title">Ort auswählen</string>
     <string name="oepl_location_query">Stadt oder Gemeinde</string>
     <string name="oepl_location_hint">Ort suchen und den richtigen auswählen. Namen wiederholen sich — es gibt mehr als ein Neustadt, und die Suche kann nicht wissen, welches gemeint war.</string>
