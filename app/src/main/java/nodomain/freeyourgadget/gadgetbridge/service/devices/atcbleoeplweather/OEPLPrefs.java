@@ -830,9 +830,13 @@ public final class OEPLPrefs {
             editor.putInt(DETECTED_HARDWARE_TYPE, ad.hardwareType);
             final OEPLTagTypes.TagType type = OEPLTagTypes.byHardwareType(ad.hardwareType);
             if (type != null) {
-                // a sensible geometry to fall back on if the display never answers
-                editor.putInt(PANEL_WIDTH, type.width);
-                editor.putInt(PANEL_HEIGHT, type.height);
+                // A sensible geometry to fall back on if the display never answers - and the
+                // buffer rather than the panel, because that is what these two keys hold and
+                // what every reader of them does with them. The catalogue knows how far apart
+                // the two are; see OEPLDisplayConfig.fromCatalogue.
+                final OEPLDisplayConfig panel = OEPLDisplayConfig.fromCatalogue(ad.hardwareType);
+                editor.putInt(PANEL_WIDTH, panel.bufferWidth);
+                editor.putInt(PANEL_HEIGHT, panel.bufferHeight);
                 editor.putInt(PANEL_COLORS, Math.max(1, type.colorCount - 1));
             }
         }

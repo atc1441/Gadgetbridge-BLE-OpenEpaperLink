@@ -147,10 +147,20 @@ public class OEPLDisplayConfig {
             return c;
         }
         c.hardwareType = hardwareType;
-        // the catalogue states the panel as it is seen; the buffer is the short axis first,
-        // the same way the firmware reports screen_w and screen_h
-        c.bufferWidth = Math.min(type.width, type.height);
-        c.bufferHeight = Math.max(type.width, type.height);
+        // The catalogue states the panel as it is seen, and how many quarter turns the buffer
+        // is away from it. An odd number of turns transposes the axes; an even number leaves
+        // them as they are. So the buffer is not simply the short axis first.
+        //
+        // The short axis first is what this used to be, and for the two thirds of the
+        // catalogue whose buffer is a quarter turn out it came to the same answer. On a 9.7"
+        // panel, which is written the way it is read, it packed 960 by 672 pixels as 672 wide
+        // and told the display so: the same bytes, every row a different length than the one
+        // the panel lays out - which the panel shows as a picture turned on its side and
+        // sheared into noise. It only happened on the connections where the display did not
+        // describe itself in time, which is why the next refresh drew it correctly again.
+        final boolean quarterTurn = type.rotateBuffer % 2 != 0;
+        c.bufferWidth = quarterTurn ? type.height : type.width;
+        c.bufferHeight = quarterTurn ? type.width : type.height;
         c.colors = Math.max(1, type.colorCount - 1);
         c.blackInvert = true;
         c.fromCatalogue = true;

@@ -79,7 +79,7 @@ public class OEPLDisplayConfigTest {
         final OEPLDisplayConfig c = OEPLDisplayConfig.fromCatalogue(0x53);
         assertTrue("0x53 is in the catalogue, so its panel is known", c.valid);
         assertTrue(c.fromCatalogue);
-        assertEquals("the buffer is the short axis first, as the firmware reports it",
+        assertEquals("a 480 by 224 panel written a quarter turn round, so the short axis first",
                 224, c.bufferWidth);
         assertEquals(480, c.bufferHeight);
         assertEquals(4, c.colorCount());
@@ -90,6 +90,48 @@ public class OEPLDisplayConfigTest {
 
         assertFalse("a type nobody has heard of cannot be filled in",
                 OEPLDisplayConfig.fromCatalogue(0x1234).valid);
+    }
+
+    /**
+     * The panel that is written the way it is read. Its buffer is not the short axis first, and
+     * taking it for granted that every buffer is cost the 9.7" its picture: 960 by 672 pixels
+     * packed as 672 wide and announced as 672 wide is the same bytes with every row a different
+     * length than the panel lays out, which the display shows as a picture on its side. It only
+     * happened on the connections where the display did not describe itself in time, so the
+     * refresh after it looked right again.
+     */
+    @Test
+    public void aPanelWrittenTheWayItIsReadKeepsItsLongAxisFirst() {
+        final OEPLDisplayConfig big = OEPLDisplayConfig.fromCatalogue(0x2E);  // M3 9.7"
+        assertTrue(big.valid);
+        assertEquals(960, big.bufferWidth);
+        assertEquals(672, big.bufferHeight);
+        assertEquals("half a turn is still no turn of the axes", 180, big.autoRotationDegrees());
+
+        final OEPLDisplayConfig gfsk = OEPLDisplayConfig.fromCatalogue(0xD5); // the same panel
+        assertEquals(960, gfsk.bufferWidth);
+        assertEquals(672, gfsk.bufferHeight);
+        assertEquals(0, gfsk.autoRotationDegrees());
+    }
+
+    /**
+     * And the rule behind both, over the whole catalogue: a card is drawn in the orientation it
+     * is read in and then turned into the buffer, so the buffer is the panel turned by exactly
+     * that much. A quarter turn transposes the axes; half a turn and no turn leave them alone.
+     */
+    @Test
+    public void everyCatalogueBufferIsThePanelTurnedByItsOwnRotation() {
+        for (final OEPLTagTypes.TagType type : OEPLTagTypes.all().values()) {
+            final OEPLDisplayConfig c = OEPLDisplayConfig.fromCatalogue(type.hardwareType);
+            if (!c.valid) {
+                continue;   // a panel of a few pixels, like the thermometer's own display
+            }
+            final int degrees = type.rotationDegrees();
+            final boolean quarterTurn = degrees == 90 || degrees == 270;
+            final String what = type.name + " at " + degrees + "°";
+            assertEquals(what, quarterTurn ? type.height : type.width, c.bufferWidth);
+            assertEquals(what, quarterTurn ? type.width : type.height, c.bufferHeight);
+        }
     }
 
     /**

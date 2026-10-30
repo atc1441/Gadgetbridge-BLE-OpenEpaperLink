@@ -64,6 +64,10 @@ public class CardRendererTest {
             {128, 296, 3}, {152, 296, 3}, {184, 384, 4}, {300, 400, 3},
             {480, 800, 3}, {672, 960, 4}, {122, 250, 2}, {296, 128, 3},
             {384, 184, 3}, {400, 300, 3},
+            // the big panels that are written the way they are read, long axis first: the 9.7"
+            // and the 7.5" wall panel. Only ever listed the other way round, the sweep never
+            // drew what those two actually get handed.
+            {960, 672, 3}, {800, 480, 3},
     };
 
     private static WeatherSpec demoSpec() {
@@ -259,6 +263,40 @@ public class CardRendererTest {
                     .render(184, 384, rotation, content("weather"));
             assertEquals("width at " + rotation, 184, b.getWidth());
             assertEquals("height at " + rotation, 384, b.getHeight());
+        }
+    }
+
+    /**
+     * What goes out is packed to the row length it is announced with, and that row length is
+     * the panel's own.
+     * <p>
+     * A 9.7" drawn from the catalogue used to be built as 672 by 960 and announced as 672 wide,
+     * although that panel is written the way it is read: 960 across. The display laid the same
+     * bytes out in rows of the length it was told, which is a picture lying on its side and
+     * sheared into noise - and only on the connections where the display had not described
+     * itself yet, so the next refresh put it right again.
+     */
+    @Test
+    public void aPanelGetsThePictureInTheRowLengthItIsWrittenIn() {
+        for (final int hardwareType : new int[]{0x2E, 0xD5, 0x36, 0x2D, 0x53, 0x6D}) {
+            final OEPLDisplayConfig panel = OEPLDisplayConfig.fromCatalogue(hardwareType);
+            final OEPLTagTypes.TagType type = OEPLTagTypes.byHardwareType(hardwareType);
+            final String what = type.name + " (0x" + Integer.toHexString(hardwareType) + ")";
+
+            final CardRenderer.Options opt = new CardRenderer.Options();
+            opt.accent = OEPLImageCodec.RED;
+            final Bitmap card = new CardRenderer(opt).render(panel.bufferWidth,
+                    panel.bufferHeight, panel.autoRotationDegrees(), content("weather"));
+            assertEquals(what, panel.bufferWidth, card.getWidth());
+            assertEquals(what, panel.bufferHeight, card.getHeight());
+            assertEquals(what, panel.planeSizeBytes() * panel.planeCount(),
+                    OEPLImageCodec.packPlanes(OEPLImageCodec.pixelsOf(card), card.getWidth(),
+                            card.getHeight(), panel.colorCount(), false, false, false).length);
+
+            // and turned back by the rotation it was given, it is the panel as it is read
+            final boolean quarterTurn = panel.autoRotationDegrees() % 180 != 0;
+            assertEquals(what + " is read " + type.width + " across",
+                    type.width, quarterTurn ? card.getHeight() : card.getWidth());
         }
     }
 

@@ -84,8 +84,29 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             Executors.newSingleThreadScheduledExecutor();
     /** Coalesces the replies arriving during startup into a single picture update. */
     private ScheduledFuture<?> pendingPush;
+    /** How long replies are gathered before the picture they asked for is drawn. */
+    private static final long SETTLE_MILLIS = 250L;
+    /**
+     * And how long a picture waits for the hardware read when only the settings blob has
+     * answered so far.
+     * <p>
+     * The two answers do not always describe the panel the same way round, and the hardware
+     * read is the one the firmware drives the panel with - which is why it overrides the other.
+     * It is asked for 150 ms behind the settings read, so a picture drawn a quarter of a second
+     * after that reply could go out packed the way the settings blob said, and a buffer packed
+     * to the wrong row length is what the display shows lying on its side. A second of patience
+     * on the one connection in which that happens is cheaper than the picture after it.
+     */
+    private static final long HARDWARE_READ_MILLIS = 1200L;
 
-    private OEPLDisplayConfig config;
+    /**
+     * The panel, as the display last described it. It is written on the Bluetooth thread as the
+     * two configuration replies come in and read on the render thread, hence volatile - and
+     * hence a picture takes one snapshot of it and is built from that alone. A geometry that
+     * moved between the drawing and the packing means a buffer packed to the wrong row length,
+     * which the panel shows as a picture lying on its side.
+     */
+    private volatile OEPLDisplayConfig config;
     private byte[] payload;
     private byte[] blockData;
     private int blockCount = -1;
@@ -656,8 +677,9 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                     Toast.LENGTH_LONG, GB.INFO);
         }
 
-        // the hardware read follows right behind and is more accurate, so let that one decide
-        pushUpdateIfNeeded();
+        // the hardware read follows right behind and is more accurate, so let that one decide:
+        // it gets its whole reply, not a quarter of a second of it
+        pushUpdateIfNeeded(config.fromDynamicRead ? SETTLE_MILLIS : HARDWARE_READ_MILLIS);
     }
 
     // ------------------------------------------------------------------ the update itself
@@ -667,7 +689,15 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
      * panel is already showing - in which case the radio goes quiet again immediately.
      * Rendering and compression happen off the Bluetooth queue thread.
      */
-    private synchronized void pushUpdateIfNeeded() {
+    private void pushUpdateIfNeeded() {
+        pushUpdateIfNeeded(SETTLE_MILLIS);
+    }
+
+    /**
+     * The same, waiting the given time for whatever else is still coming in before the picture
+     * is drawn. See {@link #HARDWARE_READ_MILLIS}.
+     */
+    private synchronized void pushUpdateIfNeeded(final long settleMillis) {
         if (goingToSleep || commandSession) {
             // this connection was opened for a command, and a picture behind it would be a
             // transfer into a display that is rebooting, sleeping or about to be let go - a
@@ -687,7 +717,8 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if (pendingPush != null) {
             pendingPush.cancel(false);
         }
-        pendingPush = renderExecutor.schedule(this::renderAndSend, 250, TimeUnit.MILLISECONDS);
+        pendingPush = renderExecutor.schedule(this::renderAndSend, settleMillis,
+                TimeUnit.MILLISECONDS);
     }
 
     /** When the running transfer started, so the overview can report how long it took. */
@@ -702,6 +733,16 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
         final String address = getDevice().getAddress();
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(address);
+        // One panel for the whole picture. Everything from here on - the size it is drawn at,
+        // the turn it is given, the palette, the row length it is packed to and the size the
+        // display is told - comes from this one snapshot, so that a configuration reply landing
+        // halfway through cannot leave the picture packed one way and announced another.
+        final OEPLDisplayConfig panel = config;
+        if (panel == null || !panel.valid) {
+            LOG.warn("no usable panel configuration by the time the picture was to be drawn");
+            disconnectIfTransient();
+            return;
+        }
 
         final String waitingFor = CardContentFactory.waitingForSource(prefs);
         if (waitingFor != null) {
@@ -728,13 +769,13 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             OEPLUpdateScheduler.requestFollowUp(getContext(), address, 3 * 60_000L);
         }
 
-        final Bitmap card = renderCard(prefs);
-        final byte[] encoded = encode(card, prefs);
+        final Bitmap card = renderCard(prefs, panel);
+        final byte[] encoded = encode(card, prefs, panel);
         final long crc = crc32(encoded);
 
         // kept so the app can show what the display was last asked to show, and used as the
         // device's own icon
-        OEPLStatusStore.storePreview(getContext(), address, card, rotation(prefs));
+        OEPLStatusStore.storePreview(getContext(), address, card, rotation(prefs, panel));
 
         if (!forced && crc == prefs.getLong(OEPLPrefs.LAST_IMAGE_CRC, 0L)) {
             LOG.info("rendered card is unchanged, skipping the transfer entirely");
@@ -744,11 +785,26 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
             disconnectIfTransient();
             return;
         }
+        if (!samePanel(panel, config)) {
+            // The display described itself while this picture was being drawn, and the panel it
+            // describes is not the one the picture was packed for. Sending it anyway is the
+            // sideways picture; the reply that moved the configuration has asked for a picture
+            // of its own, which will be drawn against the panel as it now stands.
+            LOG.info("the panel moved from {}x{} while drawing, dropping this picture",
+                    panel.bufferWidth, panel.bufferHeight);
+            return;
+        }
         pendingCrc = crc;
         transferIsFirmware = false;
         transferStarted = System.currentTimeMillis();
-        transferRawBytes = config.planeSizeBytes() * config.planeCount();
+        transferRawBytes = panel.planeSizeBytes() * panel.planeCount();
         send(encoded, OEPLProtocol.DATATYPE_ZLIB, R.string.sending_image);
+    }
+
+    /** Whether a picture packed for one reading of the panel still belongs on another. */
+    private static boolean samePanel(final OEPLDisplayConfig a, final OEPLDisplayConfig b) {
+        return a != null && b != null && a.bufferWidth == b.bufferWidth
+                && a.bufferHeight == b.bufferHeight && a.colorCount() == b.colorCount();
     }
 
     /**
@@ -818,17 +874,22 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         }
     }
 
-    /** Rotation to apply, taking the OpenEPaperLink catalogue as the default. */
-    private int rotation(final SharedPreferences prefs) {
+    /**
+     * Rotation to apply, taking the OpenEPaperLink catalogue as the default. The panel is handed
+     * in rather than read from the field, so that the turn a picture is given is the one that
+     * belongs to the geometry it was drawn at.
+     */
+    private int rotation(final SharedPreferences prefs, @Nullable final OEPLDisplayConfig panel) {
         final int configured = OEPLPrefs.rotation(prefs);
         if (configured >= 0) {
             return configured;
         }
-        return config != null ? config.autoRotationDegrees() : 0;
+        return panel != null ? panel.autoRotationDegrees() : 0;
     }
 
     /** Whether to draw accents in yellow, likewise defaulting to the catalogue. */
-    private boolean accentIsYellow(final SharedPreferences prefs) {
+    private boolean accentIsYellow(final SharedPreferences prefs,
+                                   @Nullable final OEPLDisplayConfig panel) {
         final String mode = OEPLPrefs.accentMode(prefs);
         if ("yellow".equals(mode)) {
             return true;
@@ -836,7 +897,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         if ("red".equals(mode)) {
             return false;
         }
-        return config != null && config.autoAccentIsYellow();
+        return panel != null && panel.autoAccentIsYellow();
     }
 
     @Nullable
@@ -845,12 +906,12 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
         return specs.isEmpty() ? null : specs.get(0);
     }
 
-    private Bitmap renderCard(final SharedPreferences prefs) {
+    private Bitmap renderCard(final SharedPreferences prefs, final OEPLDisplayConfig panel) {
         final CardRenderer.Options options = new CardRenderer.Options();
         options.frame = OEPLPrefs.frame(prefs);
-        options.accent = config.colorCount() <= 2
+        options.accent = panel.colorCount() <= 2
                 ? OEPLImageCodec.BLACK
-                : (accentIsYellow(prefs) ? OEPLImageCodec.YELLOW : OEPLImageCodec.RED);
+                : (accentIsYellow(prefs, panel) ? OEPLImageCodec.YELLOW : OEPLImageCodec.RED);
         options.fahrenheit = GBApplication.getPrefs().getTemperatureUnit()
                 == nodomain.freeyourgadget.gadgetbridge.model.TemperatureUnit.FAHRENHEIT;
         options.showFooter = OEPLPrefs.showFooter(prefs);
@@ -861,7 +922,7 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
 
         final CardContent content = CardContentFactory.create(getContext(), getDevice(), prefs);
         return new CardRenderer(options)
-                .render(config.bufferWidth, config.bufferHeight, rotation(prefs), content);
+                .render(panel.bufferWidth, panel.bufferHeight, rotation(prefs, panel), content);
     }
 
     /** Tells the user which source is missing instead of just leaving the card blank. */
@@ -918,16 +979,21 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                 ? R.string.oepl_weather_no_calendar : R.string.oepl_weather_calendar_off);
     }
 
-    private byte[] encode(final Bitmap bitmap, final SharedPreferences prefs) {
-        final boolean yellow = accentIsYellow(prefs);
+    private byte[] encode(final Bitmap bitmap, final SharedPreferences prefs,
+                          final OEPLDisplayConfig panel) {
+        final boolean yellow = accentIsYellow(prefs, panel);
         final int[] pixels = OEPLImageCodec.pixelsOf(bitmap);
-        final int[] palette = OEPLImageCodec.palette(config.colorCount(), yellow);
+        final int[] palette = OEPLImageCodec.palette(panel.colorCount(), yellow);
         OEPLImageCodec.quantize(pixels, palette);
-        final byte[] planes = OEPLImageCodec.packPlanes(pixels, config.bufferWidth,
-                config.bufferHeight, config.colorCount(), yellow,
-                OEPLPrefs.invertImage(prefs), false);
-        return OEPLImageCodec.compressedPayload(planes, config.bufferWidth, config.bufferHeight,
-                config.planeCount());
+        // The row length is the bitmap's own, not the panel's. The renderer promises a bitmap
+        // of exactly the buffer it was given, so the two are the same thing - but they are the
+        // same thing only as long as nobody packs one picture to another picture's width, and
+        // that is precisely what reaches the panel as a sideways smear.
+        final int width = bitmap.getWidth();
+        final int height = bitmap.getHeight();
+        final byte[] planes = OEPLImageCodec.packPlanes(pixels, width, height,
+                panel.colorCount(), yellow, OEPLPrefs.invertImage(prefs), false);
+        return OEPLImageCodec.compressedPayload(planes, width, height, panel.planeCount());
     }
 
     private void send(final byte[] data, final int dataType, final int progressText) {
@@ -1488,26 +1554,29 @@ public class ATCBLEOEPLWeatherDeviceSupport extends AbstractBTLESingleDeviceSupp
                 }
                 return;
             }
-            if (config == null || !config.valid) {
+            // the same one snapshot for the whole picture as in renderAndSend, and for the
+            // same reason: a configuration reply may land while this one is being scaled
+            final OEPLDisplayConfig panel = config;
+            if (panel == null || !panel.valid) {
                 LOG.error("panel geometry unknown, cannot scale the picture");
                 return;
             }
             final Bitmap source = MediaStore.Images.Media.getBitmap(
                     GBApplication.getContext().getContentResolver(), uri);
             final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-            final Bitmap fitted = letterbox(source, config.bufferWidth, config.bufferHeight,
-                    rotation(prefs));
+            final Bitmap fitted = letterbox(source, panel.bufferWidth, panel.bufferHeight,
+                    rotation(prefs, panel));
 
-            final boolean yellow = accentIsYellow(prefs);
+            final boolean yellow = accentIsYellow(prefs, panel);
             final int[] pixels = OEPLImageCodec.pixelsOf(fitted);
-            final int[] palette = OEPLImageCodec.palette(config.colorCount(), yellow);
+            final int[] palette = OEPLImageCodec.palette(panel.colorCount(), yellow);
             // a photograph benefits from dithering, unlike the rendered card
-            OEPLImageCodec.dither(pixels, palette, config.bufferWidth, config.bufferHeight);
-            final byte[] planes = OEPLImageCodec.packPlanes(pixels, config.bufferWidth,
-                    config.bufferHeight, config.colorCount(), yellow,
+            OEPLImageCodec.dither(pixels, palette, fitted.getWidth(), fitted.getHeight());
+            final byte[] planes = OEPLImageCodec.packPlanes(pixels, fitted.getWidth(),
+                    fitted.getHeight(), panel.colorCount(), yellow,
                     OEPLPrefs.invertImage(prefs), false);
-            final byte[] encoded = OEPLImageCodec.compressedPayload(planes, config.bufferWidth,
-                    config.bufferHeight, config.planeCount());
+            final byte[] encoded = OEPLImageCodec.compressedPayload(planes, fitted.getWidth(),
+                    fitted.getHeight(), panel.planeCount());
 
             transferIsFirmware = false;
             forced = true;
