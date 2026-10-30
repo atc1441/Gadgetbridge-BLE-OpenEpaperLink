@@ -35,6 +35,12 @@ import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
  * the month - with today marked, so that the left hand column is read as today rather than as
  * a Monday. Weekends are named in the accent colour rather than filled with grey, since a tag
  * has no greys to fill with.
+ * <p>
+ * The hour grid holds what happens inside one day. An appointment that runs from one day into
+ * another - from Tuesday morning until Thursday night, say - is not an hour of a day but days
+ * being taken, so it goes into the band above the grid beside the all day entries, spanning
+ * the columns of the days it covers. As a box in a column it was drawn down the day it began
+ * on, cut off at the bottom edge of the panel, and every further day it covered stayed empty.
  */
 public class OeplCalendarWeekCard extends OeplCard {
 
@@ -81,7 +87,7 @@ public class OeplCalendarWeekCard extends OeplCard {
         final long[] starts = dayStarts(Calendar.getInstance(), days);
 
         final List<CalendarEvent> timed = new ArrayList<>();
-        final List<CalendarEvent> allDay = new ArrayList<>();
+        final List<CalendarEvent> banded = new ArrayList<>();
         int minHour = 9;
         int maxHour = 17;
         final Calendar when = Calendar.getInstance();
@@ -89,20 +95,36 @@ public class OeplCalendarWeekCard extends OeplCard {
             if (e.isAllDay()) {
                 // by the days it is written on, not by the instants it carries: see OeplDays
                 if (OeplDays.ends(e) > starts[0] && OeplDays.begins(e) < starts[days]) {
-                    allDay.add(e);
+                    banded.add(e);
                 }
                 continue;
             }
             if (e.getEnd() <= starts[0] || e.getBegin() >= starts[days]) {
                 continue;
             }
+            // An appointment that runs from one day into another is not an hour of a day, it
+            // is days being taken - so it goes into the band above the grid, where it spans
+            // the columns of the days it covers, exactly as an all day entry does. As a box in
+            // one column it ran down the day it began on, was cut off at the bottom edge of
+            // the panel, and left every further day it covers empty; and a column it filled
+            // would have taken the lane the rest of that day's appointments need.
+            if (OeplDays.firstDay(e) != OeplDays.lastDay(e)) {
+                banded.add(e);
+                continue;
+            }
             timed.add(e);
             when.setTimeInMillis(e.getBegin());
             minHour = Math.min(minHour, when.get(Calendar.HOUR_OF_DAY));
-            when.setTimeInMillis(e.getEnd());
-            int endHour = when.get(Calendar.HOUR_OF_DAY);
-            if (when.get(Calendar.MINUTE) > 1) {
-                endHour++;
+            // The hour it is over, which for one running until midnight is the twenty fourth
+            // and not the nought the clock then reads: read off the clock, the last evening
+            // appointment of the day asked for no room at all and was drawn under the panel.
+            int endHour = 24;
+            if (e.getEnd() < OeplDays.nextDay(OeplDays.firstDay(e))) {
+                when.setTimeInMillis(e.getEnd());
+                endHour = when.get(Calendar.HOUR_OF_DAY);
+                if (when.get(Calendar.MINUTE) > 1) {
+                    endHour++;
+                }
             }
             maxHour = Math.max(maxHour, Math.min(24, endHour));
         }
@@ -133,9 +155,11 @@ public class OeplCalendarWeekCard extends OeplCard {
         final float numberSize = nameSize * 0.92f;
         final float headerBottom = c.lineHeight(nameSize) + c.lineHeight(numberSize) + 2f;
 
-        // all day entries stack into their own band between the headings and the grid
+        // Entries that take whole days stack into their own band between the headings and the
+        // grid, as many rows as the band may have without taking the grid's own room.
         final float bandRow = Math.max(OeplCanvas.READABLE, Math.min(h * 0.115f, w * 0.07f));
-        final int bands = Math.min(allDay.isEmpty() ? 0 : 2, allDay.size());
+        final int bandRows = Math.max(1, Math.min(3, (int) ((h - headerBottom) * 0.4f / bandRow)));
+        final int bands = Math.min(banded.isEmpty() ? 0 : bandRows, banded.size());
         final float gridTop = headerBottom + bands * bandRow;
 
         // An hour row has to stay thick enough to hold a box with a readable label. When the
@@ -157,7 +181,7 @@ public class OeplCalendarWeekCard extends OeplCard {
         }
 
         int row = 0;
-        for (final CalendarEvent e : allDay) {
+        for (final CalendarEvent e : banded) {
             if (row >= bands) {
                 break;
             }

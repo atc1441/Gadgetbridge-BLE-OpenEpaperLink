@@ -258,7 +258,15 @@ public class OeplLayoutAuditTest {
                 for (final nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent
                         event : OeplDemo.events()) {
                     final String title = event.getTitle();
-                    if (!event.isAllDay() && title != null && title.length() >= NAME) {
+                    // an all day entry and an appointment running from one day into another
+                    // are both drawn on every day they cover, which is the one case where
+                    // twice is right
+                    final boolean overDays = nodomain.freeyourgadget.gadgetbridge.service.devices
+                            .atcbleoeplweather.oepl.OeplDays.firstDay(event)
+                            != nodomain.freeyourgadget.gadgetbridge.service.devices
+                            .atcbleoeplweather.oepl.OeplDays.lastDay(event);
+                    if (!event.isAllDay() && !overDays && title != null
+                            && title.length() >= NAME) {
                         titles.add(title.substring(0, NAME));
                     }
                 }

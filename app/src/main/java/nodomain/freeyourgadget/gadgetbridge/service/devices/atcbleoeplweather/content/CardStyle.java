@@ -202,6 +202,25 @@ public class CardStyle {
     }
 
     /**
+     * The other end of the same thing: the baseline for a line hanging from the top of a box,
+     * far enough down that the line's own ink stays inside it.
+     * <p>
+     * {@link #drawTop} hangs a line from the ascent the face reports, widened by the factor
+     * measured from a sample of the reader's language. A word can still reach above that - an
+     * Arabic heading at the very top of a pane did, by a pixel, and the pane is at the top edge
+     * of the panel - so where there is nothing above the line to give way, its own ink decides.
+     */
+    public float baselineBelow(final float top, final Paint paint, final String text) {
+        final float fromTheFace = top - paint.getFontMetrics().ascent * OeplFonts.lineFactor();
+        if (text == null || text.isEmpty()) {
+            return fromTheFace;
+        }
+        final Rect bounds = new Rect();
+        paint.getTextBounds(text, 0, text.length(), bounds);
+        return Math.max(fromTheFace, top - bounds.top);
+    }
+
+    /**
      * Shrinks text to fit, but not past the point where a panel can still be read across a
      * room. Anything that does not fit at that size is better cut than made microscopic.
      */

@@ -243,10 +243,128 @@ public class OeplWeekGridTest {
         }
     }
 
+    /**
+     * An appointment from early on one day until late on another covers every day in between,
+     * and the reader of the grid has to see all of them. This is the fault as it was reported:
+     * Tuesday four in the morning until Thursday eleven at night, drawn down the Tuesday
+     * column, cut off at the foot of the panel, and Wednesday and Thursday left empty.
+     * <p>
+     * An appointment like that is not an hour of a day but days being taken, so it is drawn
+     * the way an all day entry is: one box in the band above the grid, spanning the columns of
+     * the days it covers.
+     */
+    @Test
+    public void anAppointmentOverSeveralDaysSpansEachDayItCovers() {
+        final long start = midnight();
+        final List<CalendarEvent> events = new ArrayList<>();
+        events.add(event(start + 86400_000L + 4 * 3600_000L,
+                start + 3 * 86400_000L + 23 * 3600_000L, 1, "Messe", false));
+        // and the days it crosses keep their own appointments, which a box filling a column
+        // would have pushed into a second lane and off a grid this narrow
+        events.add(event(start + 2 * 86400_000L + 11 * 3600_000L,
+                start + 2 * 86400_000L + 12 * 3600_000L, 2, "Markt", false));
+
+        final List<OeplInkRecorder.Run> runs = draw(800, 480, 7, events);
+        final float column = (800f - 26f) / 7f;
+
+        assertEquals("the appointment is named once", 1, named(runs, "Messe"));
+        assertEquals("and so is the one on a day it covers", 1, named(runs, "Markt"));
+
+        final RectF box = widest(runs);
+        assertTrue("one box has to span the three days it covers, not one: " + box,
+                box != null && box.width() > column * 2.5f);
+        final RectF title = boxOf(runs, "Messe");
+        assertTrue("and the name of it belongs in that box: " + title,
+                title != null && title.left >= box.left - 1f && title.right <= box.right + 1f);
+    }
+
+    /**
+     * The same for an appointment that only crosses one midnight: an evening that ends the
+     * next morning is two days, and the second of them showed nothing at all.
+     */
+    @Test
+    public void anAppointmentThatRunsPastMidnightReachesTheNextDay() {
+        final long start = midnight();
+        final List<CalendarEvent> events = new ArrayList<>();
+        events.add(event(start + 22 * 3600_000L, start + 86400_000L + 2 * 3600_000L, 1,
+                "Nacht", false));
+
+        final List<OeplInkRecorder.Run> runs = draw(800, 480, 3, events);
+        final float column = (800f - 26f) / 3f;
+        final RectF box = widest(runs);
+        assertEquals("the night is named once", 1, named(runs, "Nacht"));
+        assertTrue("and its box covers both of its days: " + box,
+                box != null && box.width() > column * 1.5f);
+    }
+
+    /**
+     * An appointment running until midnight ends in the twenty fourth hour of its day, not in
+     * the nought the clock reads then. Taken off the clock, the last appointment of the day
+     * asked the grid for no room at all and was drawn under the bottom edge of the panel.
+     */
+    @Test
+    public void anAppointmentEndingAtMidnightStillHasItsHours() {
+        final long start = midnight();
+        final List<CalendarEvent> events = new ArrayList<>();
+        events.add(event(start + 21 * 3600_000L, start + 86400_000L, 1, "Spaet", false));
+
+        final List<OeplInkRecorder.Run> runs = draw(800, 480, 3, events);
+        assertEquals("the late shift is on the panel", 1, named(runs, "Spaet"));
+        final RectF box = boxOf(runs, "Spaet");
+        assertTrue("inside the panel: " + box, box != null && box.bottom <= 480f + 1f);
+    }
+
+    /** How often a title was written, whole or squeezed. */
+    private static int named(final List<OeplInkRecorder.Run> runs, final String title) {
+        int found = 0;
+        for (final OeplInkRecorder.Run run : runs) {
+            if (run.text && run.what != null && run.what.contains(title)) {
+                found++;
+            }
+        }
+        return found;
+    }
+
+    /** Where a title was written. */
+    private static RectF boxOf(final List<OeplInkRecorder.Run> runs, final String title) {
+        for (final OeplInkRecorder.Run run : runs) {
+            if (run.text && run.what != null && run.what.contains(title)) {
+                return run.wanted;
+            }
+        }
+        return null;
+    }
+
+    /** The widest box on the panel, which is the one an appointment spanning days is drawn as. */
+    private static RectF widest(final List<OeplInkRecorder.Run> runs) {
+        RectF widest = null;
+        for (final OeplInkRecorder.Run run : runs) {
+            if (!run.text && "rect".equals(run.what)
+                    && (widest == null || run.wanted.width() > widest.width())) {
+                widest = run.wanted;
+            }
+        }
+        return widest;
+    }
+
+    private static long midnight() {
+        final Calendar day = Calendar.getInstance();
+        day.set(Calendar.HOUR_OF_DAY, 0);
+        day.set(Calendar.MINUTE, 0);
+        day.set(Calendar.SECOND, 0);
+        day.set(Calendar.MILLISECOND, 0);
+        return day.getTimeInMillis();
+    }
+
     private static List<OeplInkRecorder.Run> draw(final int w, final int h, final int days) {
+        return draw(w, h, days, events());
+    }
+
+    private static List<OeplInkRecorder.Run> draw(final int w, final int h, final int days,
+                                                  final List<CalendarEvent> events) {
         final Bitmap sheet = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         final OeplInkRecorder recorder = new OeplInkRecorder(sheet);
-        new OeplCalendarWeekCard(events(), days).draw(recorder,
+        new OeplCalendarWeekCard(events, days).draw(recorder,
                 new CardStyle(OEPLImageCodec.BLACK, OEPLImageCodec.WHITE, OEPLImageCodec.RED,
                         false),
                 new RectF(0f, 0f, w, h));

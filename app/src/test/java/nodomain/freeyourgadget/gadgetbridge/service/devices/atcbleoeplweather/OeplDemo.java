@@ -647,6 +647,11 @@ public final class OeplDemo {
                     base + 86400_000L + 12 * 3600_000L, 3,
                     "Werkstatttermin: Inspektion, Reifen und Klimaanlage", false));
             events.add(allDayEvent(1, 2, 4, "Betriebsausflug in den Harz mit Uebernachtung"));
+            // one running from early on one day until late on another, which is drawn on each
+            // of the days it covers
+            events.add(event(base + 86400_000L + 4 * 3600_000L,
+                    base + 3 * 86400_000L + 23 * 3600_000L, 6,
+                    "Klassenfahrt nach Hamburg, Abfahrt am Schulhof", false));
             return events;
         }
         events.add(event(now - 600_000L, now + 1800_000L, 0, "Standup", false));
@@ -658,6 +663,11 @@ public final class OeplDemo {
         events.add(allDayEvent(1, 1, 4, "Urlaub"));
         events.add(event(base + 2 * 86400_000L + 9 * 3600_000L,
                 base + 2 * 86400_000L + 10 * 3600_000L, 5, "Elternabend", false));
+        // From four in the morning of one day until eleven at night of another: an appointment
+        // with hours of its own that still takes whole days, which is the shape the week grid
+        // used to draw in the column it began in and nowhere else.
+        events.add(event(base + 86400_000L + 4 * 3600_000L,
+                base + 3 * 86400_000L + 23 * 3600_000L, 6, "Messebesuch in Hannover", false));
         return events;
     }
 

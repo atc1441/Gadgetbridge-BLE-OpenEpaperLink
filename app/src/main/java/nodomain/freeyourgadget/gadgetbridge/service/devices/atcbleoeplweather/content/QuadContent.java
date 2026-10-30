@@ -181,7 +181,10 @@ public class QuadContent implements CardContent {
             return;
         }
         final Paint paint = style.paint(style.ink, true, headSize);
-        style.drawTopEllipsised(canvas, heading, cell.left, cell.top, cell.width(), paint);
+        // hung from its own ink rather than from the face's ascent: the top row of panes is at
+        // the top edge of the panel, where there is nothing above the line to give way
+        style.drawEllipsised(canvas, heading, cell.left,
+                style.baselineBelow(cell.top, paint, heading), cell.width(), paint);
         final float used = style.lineHeight(paint) * 1.05f;
         part.draw(canvas, style, new RectF(cell.left, cell.top + used, cell.right,
                 cell.bottom));
