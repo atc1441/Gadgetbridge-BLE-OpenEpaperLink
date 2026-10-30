@@ -131,6 +131,7 @@ public class OeplCalendarWeekCard extends OeplCard {
         if (maxHour <= minHour) {
             maxHour = minHour + 1;
         }
+        final List<Band> bandedRows = pack(banded, starts);
 
         // A column per day plus the hour gutter needs room. Below that the grid says less than
         // a plain list of what is coming up, so that is what a small tag gets instead - a week
@@ -155,11 +156,15 @@ public class OeplCalendarWeekCard extends OeplCard {
         final float numberSize = nameSize * 0.92f;
         final float headerBottom = c.lineHeight(nameSize) + c.lineHeight(numberSize) + 2f;
 
-        // Entries that take whole days stack into their own band between the headings and the
-        // grid, as many rows as the band may have without taking the grid's own room.
+        // Entries that take whole days go in their own band between the headings and the grid,
+        // in as many rows as they need and the band may have without taking the grid's room.
         final float bandRow = Math.max(OeplCanvas.READABLE, Math.min(h * 0.115f, w * 0.07f));
-        final int bandRows = Math.max(1, Math.min(3, (int) ((h - headerBottom) * 0.4f / bandRow)));
-        final int bands = Math.min(banded.isEmpty() ? 0 : bandRows, banded.size());
+        final int bandRows = Math.max(1, Math.min(4, (int) ((h - headerBottom) * 0.45f / bandRow)));
+        int wanted = 0;
+        for (final Band band : bandedRows) {
+            wanted = Math.max(wanted, band.row + 1);
+        }
+        final int bands = Math.min(wanted, bandRows);
         final float gridTop = headerBottom + bands * bandRow;
 
         // An hour row has to stay thick enough to hold a box with a readable label. When the
@@ -180,28 +185,21 @@ public class OeplCalendarWeekCard extends OeplCard {
             c.line(x, headerBottom, x, h, c.ink, 1f);
         }
 
-        int row = 0;
-        for (final CalendarEvent e : banded) {
-            if (row >= bands) {
-                break;
+        for (final Band band : bandedRows) {
+            if (band.row >= bands) {
+                continue;
             }
-            // by its first and last day: the midnight that ends an all day entry belongs to
-            // the day before it, and without that a holiday ending on Sunday reaches into
-            // Monday and takes a column that has nothing on it
-            final int firstDay = Math.max(0, column(starts, OeplDays.firstDay(e)));
-            final int lastDay = Math.min(days - 1, column(starts, OeplDays.lastDay(e)));
-            final float left = gutter + firstDay * columnWidth + 2f;
+            final float left = gutter + band.from * columnWidth + 2f;
             final float width = Math.max(columnWidth - 4f,
-                    (lastDay - firstDay + 1) * columnWidth - 4f);
-            final float top = headerBottom + row * bandRow + 1f;
+                    (band.to - band.from + 1) * columnWidth - 4f);
+            final float top = headerBottom + band.row * bandRow + 1f;
             c.fillRect(left, top, width, bandRow - 2f, c.paper);
             c.strokeRect(left, top, width, bandRow - 2f, c.accent, 1f);
             final float bandSize = c.sizeForHeight(bandRow * 0.82f, bandRow - 2f, OeplCanvas.READABLE);
             if (bandSize > 0f) {
-                c.textSqueezed(e.getTitle(), left + 2f, top, bandSize, OeplCanvas.LEFT,
+                c.textSqueezed(band.event.getTitle(), left + 2f, top, bandSize, OeplCanvas.LEFT,
                         c.ink, width - 4f, Math.max(OeplCanvas.READABLE, bandSize * 0.45f));
             }
-            row++;
         }
         if (bands > 0) {
             c.line(0, gridTop, w, gridTop, c.ink, 1f);
@@ -362,6 +360,59 @@ public class OeplCalendarWeekCard extends OeplCard {
     /** Which column a moment is drawn in, the edges standing in for what is outside. */
     static int dayOf(final long[] starts, final long time) {
         return Math.max(0, Math.min(starts.length - 2, column(starts, time)));
+    }
+
+    /** One entry of the band: the columns it covers and the row it was packed into. */
+    private static final class Band {
+        final CalendarEvent event;
+        final int from;
+        final int to;
+        int row;
+
+        Band(final CalendarEvent event, final int from, final int to) {
+            this.event = event;
+            this.from = from;
+            this.to = to;
+        }
+    }
+
+    /**
+     * The band, packed into rows: two entries that do not share a day share a row, the way two
+     * appointments that do not share an hour share a column in the grid below.
+     * <p>
+     * One entry per row is what a week of three birthdays and a holiday fills a panel with,
+     * and the band only has room for a handful of rows - so the appointment running through
+     * that week was left off the sheet altogether. Packed, the same week is one row.
+     * <p>
+     * Each entry covers the columns of its first and its last day. The midnight that ends an
+     * all day entry belongs to the day before it, and without that a holiday ending on Sunday
+     * reaches into Monday and takes a column that has nothing on it - see {@link OeplDays}.
+     */
+    private static List<Band> pack(final List<CalendarEvent> banded, final long[] starts) {
+        final int days = starts.length - 1;
+        final List<Band> rows = new ArrayList<>(banded.size());
+        for (final CalendarEvent e : banded) {
+            rows.add(new Band(e, Math.max(0, column(starts, OeplDays.firstDay(e))),
+                    Math.min(days - 1, column(starts, OeplDays.lastDay(e)))));
+        }
+        // earliest first, and where two begin on the same day the longer of them on top: that
+        // is the order a reader of a row of days expects, and it packs the tightest
+        java.util.Collections.sort(rows, (a, b) -> a.from != b.from
+                ? Integer.compare(a.from, b.from) : Integer.compare(b.to, a.to));
+        final List<Integer> filledTo = new ArrayList<>();
+        for (final Band band : rows) {
+            int row = 0;
+            while (row < filledTo.size() && filledTo.get(row) >= band.from) {
+                row++;
+            }
+            if (row == filledTo.size()) {
+                filledTo.add(band.to);
+            } else {
+                filledTo.set(row, band.to);
+            }
+            band.row = row;
+        }
+        return rows;
     }
 
     /**

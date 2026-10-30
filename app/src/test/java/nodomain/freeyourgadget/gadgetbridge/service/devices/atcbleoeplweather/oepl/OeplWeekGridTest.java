@@ -314,6 +314,45 @@ public class OeplWeekGridTest {
         assertTrue("inside the panel: " + box, box != null && box.bottom <= 480f + 1f);
     }
 
+    /**
+     * The band is where everything that takes whole days goes, and a week of birthdays fills
+     * it. Stacked one entry per row it held three of them and the appointment running through
+     * that week was left off the panel altogether, which is how this was reported. Two entries
+     * that do not share a day share a row, as two appointments that do not share an hour share
+     * a column in the grid below.
+     */
+    @Test
+    public void aBandFullOfWholeDaysKeepsTheAppointmentRunningThroughThem() {
+        final long start = midnight();
+        final List<CalendarEvent> events = new ArrayList<>();
+        events.add(allDay(0, 1, 11, "Oma"));
+        events.add(allDay(1, 1, 12, "Muell"));
+        events.add(allDay(2, 1, 13, "Putztag"));
+        events.add(event(start + 4 * 86400_000L + 4 * 3600_000L,
+                start + 6 * 86400_000L + 23 * 3600_000L, 1, "Messe", false));
+
+        for (final int[] panel : new int[][]{{960, 672}, {800, 480}, {400, 300}}) {
+            final List<OeplInkRecorder.Run> runs = draw(panel[0], panel[1], 7, events);
+            assertEquals("the appointment running through the week is on the "
+                            + panel[0] + "x" + panel[1] + " panel", 1, named(runs, "Messe"));
+            assertEquals("and so is the first of the days taken", 1, named(runs, "Oma"));
+        }
+    }
+
+    /** An all day entry as android stores one, counted in days from today. */
+    private static CalendarEvent allDay(final int from, final int length, final int id,
+                                        final String title) {
+        final Calendar local = Calendar.getInstance();
+        local.add(Calendar.DAY_OF_MONTH, from);
+        final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        utc.clear();
+        utc.set(local.get(Calendar.YEAR), local.get(Calendar.MONTH),
+                local.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+        final long begin = utc.getTimeInMillis();
+        utc.add(Calendar.DAY_OF_MONTH, length);
+        return event(begin, utc.getTimeInMillis(), id, title, true);
+    }
+
     /** How often a title was written, whole or squeezed. */
     private static int named(final List<OeplInkRecorder.Run> runs, final String title) {
         int found = 0;
